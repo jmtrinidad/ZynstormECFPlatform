@@ -15,7 +15,7 @@ public partial class SystemLog
 
     public string Message { get; set; } = null!;
 
-    public DateTime CreateAt { get; set; }
+    public DateTime CreateAtUtc { get; set; }
 
     public string? Exception { get; set; }
 

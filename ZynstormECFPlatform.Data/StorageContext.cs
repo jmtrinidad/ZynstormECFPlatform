@@ -1,70 +1,47 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using ZynstormECFPlatform.Abstractions.Data;
+using ZynstormECFPlatform.Core.Entities;
 
-namespace ZynstormECFPlatform.Core.Entities;
+namespace ZynstormECFPlatform.Data;
 
-public partial class ZynstormEcfPlatformContext : DbContext
+public class StorageContext : IdentityDbContext<User, Role, string>, IStorageContext
 {
-    public ZynstormEcfPlatformContext()
+    private string DefaultDateTimeSqlValue => Database.IsRelational() && Database.IsNpgsql() ? "CURRENT_TIMESTAMP" : "GETDATE()";
+    private string DefaultGUIDSqlValue => Database.IsRelational() && Database.IsNpgsql() ? "gen_random_uuid()" : "NEWID()";
+    private string DefaultDueDateTimeSqlValue => Database.IsRelational() && Database.IsNpgsql() ? "CURRENT_TIMESTAMP + interval '1 month'" : "DATEADD(month, 1, GETDATE())";
+    private string DateTimeColumnType => Database.IsRelational() && Database.IsNpgsql() ? "timestamp with time zone" : "datetime";
+    private string StringColumnType => Database.IsRelational() && Database.IsNpgsql() ? "text" : "NVARCHAR";
+
+    public StorageContext(DbContextOptions options) : base(options)
     {
     }
 
-    public ZynstormEcfPlatformContext(DbContextOptions<ZynstormEcfPlatformContext> options)
-        : base(options)
+    protected StorageContext()
     {
     }
 
-    public virtual DbSet<ApiKey> ApiKeys { get; set; }
-
-    public virtual DbSet<Client> Clients { get; set; }
-
-    public virtual DbSet<ClientBranche> ClientBranches { get; set; }
-
-    public virtual DbSet<ClientCallBack> ClientCallBacks { get; set; }
-
-    public virtual DbSet<ClientCertificate> ClientCertificates { get; set; }
-
-    public virtual DbSet<Currency> Currencies { get; set; }
-
-    public virtual DbSet<Dgiiunit> Dgiiunits { get; set; }
-
-    public virtual DbSet<EcfDocument> EcfDocuments { get; set; }
-
-    public virtual DbSet<EcfDocumentDetail> EcfDocumentDetails { get; set; }
-
-    public virtual DbSet<EcfDocumentTotal> EcfDocumentTotals { get; set; }
-
-    public virtual DbSet<EcfStatus> EcfStatuses { get; set; }
-
-    public virtual DbSet<EcfStatusHistory> EcfStatusHistories { get; set; }
-
-    public virtual DbSet<EcfTransmission> EcfTransmissions { get; set; }
-
-    public virtual DbSet<EcfType> EcfTypes { get; set; }
-
-    public virtual DbSet<EcfXmlDocument> EcfXmlDocuments { get; set; }
-
-    public virtual DbSet<Status> Statuses { get; set; }
-
-    public virtual DbSet<SystemLog> SystemLogs { get; set; }
-
-    public virtual DbSet<UseClient> UseClients { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlServer("Server=217.216.91.10,15432;Database=zynstorm_ecf_platform;User Id=sa;Password=rEMIGIO13579@#;TrustServerCertificate=True;");
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder.Properties<decimal>()
+            .HavePrecision(18, 2);
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
         modelBuilder.Entity<ApiKey>(entity =>
         {
-            entity.ToTable("ApiKey");
+            entity.HasKey(c => c.ApiKeyId);
 
             entity.Property(e => e.Apikey)
-                .IsUnicode(false)
-                .HasColumnName("APIKey");
-            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+                  .IsUnicode(false)
+                  .HasColumnName("APIKey");
+
+            entity.Property(e => e.CreatedAtUtc)
+                  .HasColumnType("datetime");
+
             entity.Property(e => e.SecretKey).IsUnicode(false);
 
             entity.HasOne(d => d.Client).WithMany(p => p.ApiKeys)
@@ -80,9 +57,11 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<Client>(entity =>
         {
-            entity.ToTable("Client");
+            entity.HasKey(c => c.ClientId);
 
-            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAt)
+                  .HasColumnType("datetime");
+
             entity.Property(e => e.Email)
                 .HasMaxLength(50)
                 .IsUnicode(false);
@@ -105,7 +84,7 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<ClientBranche>(entity =>
         {
-            entity.ToTable("ClientBranche");
+            entity.HasKey(c => c.ClientBrancheId);
 
             entity.Property(e => e.Address)
                 .HasMaxLength(200)
@@ -113,7 +92,7 @@ public partial class ZynstormEcfPlatformContext : DbContext
             entity.Property(e => e.Code)
                 .HasMaxLength(20)
                 .IsUnicode(false);
-            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAtUtc).HasColumnType("datetime");
             entity.Property(e => e.Email)
                 .HasMaxLength(30)
                 .IsUnicode(false);
@@ -137,9 +116,11 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<ClientCallBack>(entity =>
         {
-            entity.ToTable("ClientCallBack");
+            entity.HasKey(c => c.ClientCallBackId);
 
-            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAtUtc)
+                  .HasColumnType("datetime");
+
             entity.Property(e => e.Secret)
                 .HasMaxLength(200)
                 .IsUnicode(false);
@@ -163,11 +144,11 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<ClientCertificate>(entity =>
         {
-            entity.ToTable("ClientCertificate");
+            entity.HasKey(c => c.ClientCertificateId);
 
             entity.Property(e => e.Certificate).IsUnicode(false);
-            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
-            entity.Property(e => e.ExpirationDate).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAtUtc).HasColumnType("datetime");
+            entity.Property(e => e.ExpirationDateUtc).HasColumnType("datetime");
             entity.Property(e => e.Password).IsUnicode(false);
             entity.Property(e => e.Thumbprint).IsUnicode(false);
 
@@ -179,7 +160,7 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<Currency>(entity =>
         {
-            entity.ToTable("Currency");
+            entity.HasKey(c => c.CurrencyId);
 
             entity.Property(e => e.Code)
                 .HasMaxLength(20)
@@ -189,22 +170,23 @@ public partial class ZynstormEcfPlatformContext : DbContext
                 .IsUnicode(false);
         });
 
-        modelBuilder.Entity<Dgiiunit>(entity =>
+        modelBuilder.Entity<DGIIUnit>(entity =>
         {
-            entity.ToTable("DGIIUnit");
+            entity.HasKey(c => c.DGIIUnitId);
 
-            entity.Property(e => e.DgiiunitId).HasColumnName("DGIIUnitId");
-            entity.Property(e => e.Dgiicode).HasColumnName("DGIICode");
+            entity.Property(e => e.DGIIUnitId);
+            entity.Property(e => e.DGIICode);
             entity.Property(e => e.Name)
-                .HasMaxLength(100)
-                .IsUnicode(false);
+                  .HasMaxLength(100)
+                  .IsUnicode(false);
         });
 
         modelBuilder.Entity<EcfDocument>(entity =>
         {
-            entity.ToTable("EcfDocument");
+            entity.HasKey(c => c.EcfDocumentId);
 
-            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAtUtc)
+                  .HasColumnType("datetime");
             entity.Property(e => e.CustomerAddress)
                 .HasMaxLength(300)
                 .IsUnicode(false);
@@ -268,7 +250,7 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<EcfDocumentDetail>(entity =>
         {
-            entity.ToTable("EcfDocumentDetail");
+            entity.HasKey(c => c.EcfDocumentDetailId);
 
             entity.Property(e => e.Description)
                 .HasMaxLength(200)
@@ -289,7 +271,7 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<EcfDocumentTotal>(entity =>
         {
-            entity.ToTable("EcfDocumentTotal");
+            entity.HasKey(c => c.EcfDocumentId);
 
             entity.Property(e => e.DiscountTotal).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.ExemptTotal).HasColumnType("decimal(18, 2)");
@@ -307,7 +289,7 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<EcfStatus>(entity =>
         {
-            entity.ToTable("EcfStatus");
+            entity.HasKey(c => c.EcfStatusId);
 
             entity.Property(e => e.Name)
                 .HasMaxLength(50)
@@ -316,9 +298,9 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<EcfStatusHistory>(entity =>
         {
-            entity.ToTable("EcfStatusHistory");
+            entity.HasKey(c => c.EcfStatusHistoryId);
 
-            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAtUtc).HasColumnType("datetime");
             entity.Property(e => e.Message).HasColumnType("text");
 
             entity.HasOne(d => d.EcfDocument).WithMany(p => p.EcfStatusHistories)
@@ -334,7 +316,7 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<EcfTransmission>(entity =>
         {
-            entity.ToTable("EcfTransmission");
+            entity.HasKey(c => c.EcfTransmissionId);
 
             entity.Property(e => e.RequestPayload).HasColumnType("text");
             entity.Property(e => e.ResponseCode)
@@ -342,7 +324,7 @@ public partial class ZynstormEcfPlatformContext : DbContext
                 .IsUnicode(false);
             entity.Property(e => e.ResponseMessage).HasColumnType("text");
             entity.Property(e => e.ResponsePayload).HasColumnType("text");
-            entity.Property(e => e.SentAt).HasColumnType("datetime");
+            entity.Property(e => e.SentAtUtc).HasColumnType("datetime");
             entity.Property(e => e.TrackId)
                 .HasMaxLength(100)
                 .IsUnicode(false);
@@ -360,7 +342,7 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<EcfType>(entity =>
         {
-            entity.ToTable("EcfType");
+            entity.HasKey(c => c.EcfTypeId);
 
             entity.Property(e => e.Code)
                 .HasMaxLength(10)
@@ -372,9 +354,9 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<EcfXmlDocument>(entity =>
         {
-            entity.ToTable("EcfXmlDocument");
+            entity.HasKey(c => c.EcfXmlDocumentId);
 
-            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAtUtc).HasColumnType("datetime");
             entity.Property(e => e.XmlSigned).HasColumnType("text");
             entity.Property(e => e.XmlUnsigned).HasColumnType("text");
 
@@ -386,7 +368,7 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<Status>(entity =>
         {
-            entity.ToTable("Status");
+            entity.HasKey(c => c.StatusId);
 
             entity.Property(e => e.Name)
                 .HasMaxLength(50)
@@ -395,11 +377,9 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<SystemLog>(entity =>
         {
-            entity
-                .HasNoKey()
-                .ToTable("SystemLog");
+            entity.HasKey(c => c.SystemLogId);
 
-            entity.Property(e => e.CreateAt).HasColumnType("datetime");
+            entity.Property(e => e.CreateAtUtc).HasColumnType("datetime");
             entity.Property(e => e.Exception).HasColumnType("text");
             entity.Property(e => e.LogLevel)
                 .HasMaxLength(20)
@@ -420,20 +400,17 @@ public partial class ZynstormEcfPlatformContext : DbContext
 
         modelBuilder.Entity<UseClient>(entity =>
         {
-            entity
-                .HasNoKey()
-                .ToTable("UseClient");
+            entity.HasKey(c => new { c.UserId, c.ClientId });
 
-            entity.Property(e => e.UserId).IsUnicode(false);
+            entity.Property(e => e.UserId)
+                       .IsRequired()
+                       .HasMaxLength(450)
+                       .IsUnicode(false);
 
             entity.HasOne(d => d.Client).WithMany()
                 .HasForeignKey(d => d.ClientId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_UseClient_Client");
         });
-
-        OnModelCreatingPartial(modelBuilder);
     }
-
-    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 }

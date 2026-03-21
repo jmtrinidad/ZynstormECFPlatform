@@ -3,11 +3,11 @@ using System.Collections.Generic;
 
 namespace ZynstormECFPlatform.Core.Entities;
 
-public partial class Dgiiunit
+public partial class DGIIUnit
 {
-    public int DgiiunitId { get; set; }
+    public int DGIIUnitId { get; set; }
 
-    public int Dgiicode { get; set; }
+    public int DGIICode { get; set; }
 
     public string Name { get; set; } = null!;
 }

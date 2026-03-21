@@ -19,7 +19,7 @@ public partial class EcfTransmission
 
     public int EcfStatusId { get; set; }
 
-    public DateTime SentAt { get; set; }
+    public DateTime SentAtUtc { get; set; }
 
     public string ResponseCode { get; set; } = null!;
 

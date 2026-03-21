@@ -23,7 +23,7 @@ public partial class ClientBranche
 
     public int StatusId { get; set; }
 
-    public DateTime CreatedAt { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
 
     public virtual Client Client { get; set; } = null!;
 

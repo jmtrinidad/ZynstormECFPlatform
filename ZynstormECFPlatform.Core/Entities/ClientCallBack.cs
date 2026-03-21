@@ -19,7 +19,7 @@ public partial class ClientCallBack
 
     public bool IsActive { get; set; }
 
-    public DateTime CreatedAt { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
 
     public virtual ApiKey? ApiKey { get; set; }
 

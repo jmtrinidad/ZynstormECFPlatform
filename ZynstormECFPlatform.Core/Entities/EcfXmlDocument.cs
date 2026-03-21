@@ -13,7 +13,7 @@ public partial class EcfXmlDocument
 
     public string XmlSigned { get; set; } = null!;
 
-    public DateTime? CreatedAt { get; set; }
+    public DateTime? CreatedAtUtc { get; set; }
 
     public virtual EcfDocument EcfDocument { get; set; } = null!;
 }

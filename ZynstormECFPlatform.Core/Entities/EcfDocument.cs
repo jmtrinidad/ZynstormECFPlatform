@@ -41,7 +41,7 @@ public partial class EcfDocument
 
     public string? HangfireJobId { get; set; }
 
-    public DateTime CreatedAt { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
 
     public virtual ApiKey ApiKey { get; set; } = null!;
 
