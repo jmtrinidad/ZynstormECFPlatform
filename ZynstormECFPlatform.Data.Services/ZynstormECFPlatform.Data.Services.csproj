@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ZynstormECFPlatform.Data\ZynstormECFPlatform.Data.csproj" />
+  </ItemGroup>
+
 </Project>
