@@ -15,7 +15,7 @@ public partial class EcfDocumentTotal
 
     public decimal DiscountTotal { get; set; }
 
-    public decimal Itbistotal { get; set; }
+    public decimal ITBISTotal { get; set; }
 
     public decimal Total { get; set; }
 

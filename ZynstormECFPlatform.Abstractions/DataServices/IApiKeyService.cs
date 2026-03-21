@@ -3,6 +3,6 @@ using ZynstormECFPlatform.Core.Entities;
 
 namespace ZynstormECFPlatform.Abstractions.DataServices;
 
-public interface IApiKeyService : IRepository<ApiKey>
+public interface IApiKeyService //: IRepository<ApiKey>
 {
 }

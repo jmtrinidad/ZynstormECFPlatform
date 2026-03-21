@@ -13,7 +13,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
     private string DateTimeColumnType => Database.IsRelational() && Database.IsNpgsql() ? "timestamp with time zone" : "datetime";
     private string StringColumnType => Database.IsRelational() && Database.IsNpgsql() ? "text" : "NVARCHAR";
 
-    public StorageContext(DbContextOptions options) : base(options)
+    public StorageContext(DbContextOptions<StorageContext> options) : base(options)
     {
     }
 
@@ -40,7 +40,8 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasColumnName("APIKey");
 
             entity.Property(e => e.CreatedAtUtc)
-                  .HasColumnType("datetime");
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
 
             entity.Property(e => e.SecretKey).IsUnicode(false);
 
@@ -60,7 +61,8 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.HasKey(c => c.ClientId);
 
             entity.Property(e => e.CreatedAt)
-                  .HasColumnType("datetime");
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
 
             entity.Property(e => e.Email)
                 .HasMaxLength(50)
@@ -92,7 +94,11 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.Code)
                 .HasMaxLength(20)
                 .IsUnicode(false);
-            entity.Property(e => e.CreatedAtUtc).HasColumnType("datetime");
+
+            entity.Property(e => e.CreatedAtUtc)
+                .HasColumnType(DateTimeColumnType)
+                .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
             entity.Property(e => e.Email)
                 .HasMaxLength(30)
                 .IsUnicode(false);
@@ -119,11 +125,13 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.HasKey(c => c.ClientCallBackId);
 
             entity.Property(e => e.CreatedAtUtc)
-                  .HasColumnType("datetime");
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
 
             entity.Property(e => e.Secret)
-                .HasMaxLength(200)
-                .IsUnicode(false);
+                  .HasMaxLength(200)
+                  .IsUnicode(false);
+
             entity.Property(e => e.Url)
                 .HasMaxLength(300)
                 .IsUnicode(false);
@@ -147,8 +155,8 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.HasKey(c => c.ClientCertificateId);
 
             entity.Property(e => e.Certificate).IsUnicode(false);
-            entity.Property(e => e.CreatedAtUtc).HasColumnType("datetime");
-            entity.Property(e => e.ExpirationDateUtc).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAtUtc).HasColumnType(DateTimeColumnType).HasDefaultValueSql(DefaultDateTimeSqlValue);
+            entity.Property(e => e.ExpirationDateUtc).HasColumnType(DateTimeColumnType);
             entity.Property(e => e.Password).IsUnicode(false);
             entity.Property(e => e.Thumbprint).IsUnicode(false);
 
@@ -186,10 +194,13 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.HasKey(c => c.EcfDocumentId);
 
             entity.Property(e => e.CreatedAtUtc)
-                  .HasColumnType("datetime");
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
             entity.Property(e => e.CustomerAddress)
                 .HasMaxLength(300)
                 .IsUnicode(false);
+
             entity.Property(e => e.CustomerEmail)
                 .HasMaxLength(200)
                 .IsUnicode(false);
@@ -206,7 +217,8 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.HangfireJobId)
                 .HasMaxLength(100)
                 .IsUnicode(false);
-            entity.Property(e => e.IssueDate).HasColumnType("datetime");
+            entity.Property(e => e.IssueDate).HasColumnType(DateTimeColumnType)
+                     .HasDefaultValueSql(DefaultDateTimeSqlValue);
             entity.Property(e => e.Itbistotal)
                 .HasColumnType("decimal(18, 2)")
                 .HasColumnName("ITBISTotal");
@@ -275,9 +287,8 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
             entity.Property(e => e.DiscountTotal).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.ExemptTotal).HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.Itbistotal)
-                .HasColumnType("decimal(18, 2)")
-                .HasColumnName("ITBISTotal");
+            entity.Property(e => e.ITBISTotal)
+                .HasColumnType("decimal(18, 2)");
             entity.Property(e => e.TaxableTotal).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.Total).HasColumnType("decimal(18, 2)");
 
@@ -300,7 +311,9 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
         {
             entity.HasKey(c => c.EcfStatusHistoryId);
 
-            entity.Property(e => e.CreatedAtUtc).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAtUtc)
+                .HasColumnType(DateTimeColumnType)
+                .HasDefaultValueSql(DefaultDateTimeSqlValue);
             entity.Property(e => e.Message).HasColumnType("text");
 
             entity.HasOne(d => d.EcfDocument).WithMany(p => p.EcfStatusHistories)
@@ -324,7 +337,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                 .IsUnicode(false);
             entity.Property(e => e.ResponseMessage).HasColumnType("text");
             entity.Property(e => e.ResponsePayload).HasColumnType("text");
-            entity.Property(e => e.SentAtUtc).HasColumnType("datetime");
+            entity.Property(e => e.SentAtUtc).HasColumnType(DateTimeColumnType).HasDefaultValueSql(DefaultDateTimeSqlValue);
             entity.Property(e => e.TrackId)
                 .HasMaxLength(100)
                 .IsUnicode(false);
@@ -356,7 +369,9 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
         {
             entity.HasKey(c => c.EcfXmlDocumentId);
 
-            entity.Property(e => e.CreatedAtUtc).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAtUtc)
+                .HasColumnType(DateTimeColumnType)
+                .HasDefaultValueSql(DefaultDateTimeSqlValue);
             entity.Property(e => e.XmlSigned).HasColumnType("text");
             entity.Property(e => e.XmlUnsigned).HasColumnType("text");
 
@@ -379,7 +394,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
         {
             entity.HasKey(c => c.SystemLogId);
 
-            entity.Property(e => e.CreateAtUtc).HasColumnType("datetime");
+            entity.Property(e => e.CreateAtUtc).HasColumnType(DateTimeColumnType).HasDefaultValueSql(DefaultDateTimeSqlValue);
             entity.Property(e => e.Exception).HasColumnType("text");
             entity.Property(e => e.LogLevel)
                 .HasMaxLength(20)

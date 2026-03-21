@@ -8,13 +8,13 @@ namespace ZynstormECFPlatform.Data.Services;
 
 public class ClientService : Repository<Client>, IClientService
 {
-    public ClientService(ZynstormEcfPlatformContext context) : base(context)
+    public ClientService(StorageContext context, ISqlGenerator sqlGenerator) : base(context, sqlGenerator)
     {
     }
 
     public async Task<ClientDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbSet
+        var entity = await Table
             .Include(x => x.Status)
             .Include(x => x.ClientBranches)
             .FirstOrDefaultAsync(x => x.ClientId == id, cancellationToken);
@@ -26,16 +26,9 @@ public class ClientService : Repository<Client>, IClientService
 
     public async Task<IPagedCollection<ClientDto>> GetPagedAsync(int page, int perPage, CancellationToken cancellationToken = default)
     {
-        var count = await _dbSet.CountAsync(cancellationToken);
-        var items = await _dbSet
-            .Include(x => x.Status)
-            .OrderBy(x => x.Name)
-            .Skip((page - 1) * perPage)
-            .Take(perPage)
-            .ToListAsync(cancellationToken);
-
-        var dtos = items.Select(MapToDto).ToList();
-        return new PagedCollection<ClientDto>(dtos, count, page, perPage);
+        var pagedItems = await GetPagedAsync(page, perPage);
+        var dtos = pagedItems.Select(MapToDto).ToList();
+        return new PagedCollection<ClientDto>(dtos, page, perPage, pagedItems.TotalItemCount);
     }
 
     public async Task<ClientDto> CreateAsync(ClientDto dto, CancellationToken cancellationToken = default)
@@ -50,15 +43,15 @@ public class ClientService : Repository<Client>, IClientService
             CreatedAt = DateTime.UtcNow
         };
 
-        await _dbSet.AddAsync(entity, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
+        Add(entity);
+        await SaveChangesAsync();
 
         return MapToDto(entity);
     }
 
     public async Task<bool> UpdateAsync(ClientDto dto, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbSet.FindAsync(new object[] { dto.ClientId }, cancellationToken);
+        var entity = await GetAsync(dto.ClientId, cancellationToken);
         if (entity == null) return false;
 
         entity.Name = dto.Name;
@@ -67,17 +60,13 @@ public class ClientService : Repository<Client>, IClientService
         entity.Phone = dto.Phone;
         entity.StatusId = dto.StatusId;
 
-        _dbSet.Update(entity);
-        return await _context.SaveChangesAsync(cancellationToken) > 0;
+        Update(entity);
+        return await SaveChangesAsync() > 0;
     }
 
     public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
-        var entity = await _dbSet.FindAsync(new object[] { id }, cancellationToken);
-        if (entity == null) return false;
-
-        _dbSet.Remove(entity);
-        return await _context.SaveChangesAsync(cancellationToken) > 0;
+        return await SoftDeleteAsync(id);
     }
 
     private ClientDto MapToDto(Client entity)
