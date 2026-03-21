@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ZynstormECFPlatform.Core\ZynstormECFPlatform.Core.csproj" />
+    <ProjectReference Include="..\ZynstormECFPlatform.Dtos\ZynstormECFPlatform.Dtos.csproj" />
   </ItemGroup>
 
 </Project>
