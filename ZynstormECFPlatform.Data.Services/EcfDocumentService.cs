@@ -4,6 +4,8 @@ using ZynstormECFPlatform.Core.Entities;
 
 namespace ZynstormECFPlatform.Data.Services;
 
-public class EcfDocumentService(StorageContext context, ISqlGenerator sqlGenerator) : Repository<EcfDocument>(context, sqlGenerator), IEcfDocumentService
+public class EcfDocumentService(
+    StorageContext context,
+    ISqlGenerator sqlGenerator) : Repository<EcfDocument>(context, sqlGenerator), IEcfDocumentService
 {
 }

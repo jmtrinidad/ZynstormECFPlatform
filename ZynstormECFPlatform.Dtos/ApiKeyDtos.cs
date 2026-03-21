@@ -1,17 +1,11 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace ZynstormECFPlatform.Dtos;
 
-public class ApiKeyDto
+public class ApiKeyViewDto
 {
-    [Required]
     public int ApiKeyId { get; set; }
 
-    [Required]
     public int ClientId { get; set; }
 
-    [Required]
-    [StringLength(100)]
     public string Key { get; set; } = string.Empty;
 
     public string? Description { get; set; }
@@ -21,6 +15,4 @@ public class ApiKeyDto
     public int StatusId { get; set; }
 
     public DateTime CreatedAt { get; set; }
-
-    public StatusDto? Status { get; set; }
 }

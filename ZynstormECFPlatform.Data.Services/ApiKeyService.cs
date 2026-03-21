@@ -4,6 +4,8 @@ using ZynstormECFPlatform.Core.Entities;
 
 namespace ZynstormECFPlatform.Data.Services;
 
-public class ApiKeyService(StorageContext context, ISqlGenerator sqlGenerator) : Repository<ApiKey>(context, sqlGenerator), IApiKeyService
+public class ApiKeyService(
+    StorageContext context,
+    ISqlGenerator sqlGenerator) : Repository<ApiKey>(context, sqlGenerator), IApiKeyService
 {
 }

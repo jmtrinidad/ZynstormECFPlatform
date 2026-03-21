@@ -2,11 +2,8 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ZynstormECFPlatform.Dtos;
 
-public class ClientDto
+public class ClientCreateDto
 {
-    [Required]
-    public int ClientId { get; set; }
-
     [Required]
     [StringLength(200)]
     public string Name { get; set; } = string.Empty;
@@ -22,29 +19,15 @@ public class ClientDto
     public string? Phone { get; set; }
 
     public int StatusId { get; set; }
-
-    public DateTime CreatedAt { get; set; }
-
-    public StatusDto? Status { get; set; }
-
-    public ICollection<ClientBrancheDto> Branches { get; set; } = new List<ClientBrancheDto>();
 }
 
-public class ClientBrancheDto
+public class ClientUpdateDto : ClientCreateDto
 {
     [Required]
-    public int ClientBrancheId { get; set; }
-
-    [Required]
     public int ClientId { get; set; }
+}
 
-    [Required]
-    [StringLength(200)]
-    public string Name { get; set; } = string.Empty;
-
-    [StringLength(200)]
-    public string? Address { get; set; }
-
-    [Phone]
-    public string? Phone { get; set; }
+public class ClientViewDto : ClientupdateDto
+{
+    public DateTime CreatedAt { get; set; }
 }
