@@ -1,0 +1,6 @@
+@ZynstormECFPlatform.Web.Api_HostAddress = http://localhost:5220
+
+GET {{ZynstormECFPlatform.Web.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

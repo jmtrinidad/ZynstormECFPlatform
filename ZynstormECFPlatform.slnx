@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/Apps/">
+    <Project Path="ZynstormECFPlatform.Web.Api/ZynstormECFPlatform.Web.Api.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/" />
+</Solution>
