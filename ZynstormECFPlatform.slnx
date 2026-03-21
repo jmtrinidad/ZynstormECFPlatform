@@ -2,5 +2,15 @@
   <Folder Name="/Apps/">
     <Project Path="ZynstormECFPlatform.Web.Api/ZynstormECFPlatform.Web.Api.csproj" />
   </Folder>
-  <Folder Name="/Libraries/" />
+  <Folder Name="/Libraries/">
+    <Project Path="ZynstormECFPlatform.Abstractions/ZynstormECFPlatform.Abstractions.csproj" />
+    <Project Path="ZynstormECFPlatform.Common/ZynstormECFPlatform.Common.csproj" />
+    <Project Path="ZynstormECFPlatform.Core/ZynstormECFPlatform.Core.csproj" />
+    <Project Path="ZynstormECFPlatform.Data.Services/ZynstormECFPlatform.Data.Services.csproj" />
+    <Project Path="ZynstormECFPlatform.Data/ZynstormECFPlatform.Data.csproj" />
+    <Project Path="ZynstormECFPlatform.Dtos/ZynstormECFPlatform.Dtos.csproj" />
+    <Project Path="ZynstormECFPlatform.Mappings/ZynstormECFPlatform.Mappings.csproj" />
+    <Project Path="ZynstormECFPlatform.Reports/ZynstormECFPlatform.Reports.csproj" />
+    <Project Path="ZynstormECFPlatform.Services/ZynstormECFPlatform.Services.csproj" />
+  </Folder>
 </Solution>
