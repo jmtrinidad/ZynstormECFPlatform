@@ -8,10 +8,12 @@ namespace ZynstormECFPlatform.Data;
 public class StorageContext : IdentityDbContext<User, Role, string>, IStorageContext
 {
     private string DefaultDateTimeSqlValue => Database.IsRelational() && Database.IsNpgsql() ? "CURRENT_TIMESTAMP" : "GETDATE()";
-    private string DefaultGUIDSqlValue => Database.IsRelational() && Database.IsNpgsql() ? "gen_random_uuid()" : "NEWID()";
-    private string DefaultDueDateTimeSqlValue => Database.IsRelational() && Database.IsNpgsql() ? "CURRENT_TIMESTAMP + interval '1 month'" : "DATEADD(month, 1, GETDATE())";
+
+    //private string DefaultGUIDSqlValue => Database.IsRelational() && Database.IsNpgsql() ? "gen_random_uuid()" : "NEWID()";
+    //private string DefaultDueDateTimeSqlValue => Database.IsRelational() && Database.IsNpgsql() ? "CURRENT_TIMESTAMP + interval '1 month'" : "DATEADD(month, 1, GETDATE())";
     private string DateTimeColumnType => Database.IsRelational() && Database.IsNpgsql() ? "timestamp with time zone" : "datetime";
-    private string StringColumnType => Database.IsRelational() && Database.IsNpgsql() ? "text" : "NVARCHAR";
+
+    //private string StringColumnType => Database.IsRelational() && Database.IsNpgsql() ? "text" : "NVARCHAR";
 
     public StorageContext(DbContextOptions<StorageContext> options) : base(options)
     {
@@ -60,7 +62,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
         {
             entity.HasKey(c => c.ClientId);
 
-            entity.Property(e => e.CreatedAt)
+            entity.Property(e => e.CreatedAtUtc)
                   .HasColumnType(DateTimeColumnType)
                   .HasDefaultValueSql(DefaultDateTimeSqlValue);
 
@@ -217,7 +219,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.HangfireJobId)
                 .HasMaxLength(100)
                 .IsUnicode(false);
-            entity.Property(e => e.IssueDate).HasColumnType(DateTimeColumnType)
+            entity.Property(e => e.IssueDateUtc).HasColumnType(DateTimeColumnType)
                      .HasDefaultValueSql(DefaultDateTimeSqlValue);
             entity.Property(e => e.Itbistotal)
                 .HasColumnType("decimal(18, 2)")
@@ -375,7 +377,8 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.XmlSigned).HasColumnType("text");
             entity.Property(e => e.XmlUnsigned).HasColumnType("text");
 
-            entity.HasOne(d => d.EcfDocument).WithMany(p => p.EcfXmlDocuments)
+            entity.HasOne(d => d.EcfDocument)
+                 .WithMany(p => p.EcfXmlDocuments)
                 .HasForeignKey(d => d.EcfDocumentId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_EcfXmlDocument_EcfDocument");
@@ -399,18 +402,21 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.LogLevel)
                 .HasMaxLength(20)
                 .IsUnicode(false);
+
             entity.Property(e => e.Message).HasColumnType("text");
             entity.Property(e => e.SystemLogId).ValueGeneratedOnAdd();
 
-            entity.HasOne(d => d.Client).WithMany()
-                .HasForeignKey(d => d.ClientId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_SystemLog_Client");
+            entity.HasOne(d => d.Client)
+                 .WithMany(c => c.SystemLogs)
+                 .HasForeignKey(d => d.ClientId)
+                 .OnDelete(DeleteBehavior.ClientSetNull)
+                 .HasConstraintName("FK_SystemLog_Client");
 
-            entity.HasOne(d => d.EcfDocument).WithMany()
-                .HasForeignKey(d => d.EcfDocumentId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_SystemLog_EcfDocument");
+            entity.HasOne(d => d.EcfDocument)
+                  .WithMany(c => c.SystemLogs)
+                  .HasForeignKey(d => d.EcfDocumentId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_SystemLog_EcfDocument");
         });
 
         modelBuilder.Entity<UseClient>(entity =>
@@ -422,10 +428,17 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                        .HasMaxLength(450)
                        .IsUnicode(false);
 
-            entity.HasOne(d => d.Client).WithMany()
-                .HasForeignKey(d => d.ClientId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_UseClient_Client");
+            entity.HasOne(d => d.Client)
+                  .WithMany(p => p.UseClients)
+                  .HasForeignKey(d => d.ClientId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_UseClient_Client");
+
+            entity.HasOne(d => d.User)
+                  .WithMany(p => p.UseClients)
+                  .HasForeignKey(d => d.UserId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_UseClient_User");
         });
     }
 }

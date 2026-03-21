@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using ZynstormECFPlatform.Common;
 
 namespace ZynstormECFPlatform.Core.Entities;
 
-public partial class Client
+public partial class Client : IEntityMarker
 {
     public int ClientId { get; set; }
 
@@ -17,17 +18,28 @@ public partial class Client
 
     public int StatusId { get; set; }
 
-    public DateTime CreatedAt { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
 
-    public virtual ICollection<ApiKey> ApiKeys { get; set; } = new List<ApiKey>();
+    public bool IsDeleted { get; set; }
 
-    public virtual ICollection<ClientBranche> ClientBranches { get; set; } = new List<ClientBranche>();
+    public DateTime? DeletedTimeUtc { get; set; }
 
-    public virtual ICollection<ClientCallBack> ClientCallBacks { get; set; } = new List<ClientCallBack>();
+    public string GuidId { get; set; } = null!;
 
-    public virtual ICollection<ClientCertificate> ClientCertificates { get; set; } = new List<ClientCertificate>();
-
-    public virtual ICollection<EcfDocument> EcfDocuments { get; set; } = new List<EcfDocument>();
+    public DateTime? LastUpdateUtc { get; set; }
 
     public virtual Status Status { get; set; } = null!;
+
+    public virtual ICollection<ApiKey> ApiKeys { get; set; } = [];
+
+    public virtual ICollection<ClientBranche> ClientBranches { get; set; } = [];
+
+    public virtual ICollection<ClientCallBack> ClientCallBacks { get; set; } = [];
+
+    public virtual ICollection<ClientCertificate> ClientCertificates { get; set; } = [];
+
+    public virtual ICollection<EcfDocument> EcfDocuments { get; set; } = [];
+
+    public virtual ICollection<SystemLog> SystemLogs { get; set; } = [];
+    public virtual ICollection<UseClient> UseClients { get; set; } = [];
 }

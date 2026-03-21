@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using ZynstormECFPlatform.Common;
 
 namespace ZynstormECFPlatform.Core.Entities;
 
-public partial class ClientBranche
+public partial class ClientBranche : IEntityMarker
 {
     public int ClientBrancheId { get; set; }
 
@@ -25,11 +26,19 @@ public partial class ClientBranche
 
     public DateTime CreatedAtUtc { get; set; }
 
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedTimeUtc { get; set; }
+
+    public string GuidId { get; set; } = null!;
+
+    public DateTime? LastUpdateUtc { get; set; }
+
     public virtual Client Client { get; set; } = null!;
 
-    public virtual ICollection<ClientCallBack> ClientCallBacks { get; set; } = new List<ClientCallBack>();
-
-    public virtual ICollection<EcfDocument> EcfDocuments { get; set; } = new List<EcfDocument>();
-
     public virtual Status Status { get; set; } = null!;
+
+    public virtual ICollection<ClientCallBack> ClientCallBacks { get; set; } = [];
+
+    public virtual ICollection<EcfDocument> EcfDocuments { get; set; } = [];
 }

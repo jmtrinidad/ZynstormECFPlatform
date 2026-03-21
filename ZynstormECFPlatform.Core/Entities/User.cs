@@ -22,4 +22,6 @@ public class User : IdentityUser, IEntityMarker
     public DateTime? LastUpdateUtc { get; set; }
 
     public string FullName => $"{FirstName} {LastName}";
+
+    public virtual ICollection<UseClient> UseClients { get; set; } = [];
 }

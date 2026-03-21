@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using ZynstormECFPlatform.Common;
 
 namespace ZynstormECFPlatform.Core.Entities;
 
-public partial class EcfDocument
+public partial class EcfDocument : IEntityMarker
 {
     public int EcfDocumentId { get; set; }
 
@@ -27,7 +28,7 @@ public partial class EcfDocument
 
     public string? CustomerAddress { get; set; }
 
-    public DateTime IssueDate { get; set; }
+    public DateTime IssueDateUtc { get; set; }
 
     public int CurrencyId { get; set; }
 
@@ -43,6 +44,14 @@ public partial class EcfDocument
 
     public DateTime CreatedAtUtc { get; set; }
 
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedTimeUtc { get; set; }
+
+    public string GuidId { get; set; } = null!;
+
+    public DateTime? LastUpdateUtc { get; set; }
+
     public virtual ApiKey ApiKey { get; set; } = null!;
 
     public virtual Client Client { get; set; } = null!;
@@ -51,17 +60,19 @@ public partial class EcfDocument
 
     public virtual Currency Currency { get; set; } = null!;
 
-    public virtual ICollection<EcfDocumentDetail> EcfDocumentDetails { get; set; } = new List<EcfDocumentDetail>();
-
-    public virtual ICollection<EcfDocumentTotal> EcfDocumentTotals { get; set; } = new List<EcfDocumentTotal>();
-
     public virtual EcfStatus EcfStatus { get; set; } = null!;
-
-    public virtual ICollection<EcfStatusHistory> EcfStatusHistories { get; set; } = new List<EcfStatusHistory>();
-
-    public virtual ICollection<EcfTransmission> EcfTransmissions { get; set; } = new List<EcfTransmission>();
 
     public virtual EcfType EcfType { get; set; } = null!;
 
-    public virtual ICollection<EcfXmlDocument> EcfXmlDocuments { get; set; } = new List<EcfXmlDocument>();
+    public virtual ICollection<EcfDocumentDetail> EcfDocumentDetails { get; set; } = [];
+
+    public virtual ICollection<EcfDocumentTotal> EcfDocumentTotals { get; set; } = [];
+
+    public virtual ICollection<EcfStatusHistory> EcfStatusHistories { get; set; } = [];
+
+    public virtual ICollection<SystemLog> SystemLogs { get; set; } = [];
+
+    public virtual ICollection<EcfTransmission> EcfTransmissions { get; set; } = [];
+
+    public virtual ICollection<EcfXmlDocument> EcfXmlDocuments { get; set; } = [];
 }

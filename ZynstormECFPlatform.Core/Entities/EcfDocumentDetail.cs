@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using ZynstormECFPlatform.Common;
 
 namespace ZynstormECFPlatform.Core.Entities;
 
-public partial class EcfDocumentDetail
+public partial class EcfDocumentDetail : IEntityMarker
 {
     public int EcfDocumentDetailId { get; set; }
 
@@ -28,6 +29,14 @@ public partial class EcfDocumentDetail
     public decimal ItbisAmount { get; set; }
 
     public decimal Total { get; set; }
+
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedTimeUtc { get; set; }
+
+    public string GuidId { get; set; } = null!;
+
+    public DateTime? LastUpdateUtc { get; set; }
 
     public virtual EcfDocument EcfDocument { get; set; } = null!;
 }
