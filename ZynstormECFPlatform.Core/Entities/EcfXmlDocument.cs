@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using ZynstormECFPlatform.Common;
+﻿namespace ZynstormECFPlatform.Core.Entities;
 
-namespace ZynstormECFPlatform.Core.Entities;
-
-public partial class EcfXmlDocument : IEntityMarker
+public partial class EcfXmlDocument : BaseEntity
 {
     public int EcfXmlDocumentId { get; set; }
 
@@ -14,15 +10,7 @@ public partial class EcfXmlDocument : IEntityMarker
 
     public string XmlSigned { get; set; } = null!;
 
-    public DateTime? CreatedAtUtc { get; set; }
-
-    public bool IsDeleted { get; set; }
-
-    public DateTime? DeletedTimeUtc { get; set; }
-
-    public string GuidId { get; set; } = null!;
-
-    public DateTime? LastUpdateUtc { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
 
     public virtual EcfDocument EcfDocument { get; set; } = null!;
 }

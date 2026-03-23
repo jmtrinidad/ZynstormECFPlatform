@@ -1,8 +1,6 @@
-﻿using ZynstormECFPlatform.Common;
+﻿namespace ZynstormECFPlatform.Core.Entities;
 
-namespace ZynstormECFPlatform.Core.Entities;
-
-public partial class EcfStatusHistory : IEntityMarker
+public partial class EcfStatusHistory : BaseEntity
 {
     public int EcfStatusHistoryId { get; set; }
 
@@ -13,14 +11,6 @@ public partial class EcfStatusHistory : IEntityMarker
     public string Message { get; set; } = null!;
 
     public DateTime CreatedAtUtc { get; set; }
-
-    public bool IsDeleted { get; set; }
-
-    public DateTime? DeletedTimeUtc { get; set; }
-
-    public string GuidId { get; set; } = null!;
-
-    public DateTime? LastUpdateUtc { get; set; }
 
     public virtual EcfDocument EcfDocument { get; set; } = null!;
 

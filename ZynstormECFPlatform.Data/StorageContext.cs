@@ -9,7 +9,8 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 {
     private string DefaultDateTimeSqlValue => Database.IsRelational() && Database.IsNpgsql() ? "CURRENT_TIMESTAMP" : "GETDATE()";
 
-    //private string DefaultGUIDSqlValue => Database.IsRelational() && Database.IsNpgsql() ? "gen_random_uuid()" : "NEWID()";
+    private string DefaultGUIDSqlValue => Database.IsRelational() && Database.IsNpgsql() ? "gen_random_uuid()" : "NEWID()";
+
     //private string DefaultDueDateTimeSqlValue => Database.IsRelational() && Database.IsNpgsql() ? "CURRENT_TIMESTAMP + interval '1 month'" : "DATEADD(month, 1, GETDATE())";
     private string DateTimeColumnType => Database.IsRelational() && Database.IsNpgsql() ? "timestamp with time zone" : "datetime";
 
@@ -38,14 +39,32 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.HasKey(c => c.ApiKeyId);
 
             entity.Property(e => e.Apikey)
-                  .IsUnicode(false)
-                  .HasColumnName("APIKey");
+                  .IsUnicode(false);
 
             entity.Property(e => e.CreatedAtUtc)
                   .HasColumnType(DateTimeColumnType)
                   .HasDefaultValueSql(DefaultDateTimeSqlValue);
 
-            entity.Property(e => e.SecretKey).IsUnicode(false);
+            entity.Property(e => e.SecretKey)
+                  .IsUnicode(false);
+
+            entity.Property(c => c.LastUpdateUtc)
+               .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+               .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
 
             entity.HasOne(d => d.Client).WithMany(p => p.ApiKeys)
                 .HasForeignKey(d => d.ClientId)
@@ -69,16 +88,37 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.Email)
                 .HasMaxLength(50)
                 .IsUnicode(false);
+
             entity.Property(e => e.Name)
                 .HasMaxLength(50)
                 .IsUnicode(false);
+
             entity.Property(e => e.Phone)
                 .HasMaxLength(20)
                 .IsUnicode(false);
+
             entity.Property(e => e.Rnc)
                 .HasMaxLength(25)
                 .IsUnicode(false)
                 .HasColumnName("RNC");
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
 
             entity.HasOne(d => d.Status).WithMany(p => p.Clients)
                 .HasForeignKey(d => d.StatusId)
@@ -91,35 +131,57 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.HasKey(c => c.ClientBrancheId);
 
             entity.Property(e => e.Address)
-                .HasMaxLength(200)
-                .IsUnicode(false);
+                  .HasMaxLength(200)
+                  .IsUnicode(false);
+
             entity.Property(e => e.Code)
-                .HasMaxLength(20)
-                .IsUnicode(false);
+                  .HasMaxLength(20)
+                  .IsUnicode(false);
 
             entity.Property(e => e.CreatedAtUtc)
-                .HasColumnType(DateTimeColumnType)
-                .HasDefaultValueSql(DefaultDateTimeSqlValue);
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
 
             entity.Property(e => e.Email)
-                .HasMaxLength(30)
-                .IsUnicode(false);
+                  .HasMaxLength(30)
+                  .IsUnicode(false);
+
             entity.Property(e => e.Name)
-                .HasMaxLength(80)
-                .IsUnicode(false);
+                  .HasMaxLength(80)
+                  .IsUnicode(false);
+
             entity.Property(e => e.Phone)
-                .HasMaxLength(20)
-                .IsUnicode(false);
+                  .HasMaxLength(20)
+                  .IsUnicode(false);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
 
             entity.HasOne(d => d.Client).WithMany(p => p.ClientBranches)
-                .HasForeignKey(d => d.ClientId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_ClientBranche_Client");
+                  .HasForeignKey(d => d.ClientId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_ClientBranche_Client");
 
-            entity.HasOne(d => d.Status).WithMany(p => p.ClientBranches)
-                .HasForeignKey(d => d.StatusId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_ClientBranche_Status");
+            entity.HasOne(d => d.Status)
+                  .WithMany(p => p.ClientBranches)
+                  .HasForeignKey(d => d.StatusId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_ClientBranche_Status");
         });
 
         modelBuilder.Entity<ClientCallBack>(entity =>
@@ -135,21 +197,47 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsUnicode(false);
 
             entity.Property(e => e.Url)
-                .HasMaxLength(300)
-                .IsUnicode(false);
+                  .HasMaxLength(300)
+                  .IsUnicode(false);
 
-            entity.HasOne(d => d.ApiKey).WithMany(p => p.ClientCallBacks)
-                .HasForeignKey(d => d.ApiKeyId)
-                .HasConstraintName("FK_ClientCallBack_ApiKey");
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.Status)
+                  .WithMany(p => p.ClientCallBacks)
+                  .HasForeignKey(d => d.StatusId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_ClientCallBack_Status");
+
+            entity.HasOne(d => d.ApiKey)
+                  .WithMany(p => p.ClientCallBacks)
+                  .HasForeignKey(d => d.ApiKeyId)
+                  .HasConstraintName("FK_ClientCallBack_ApiKey");
 
             entity.HasOne(d => d.ClientBranche).WithMany(p => p.ClientCallBacks)
                 .HasForeignKey(d => d.ClientBrancheId)
                 .HasConstraintName("FK_ClientCallBack_ClientBranche");
 
-            entity.HasOne(d => d.Client).WithMany(p => p.ClientCallBacks)
-                .HasForeignKey(d => d.ClientId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_ClientCallBack_Client1");
+            entity.HasOne(d => d.Client)
+                  .WithMany(p => p.ClientCallBacks)
+                  .HasForeignKey(d => d.ClientId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_ClientCallBack_Client1");
         });
 
         modelBuilder.Entity<ClientCertificate>(entity =>
@@ -161,6 +249,24 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.ExpirationDateUtc).HasColumnType(DateTimeColumnType);
             entity.Property(e => e.Password).IsUnicode(false);
             entity.Property(e => e.Thumbprint).IsUnicode(false);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
 
             entity.HasOne(d => d.Client).WithMany(p => p.ClientCertificates)
                 .HasForeignKey(d => d.ClientId)
@@ -175,9 +281,28 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.Code)
                 .HasMaxLength(20)
                 .IsUnicode(false);
+
             entity.Property(e => e.Name)
                 .HasMaxLength(50)
                 .IsUnicode(false);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
         });
 
         modelBuilder.Entity<DGIIUnit>(entity =>
@@ -189,6 +314,24 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.Name)
                   .HasMaxLength(100)
                   .IsUnicode(false);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
         });
 
         modelBuilder.Entity<EcfDocument>(entity =>
@@ -206,30 +349,52 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.CustomerEmail)
                 .HasMaxLength(200)
                 .IsUnicode(false);
+
             entity.Property(e => e.CustomerName)
                 .HasMaxLength(100)
                 .IsUnicode(false);
+
             entity.Property(e => e.CustomerRnc)
                 .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("CustomerRNC");
+                .IsUnicode(false);
+
             entity.Property(e => e.ExternalReference)
                 .HasMaxLength(70)
                 .IsUnicode(false);
             entity.Property(e => e.HangfireJobId)
                 .HasMaxLength(100)
                 .IsUnicode(false);
+
             entity.Property(e => e.IssueDateUtc).HasColumnType(DateTimeColumnType)
-                     .HasDefaultValueSql(DefaultDateTimeSqlValue);
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
             entity.Property(e => e.Itbistotal)
-                .HasColumnType("decimal(18, 2)")
-                .HasColumnName("ITBISTotal");
+                  .HasColumnType("decimal(18, 2)");
+
             entity.Property(e => e.Ncf)
-                .HasMaxLength(80)
-                .IsUnicode(false)
-                .HasColumnName("NCF");
+                  .HasMaxLength(80)
+                  .IsUnicode(false);
+
             entity.Property(e => e.SubTotal).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.Total).HasColumnType("decimal(18, 2)");
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
 
             entity.HasOne(d => d.ApiKey).WithMany(p => p.EcfDocuments)
                 .HasForeignKey(d => d.ApiKeyId)
@@ -277,6 +442,24 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.Total).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.UnitPrice).HasColumnType("decimal(18, 2)");
 
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
             entity.HasOne(d => d.EcfDocument).WithMany(p => p.EcfDocumentDetails)
                 .HasForeignKey(d => d.EcfDocumentId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -294,6 +477,24 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.TaxableTotal).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.Total).HasColumnType("decimal(18, 2)");
 
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
             entity.HasOne(d => d.EcfDocument).WithMany(p => p.EcfDocumentTotals)
                 .HasForeignKey(d => d.EcfDocumentId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -307,6 +508,40 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.Name)
                 .HasMaxLength(50)
                 .IsUnicode(false);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasData(
+                new EcfStatus { EcfStatusId = 1, Name = "Created" },
+                new EcfStatus { EcfStatusId = 2, Name = "Validating" },
+                new EcfStatus { EcfStatusId = 3, Name = "ValidationFailed" },
+                new EcfStatus { EcfStatusId = 4, Name = "ReadyToSign" },
+                new EcfStatus { EcfStatusId = 5, Name = "Signing" },
+                new EcfStatus { EcfStatusId = 6, Name = "Signed" },
+                new EcfStatus { EcfStatusId = 7, Name = "SendPending" },
+                new EcfStatus { EcfStatusId = 8, Name = "Sending" },
+                new EcfStatus { EcfStatusId = 9, Name = "Sent" },
+                new EcfStatus { EcfStatusId = 10, Name = "Accepted" },
+                new EcfStatus { EcfStatusId = 11, Name = "Rejected" },
+                new EcfStatus { EcfStatusId = 12, Name = "Error" },
+                new EcfStatus { EcfStatusId = 13, Name = "Cancelled" }
+                );
         });
 
         modelBuilder.Entity<EcfStatusHistory>(entity =>
@@ -317,6 +552,24 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                 .HasColumnType(DateTimeColumnType)
                 .HasDefaultValueSql(DefaultDateTimeSqlValue);
             entity.Property(e => e.Message).HasColumnType("text");
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
 
             entity.HasOne(d => d.EcfDocument).WithMany(p => p.EcfStatusHistories)
                 .HasForeignKey(d => d.EcfDocumentId)
@@ -337,12 +590,31 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.ResponseCode)
                 .HasMaxLength(50)
                 .IsUnicode(false);
+
             entity.Property(e => e.ResponseMessage).HasColumnType("text");
             entity.Property(e => e.ResponsePayload).HasColumnType("text");
             entity.Property(e => e.SentAtUtc).HasColumnType(DateTimeColumnType).HasDefaultValueSql(DefaultDateTimeSqlValue);
             entity.Property(e => e.TrackId)
                 .HasMaxLength(100)
                 .IsUnicode(false);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
 
             entity.HasOne(d => d.EcfDocument).WithMany(p => p.EcfTransmissions)
                 .HasForeignKey(d => d.EcfDocumentId)
@@ -362,9 +634,29 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.Code)
                 .HasMaxLength(10)
                 .IsUnicode(false);
+
             entity.Property(e => e.Name)
-                .HasMaxLength(50)
-                .IsUnicode(false);
+                  .HasMaxLength(50)
+                  .IsUnicode(false);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
         });
 
         modelBuilder.Entity<EcfXmlDocument>(entity =>
@@ -374,14 +666,33 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.CreatedAtUtc)
                 .HasColumnType(DateTimeColumnType)
                 .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
             entity.Property(e => e.XmlSigned).HasColumnType("text");
+
             entity.Property(e => e.XmlUnsigned).HasColumnType("text");
 
+            entity.Property(c => c.LastUpdateUtc)
+               .HasColumnType(DateTimeColumnType)
+               .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
             entity.HasOne(d => d.EcfDocument)
-                 .WithMany(p => p.EcfXmlDocuments)
-                .HasForeignKey(d => d.EcfDocumentId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_EcfXmlDocument_EcfDocument");
+                  .WithMany(p => p.EcfXmlDocuments)
+                 .HasForeignKey(d => d.EcfDocumentId)
+                 .OnDelete(DeleteBehavior.ClientSetNull)
+                 .HasConstraintName("FK_EcfXmlDocument_EcfDocument");
         });
 
         modelBuilder.Entity<Status>(entity =>
@@ -391,6 +702,32 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.Name)
                 .HasMaxLength(50)
                 .IsUnicode(false);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasData(
+                new Status { StatusId = 1, Name = "Active" },
+                new Status { StatusId = 1, Name = "Inactive" },
+                new Status { StatusId = 1, Name = "Suspended" },
+                new Status { StatusId = 1, Name = "Deleted" }
+                );
         });
 
         modelBuilder.Entity<SystemLog>(entity =>
@@ -405,6 +742,25 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
             entity.Property(e => e.Message).HasColumnType("text");
             entity.Property(e => e.SystemLogId).ValueGeneratedOnAdd();
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
 
             entity.HasOne(d => d.Client)
                  .WithMany(c => c.SystemLogs)
@@ -427,6 +783,24 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                        .IsRequired()
                        .HasMaxLength(450)
                        .IsUnicode(false);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValue(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
 
             entity.HasOne(d => d.Client)
                   .WithMany(p => p.UseClients)

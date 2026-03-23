@@ -1,8 +1,6 @@
-﻿using ZynstormECFPlatform.Common;
+﻿namespace ZynstormECFPlatform.Core.Entities;
 
-namespace ZynstormECFPlatform.Core.Entities;
-
-public partial class ApiKey : IEntityMarker
+public partial class ApiKey : BaseEntity
 {
     public int ApiKeyId { get; set; }
 
@@ -21,14 +19,6 @@ public partial class ApiKey : IEntityMarker
     public virtual Client Client { get; set; } = null!;
 
     public virtual Status Status { get; set; } = null!;
-
-    public bool IsDeleted { get; set; }
-
-    public DateTime? DeletedTimeUtc { get; set; }
-
-    public string GuidId { get; set; } = null!;
-
-    public DateTime? LastUpdateUtc { get; set; }
 
     public virtual ICollection<ClientCallBack> ClientCallBacks { get; set; } = [];
 

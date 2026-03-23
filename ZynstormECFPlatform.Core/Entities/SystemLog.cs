@@ -1,8 +1,6 @@
-﻿using ZynstormECFPlatform.Common;
+﻿namespace ZynstormECFPlatform.Core.Entities;
 
-namespace ZynstormECFPlatform.Core.Entities;
-
-public partial class SystemLog : IEntityMarker
+public partial class SystemLog : BaseEntity
 {
     public int SystemLogId { get; set; }
 

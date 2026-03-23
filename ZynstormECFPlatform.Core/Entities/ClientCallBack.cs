@@ -4,7 +4,7 @@ using ZynstormECFPlatform.Common;
 
 namespace ZynstormECFPlatform.Core.Entities;
 
-public partial class ClientCallBack : IEntityMarker
+public partial class ClientCallBack : BaseEntity
 {
     public int ClientCallBackId { get; set; }
 
@@ -18,19 +18,13 @@ public partial class ClientCallBack : IEntityMarker
 
     public string? Secret { get; set; }
 
-    public bool IsActive { get; set; }
+    public int StatusId { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
 
-    public bool IsDeleted { get; set; }
-
-    public DateTime? DeletedTimeUtc { get; set; }
-
-    public string GuidId { get; set; } = null!;
-
-    public DateTime? LastUpdateUtc { get; set; }
-
     public virtual ApiKey? ApiKey { get; set; }
+
+    public virtual Status Status { get; set; } = null!;
 
     public virtual Client Client { get; set; } = null!;
 

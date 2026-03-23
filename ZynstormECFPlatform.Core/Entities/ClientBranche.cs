@@ -2,7 +2,7 @@
 
 namespace ZynstormECFPlatform.Core.Entities;
 
-public partial class ClientBranche : IEntityMarker
+public partial class ClientBranche : BaseEntity
 {
     public int ClientBrancheId { get; set; }
 
@@ -23,14 +23,6 @@ public partial class ClientBranche : IEntityMarker
     public int StatusId { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
-
-    public bool IsDeleted { get; set; }
-
-    public DateTime? DeletedTimeUtc { get; set; }
-
-    public string GuidId { get; set; } = null!;
-
-    public DateTime? LastUpdateUtc { get; set; }
 
     public virtual Client Client { get; set; } = null!;
 

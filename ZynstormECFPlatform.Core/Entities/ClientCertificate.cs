@@ -4,7 +4,7 @@ using ZynstormECFPlatform.Common;
 
 namespace ZynstormECFPlatform.Core.Entities;
 
-public partial class ClientCertificate : IEntityMarker
+public partial class ClientCertificate : BaseEntity
 {
     public int ClientCertificateId { get; set; }
 
@@ -19,14 +19,6 @@ public partial class ClientCertificate : IEntityMarker
     public DateTime? ExpirationDateUtc { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
-
-    public bool IsDeleted { get; set; }
-
-    public DateTime? DeletedTimeUtc { get; set; }
-
-    public string GuidId { get; set; } = null!;
-
-    public DateTime? LastUpdateUtc { get; set; }
 
     public virtual Client Client { get; set; } = null!;
 }
