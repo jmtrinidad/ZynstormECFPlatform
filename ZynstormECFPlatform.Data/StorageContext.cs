@@ -237,7 +237,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .WithMany(p => p.ClientCallBacks)
                   .HasForeignKey(d => d.ClientId)
                   .OnDelete(DeleteBehavior.ClientSetNull)
-                  .HasConstraintName("FK_ClientCallBack_Client1");
+                  .HasConstraintName("FK_ClientCallBack_Client");
         });
 
         modelBuilder.Entity<ClientCertificate>(entity =>
@@ -724,9 +724,9 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
             entity.HasData(
                 new Status { StatusId = 1, Name = "Active" },
-                new Status { StatusId = 1, Name = "Inactive" },
-                new Status { StatusId = 1, Name = "Suspended" },
-                new Status { StatusId = 1, Name = "Deleted" }
+                new Status { StatusId = 2, Name = "Inactive" },
+                new Status { StatusId = 3, Name = "Suspended" },
+                new Status { StatusId = 4, Name = "Deleted" }
                 );
         });
 

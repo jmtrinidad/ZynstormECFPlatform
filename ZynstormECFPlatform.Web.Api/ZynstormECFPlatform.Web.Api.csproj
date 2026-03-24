@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ZynstormECFPlatform.Data.Services\ZynstormECFPlatform.Data.Services.csproj" />
+    <ProjectReference Include="..\ZynstormECFPlatform.Dtos\ZynstormECFPlatform.Dtos.csproj" />
     <ProjectReference Include="..\ZynstormECFPlatform.Mappings\ZynstormECFPlatform.Mappings.csproj" />
     <ProjectReference Include="..\ZynstormECFPlatform.Reports\ZynstormECFPlatform.Reports.csproj" />
     <ProjectReference Include="..\ZynstormECFPlatform.Services\ZynstormECFPlatform.Services.csproj" />
