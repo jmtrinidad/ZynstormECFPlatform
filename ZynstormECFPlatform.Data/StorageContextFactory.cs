@@ -22,7 +22,7 @@ namespace ZynstormECFPlatform.Data
 
             // 2. Obtener la cadena de conexión
             // Si no tienes appsettings en este proyecto, puedes ponerla fija para la migración:
-            var connectionString = "Host=217.216.91.10;Port=8087;Database=ZynstormECFPlatform_dev_db;Username=easy_staging;Password=remigio135795#";
+            //var connectionString = "Host=217.216.91.10;Port=8087;Database=ZynstormECFPlatform_dev_db;Username=easy_staging;Password=remigio135795#";
 
             optionsBuilder.UseNpgsql(configuration.GetConnectionString("DefaultConnection")!);
 
