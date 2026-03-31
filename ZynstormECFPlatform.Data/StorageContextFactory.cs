@@ -1,30 +1,47 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
+using System.IO;
+using System;
 
 namespace ZynstormECFPlatform.Data
 {
-    public class StorageContextFactory() : IDesignTimeDbContextFactory<StorageContext>
+    public class StorageContextFactory : IDesignTimeDbContextFactory<StorageContext>
     {
-        //private readonly ConfigurationManager _configuration = configuration;
-
         public StorageContext CreateDbContext(string[] args)
         {
-            // 1. Cargar la configuración desde el appsettings.json (opcional pero recomendado)
-            var configuration = new ConfigurationManager();
+            var basePath = Directory.GetCurrentDirectory();
+            var apiPath = Path.Combine(basePath, "..", "ZynstormECFPlatform.Web.Api");
 
-            //.SetBasePath(Directory.GetCurrentDirectory())
-            //.AddJsonFile("appsettings.json", optional: true)
-            //.AddEnvironmentVariables()
-            //.Build();
+            // Verify if appsettings.json exists in the guessed Web.Api path, otherwise try current directory
+            if (!File.Exists(Path.Combine(apiPath, "appsettings.json")))
+            {
+                apiPath = Path.Combine(basePath, "ZynstormECFPlatform.Web.Api");
+            }
+
+            if (!File.Exists(Path.Combine(apiPath, "appsettings.json")))
+            {
+                apiPath = basePath;
+            }
+
+            var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
+
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(apiPath)
+                .AddJsonFile("appsettings.json", optional: true)
+                .AddJsonFile($"appsettings.{environment}.json", optional: true)
+                .AddEnvironmentVariables()
+                .Build();
+
+            var connectionString = configuration.GetConnectionString("DefaultConnection");
+
+            if (string.IsNullOrEmpty(connectionString))
+            {
+                throw new InvalidOperationException("Could not find a connection string named 'DefaultConnection'.");
+            }
 
             var optionsBuilder = new DbContextOptionsBuilder<StorageContext>();
-
-            // 2. Obtener la cadena de conexión
-            // Si no tienes appsettings en este proyecto, puedes ponerla fija para la migración:
-            //var connectionString = "Host=217.216.91.10;Port=8087;Database=ZynstormECFPlatform_dev_db;Username=easy_staging;Password=remigio135795#";
-
-            optionsBuilder.UseNpgsql(configuration.GetConnectionString("DefaultConnection")!);
+            optionsBuilder.UseNpgsql(connectionString);
 
             return new StorageContext(optionsBuilder.Options);
         }
