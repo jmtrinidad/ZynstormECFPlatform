@@ -16,14 +16,6 @@ public partial class SystemLog : BaseEntity
 
     public string? Exception { get; set; }
 
-    public bool IsDeleted { get; set; }
-
-    public DateTime? DeletedTimeUtc { get; set; }
-
-    public string GuidId { get; set; } = null!;
-
-    public DateTime? LastUpdateUtc { get; set; }
-
     public virtual Client Client { get; set; } = null!;
 
     public virtual EcfDocument EcfDocument { get; set; } = null!;

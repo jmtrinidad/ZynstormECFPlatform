@@ -657,6 +657,19 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasDefaultValue(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasData(
+                new EcfType { EcfTypeId = 1, Code = "31", Name = "Factura de Crédito Fiscal Electrónica" },
+                new EcfType { EcfTypeId = 2, Code = "32", Name = "Factura de Consumo Electrónica" },
+                new EcfType { EcfTypeId = 3, Code = "33", Name = "Nota de Débito Electrónica" },
+                new EcfType { EcfTypeId = 4, Code = "34", Name = "Nota de Crédito Electrónica" },
+                new EcfType { EcfTypeId = 5, Code = "41", Name = "Compras Electrónico" },
+                new EcfType { EcfTypeId = 5, Code = "43", Name = "Gastos Menores Electrónico" },
+                new EcfType { EcfTypeId = 5, Code = "44", Name = "Regímenes Especiales Electrónico" },
+                new EcfType { EcfTypeId = 5, Code = "45", Name = "Gubernamental Electrónico" },
+                new EcfType { EcfTypeId = 5, Code = "46", Name = "Comprobante de Exportaciones Electrónico" },
+                new EcfType { EcfTypeId = 5, Code = "47", Name = "Comprobante para Pagos al Exterior Electrónico" }
+                );
         });
 
         modelBuilder.Entity<EcfXmlDocument>(entity =>

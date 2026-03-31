@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using ZynstormECFPlatform.Common;
-
-namespace ZynstormECFPlatform.Core.Entities;
+﻿namespace ZynstormECFPlatform.Core.Entities;
 
 public partial class Currency : BaseEntity
 {

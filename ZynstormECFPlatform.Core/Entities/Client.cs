@@ -33,5 +33,6 @@ public partial class Client : BaseEntity
     public virtual ICollection<EcfDocument> EcfDocuments { get; set; } = [];
 
     public virtual ICollection<SystemLog> SystemLogs { get; set; } = [];
+
     public virtual ICollection<UseClient> UseClients { get; set; } = [];
 }
