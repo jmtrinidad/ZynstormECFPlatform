@@ -62,7 +62,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsRequired()
                   .HasMaxLength(450)
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -116,7 +116,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsRequired()
                   .HasMaxLength(450)
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -168,7 +168,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsRequired()
                   .HasMaxLength(450)
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -214,7 +214,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsRequired()
                   .HasMaxLength(450)
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -264,7 +264,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsRequired()
                   .HasMaxLength(450)
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -300,7 +300,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsRequired()
                   .HasMaxLength(450)
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
         });
@@ -329,7 +329,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsRequired()
                   .HasMaxLength(450)
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
         });
@@ -392,7 +392,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsRequired()
                   .HasMaxLength(450)
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -456,7 +456,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsRequired()
                   .HasMaxLength(450)
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -491,7 +491,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsRequired()
                   .HasMaxLength(450)
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -523,7 +523,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsRequired()
                   .HasMaxLength(450)
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -567,7 +567,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsRequired()
                   .HasMaxLength(450)
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -612,7 +612,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsRequired()
                   .HasMaxLength(450)
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -654,7 +654,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasMaxLength(450)
 
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -697,7 +697,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasMaxLength(450)
 
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -731,7 +731,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasMaxLength(450)
 
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -771,7 +771,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasMaxLength(450)
 
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
@@ -811,7 +811,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsRequired()
                   .HasMaxLength(450)
                   .IsUnicode(false)
-                  .HasDefaultValue(DefaultGUIDSqlValue);
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 

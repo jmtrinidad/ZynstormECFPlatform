@@ -12,7 +12,7 @@ using ZynstormECFPlatform.Data;
 namespace ZynstormECFPlatform.Data.Migrations
 {
     [DbContext(typeof(StorageContext))]
-    [Migration("20260324013313_InitialDb")]
+    [Migration("20260331123409_InitialDb")]
     partial class InitialDb
     {
         /// <inheritdoc />
@@ -164,7 +164,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -218,7 +218,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -298,7 +298,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -366,7 +366,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -437,7 +437,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -487,7 +487,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -529,7 +529,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -619,7 +619,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<string>("HangfireJobId")
                         .HasMaxLength(100)
@@ -705,7 +705,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -778,7 +778,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<decimal>("ITBISTotal")
                         .HasPrecision(18, 2)
@@ -823,7 +823,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -953,7 +953,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -1003,7 +1003,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -1076,7 +1076,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -1123,7 +1123,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -1194,7 +1194,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -1273,7 +1273,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -1321,7 +1321,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(450)
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
-                        .HasDefaultValue("gen_random_uuid()");
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
