@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using ZynstormECFPlatform.Abstractions.Data;
 using ZynstormECFPlatform.Core.Entities;
+using ZynstormECFPlatform.Data.Seeds;
 
 namespace ZynstormECFPlatform.Data;
 
@@ -66,15 +67,16 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
-            entity.HasOne(d => d.Client).WithMany(p => p.ApiKeys)
-                .HasForeignKey(d => d.ClientId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_ApiKey_Client");
+            entity.HasOne(d => d.Client)
+                  .WithMany(p => p.ApiKeys)
+                  .HasForeignKey(d => d.ClientId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_ApiKey_Client");
 
             entity.HasOne(d => d.Status).WithMany(p => p.ApiKeys)
-                .HasForeignKey(d => d.StatusId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_ApiKey_Status");
+                  .HasForeignKey(d => d.StatusId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_ApiKey_Status");
         });
 
         modelBuilder.Entity<Client>(entity =>
@@ -90,17 +92,17 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                 .IsUnicode(false);
 
             entity.Property(e => e.Name)
-                .HasMaxLength(50)
-                .IsUnicode(false);
+                  .HasMaxLength(50)
+                  .IsUnicode(false);
 
             entity.Property(e => e.Phone)
-                .HasMaxLength(20)
-                .IsUnicode(false);
+                  .HasMaxLength(20)
+                  .IsUnicode(false);
 
             entity.Property(e => e.Rnc)
-                .HasMaxLength(25)
-                .IsUnicode(false)
-                .HasColumnName("RNC");
+                  .HasMaxLength(25)
+                  .IsUnicode(false)
+                  .HasColumnName("RNC");
 
             entity.Property(c => c.LastUpdateUtc)
                   .HasColumnType(DateTimeColumnType);
@@ -120,10 +122,11 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
-            entity.HasOne(d => d.Status).WithMany(p => p.Clients)
-                .HasForeignKey(d => d.StatusId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Client_Status");
+            entity.HasOne(d => d.Status)
+                  .WithMany(p => p.Clients)
+                  .HasForeignKey(d => d.StatusId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_Client_Status");
         });
 
         modelBuilder.Entity<ClientBranche>(entity =>
@@ -172,7 +175,8 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
-            entity.HasOne(d => d.Client).WithMany(p => p.ClientBranches)
+            entity.HasOne(d => d.Client)
+                  .WithMany(p => p.ClientBranches)
                   .HasForeignKey(d => d.ClientId)
                   .OnDelete(DeleteBehavior.ClientSetNull)
                   .HasConstraintName("FK_ClientBranche_Client");
@@ -268,10 +272,11 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
-            entity.HasOne(d => d.Client).WithMany(p => p.ClientCertificates)
-                .HasForeignKey(d => d.ClientId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_ClientCertificate_Client");
+            entity.HasOne(d => d.Client)
+                  .WithMany(p => p.ClientCertificates)
+                  .HasForeignKey(d => d.ClientId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_ClientCertificate_Client");
         });
 
         modelBuilder.Entity<Currency>(entity =>
@@ -279,12 +284,12 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.HasKey(c => c.CurrencyId);
 
             entity.Property(e => e.Code)
-                .HasMaxLength(20)
-                .IsUnicode(false);
+                  .HasMaxLength(20)
+                  .IsUnicode(false);
 
             entity.Property(e => e.Name)
-                .HasMaxLength(50)
-                .IsUnicode(false);
+                  .HasMaxLength(50)
+                  .IsUnicode(false);
 
             entity.Property(c => c.LastUpdateUtc)
                   .HasColumnType(DateTimeColumnType);
@@ -343,20 +348,20 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasDefaultValueSql(DefaultDateTimeSqlValue);
 
             entity.Property(e => e.CustomerAddress)
-                .HasMaxLength(300)
-                .IsUnicode(false);
+                  .HasMaxLength(300)
+                  .IsUnicode(false);
 
             entity.Property(e => e.CustomerEmail)
-                .HasMaxLength(200)
-                .IsUnicode(false);
+                  .HasMaxLength(200)
+                  .IsUnicode(false);
 
             entity.Property(e => e.CustomerName)
-                .HasMaxLength(100)
-                .IsUnicode(false);
+                  .HasMaxLength(100)
+                  .IsUnicode(false);
 
             entity.Property(e => e.CustomerRnc)
-                .HasMaxLength(50)
-                .IsUnicode(false);
+                  .HasMaxLength(50)
+                  .IsUnicode(false);
 
             entity.Property(e => e.ExternalReference)
                 .HasMaxLength(70)
@@ -396,35 +401,69 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
             entity.HasQueryFilter(c => !c.IsDeleted);
 
-            entity.HasOne(d => d.ApiKey).WithMany(p => p.EcfDocuments)
-                .HasForeignKey(d => d.ApiKeyId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_EcfDocument_ApiKey");
+            entity.HasOne(d => d.ApiKey)
+                  .WithMany(p => p.EcfDocuments)
+                  .HasForeignKey(d => d.ApiKeyId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_EcfDocument_ApiKey");
 
-            entity.HasOne(d => d.ClientBranche).WithMany(p => p.EcfDocuments)
-                .HasForeignKey(d => d.ClientBrancheId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_EcfDocument_ClientBranche");
+            entity.HasOne(d => d.ClientBranche)
+                  .WithMany(p => p.EcfDocuments)
+                  .HasForeignKey(d => d.ClientBrancheId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_EcfDocument_ClientBranche");
 
-            entity.HasOne(d => d.Client).WithMany(p => p.EcfDocuments)
-                .HasForeignKey(d => d.ClientId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_EcfDocument_Client");
+            entity.HasOne(d => d.Client)
+                  .WithMany(p => p.EcfDocuments)
+                  .HasForeignKey(d => d.ClientId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_EcfDocument_Client");
 
-            entity.HasOne(d => d.Currency).WithMany(p => p.EcfDocuments)
-                .HasForeignKey(d => d.CurrencyId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_EcfDocument_Currency");
+            entity.HasOne(d => d.Currency)
+                  .WithMany(p => p.EcfDocuments)
+                  .HasForeignKey(d => d.CurrencyId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_EcfDocument_Currency");
 
-            entity.HasOne(d => d.EcfStatus).WithMany(p => p.EcfDocuments)
-                .HasForeignKey(d => d.EcfStatusId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_EcfDocument_EcfStatus");
+            entity.HasOne(d => d.EcfStatus)
+                  .WithMany(p => p.EcfDocuments)
+                  .HasForeignKey(d => d.EcfStatusId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_EcfDocument_EcfStatus");
 
-            entity.HasOne(d => d.EcfType).WithMany(p => p.EcfDocuments)
-                .HasForeignKey(d => d.EcfTypeId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_EcfDocument_EcfType");
+            entity.HasOne(d => d.EcfType)
+                  .WithMany(p => p.EcfDocuments)
+                  .HasForeignKey(d => d.EcfTypeId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_EcfDocument_EcfType");
+
+            // Extended Properties
+            entity.Property(e => e.Version).HasMaxLength(10).IsUnicode(false).HasDefaultValue("1.0");
+            entity.Property(e => e.SequenceExpirationDate).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.IncomeType).HasMaxLength(2).IsUnicode(false);
+            entity.Property(e => e.PaymentDeadline).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.PaymentTerms).HasMaxLength(15).IsUnicode(false);
+            entity.Property(e => e.IssuerCommercialName).HasMaxLength(150).IsUnicode(false);
+            entity.Property(e => e.IssuerBranchCode).HasMaxLength(20).IsUnicode(false);
+            entity.Property(e => e.IssuerMunicipality).HasMaxLength(6).IsUnicode(false);
+            entity.Property(e => e.IssuerProvince).HasMaxLength(6).IsUnicode(false);
+            entity.Property(e => e.IssuerActivityCode).HasMaxLength(10).IsUnicode(false);
+            entity.Property(e => e.IssuerSellerCode).HasMaxLength(10).IsUnicode(false);
+            entity.Property(e => e.IssuerWebSite).HasMaxLength(80).IsUnicode(false);
+            entity.Property(e => e.IssuerAdditionalInfo).HasMaxLength(150).IsUnicode(false);
+            entity.Property(e => e.CustomerContact).HasMaxLength(80).IsUnicode(false);
+            entity.Property(e => e.CustomerMunicipality).HasMaxLength(6).IsUnicode(false);
+            entity.Property(e => e.CustomerProvince).HasMaxLength(6).IsUnicode(false);
+            entity.Property(e => e.DeliveryDate).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.DeliveryContact).HasMaxLength(100).IsUnicode(false);
+            entity.Property(e => e.DeliveryAddress).HasMaxLength(100).IsUnicode(false);
+            entity.Property(e => e.AdditionalPhone).HasMaxLength(12).IsUnicode(false);
+            entity.Property(e => e.PurchaseOrderDate).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.PurchaseOrderNumber).HasMaxLength(20).IsUnicode(false);
+            entity.Property(e => e.ModifiedNcf).HasMaxLength(19).IsUnicode(false);
+            entity.Property(e => e.ModifiedNcfDate).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.ModificationReason).HasMaxLength(90).IsUnicode(false);
+            entity.Property(e => e.SignatureDateTime).HasColumnType(DateTimeColumnType);
         });
 
         modelBuilder.Entity<EcfDocumentDetail>(entity =>
@@ -464,6 +503,12 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                 .HasForeignKey(d => d.EcfDocumentId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_EcfDocumentDetail_EcfDocument");
+
+            // Extended Properties
+            entity.Property(e => e.ItemName).HasMaxLength(80).IsUnicode(false);
+            entity.Property(e => e.WithholdingItbis).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.WithholdingIsr).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.ItemAmount).HasColumnType("decimal(18, 2)");
         });
 
         modelBuilder.Entity<EcfDocumentTotal>(entity =>
@@ -499,6 +544,17 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                 .HasForeignKey(d => d.EcfDocumentId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_EcfDocumentTotal_EcfDocument");
+
+            // Extended Properties
+            entity.Property(e => e.TaxableAmount).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.TaxableAmountG1).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.TaxableAmountG2).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.TaxableAmountG3).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.TaxAmount1).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.TaxAmount2).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.TaxAmount3).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.TotalWithheldItbis).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.TotalWithheldIsr).HasColumnType("decimal(18, 2)");
         });
 
         modelBuilder.Entity<EcfStatus>(entity =>
@@ -664,11 +720,11 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                 new EcfType { EcfTypeId = 3, Code = "33", Name = "Nota de Débito Electrónica" },
                 new EcfType { EcfTypeId = 4, Code = "34", Name = "Nota de Crédito Electrónica" },
                 new EcfType { EcfTypeId = 5, Code = "41", Name = "Compras Electrónico" },
-                new EcfType { EcfTypeId = 5, Code = "43", Name = "Gastos Menores Electrónico" },
-                new EcfType { EcfTypeId = 5, Code = "44", Name = "Regímenes Especiales Electrónico" },
-                new EcfType { EcfTypeId = 5, Code = "45", Name = "Gubernamental Electrónico" },
-                new EcfType { EcfTypeId = 5, Code = "46", Name = "Comprobante de Exportaciones Electrónico" },
-                new EcfType { EcfTypeId = 5, Code = "47", Name = "Comprobante para Pagos al Exterior Electrónico" }
+                new EcfType { EcfTypeId = 6, Code = "43", Name = "Gastos Menores Electrónico" },
+                new EcfType { EcfTypeId = 7, Code = "44", Name = "Regímenes Especiales Electrónico" },
+                new EcfType { EcfTypeId = 8, Code = "45", Name = "Gubernamental Electrónico" },
+                new EcfType { EcfTypeId = 9, Code = "46", Name = "Comprobante de Exportaciones Electrónico" },
+                new EcfType { EcfTypeId = 10, Code = "47", Name = "Comprobante para Pagos al Exterior Electrónico" }
                 );
         });
 
@@ -826,6 +882,45 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasForeignKey(d => d.UserId)
                   .OnDelete(DeleteBehavior.ClientSetNull)
                   .HasConstraintName("FK_UseClient_User");
+        });
+
+        modelBuilder.Entity<DgiiMunicipality>(entity =>
+        {
+            entity.HasKey(c => c.DgiiMunicipalityId);
+
+            entity.Property(e => e.Code)
+                  .IsRequired()
+                  .HasMaxLength(6)
+                  .IsFixedLength()
+                  .IsUnicode(false);
+
+            entity.Property(e => e.Name)
+                  .IsRequired()
+                  .HasMaxLength(150)
+                  .IsUnicode(false);
+
+            entity.Property(e => e.IsProvince)
+                  .HasDefaultValue(false);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            DgiiMunicipalitySeeds.Seed(entity);
         });
     }
 }

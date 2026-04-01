@@ -11,6 +11,7 @@
     <Project Path="ZynstormECFPlatform.Dtos/ZynstormECFPlatform.Dtos.csproj" />
     <Project Path="ZynstormECFPlatform.Mappings/ZynstormECFPlatform.Mappings.csproj" />
     <Project Path="ZynstormECFPlatform.Reports/ZynstormECFPlatform.Reports.csproj" />
+    <Project Path="ZynstormECFPlatform.Schemas/ZynstormECFPlatform.Schemas.csproj" Id="f894f795-098a-4ac0-8e5c-9fb2fae6ec6c" />
     <Project Path="ZynstormECFPlatform.Services/ZynstormECFPlatform.Services.csproj" />
   </Folder>
 </Solution>
