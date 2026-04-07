@@ -11,9 +11,11 @@ public class ClientService(
     IRepository<ApiKey> apiKeyRepository,
     StorageContext context,
     ISqlGenerator sqlGenerator,
-    IEmailService emailService) : Repository<Client>(context, sqlGenerator), IClientService
+    IEmailService emailService,
+    IEncryptedService encryptedService) : Repository<Client>(context, sqlGenerator), IClientService
 {
     private readonly IRepository<ApiKey> _apiKeyRepository = apiKeyRepository;
+    private readonly IEncryptedService _encryptedService = encryptedService;
 
     public override async Task<Client?> InsertAsync(Client model)
     {
@@ -28,7 +30,7 @@ public class ClientService(
             {
                 ClientId = client.ClientId,
                 Apikey = apiKey,
-                SecretKey = secretKey,
+                SecretKey = _encryptedService.EncryptString(secretKey),
                 StatusId = (int)StatusEnum.Active,
                 RegisteredAt = DateTime.UtcNow,
                 GuidId = Guid.NewGuid().ToString()
