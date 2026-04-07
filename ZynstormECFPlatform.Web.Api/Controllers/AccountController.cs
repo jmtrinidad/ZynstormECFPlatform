@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
+using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Web.Api.Helpers;
@@ -11,20 +12,20 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
     [Route("[controller]")]
     public class AccountController : ControllerBase
     {
-        private readonly IAuthService _authService;
+        private readonly IAccountService _accountService;
         private readonly IEncryptedService _encryptedService;
         private readonly IJwtTokenService _jwtTokenService;
         private readonly IEmailService _emailService;
         private readonly ILogger<AccountController> _logger;
 
         public AccountController(
-             IAuthService authService,
+             IAccountService accountService,
             IEncryptedService encryptedService,
             IJwtTokenService jwtTokenService,
             IEmailService emailService,
             ILogger<AccountController> logger)
         {
-            _authService = authService;
+            _accountService = accountService;
             _encryptedService = encryptedService;
             _jwtTokenService = jwtTokenService;
             _emailService = emailService;
@@ -45,8 +46,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
             var identifier = dto.Identifier.Trim();
 
-            var user = await _authService.GetUserByEmailAsync(identifier).ConfigureAwait(false)
-                       ?? await _authService.GetUserByUserNameAsync(identifier).ConfigureAwait(false);
+            var user = await _accountService.GetUserByEmailAsync(identifier).ConfigureAwait(false)
+                       ?? await _accountService.GetUserByUserNameAsync(identifier).ConfigureAwait(false);
 
             if (user is null)
                 return Ok();
@@ -56,7 +57,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 return BadRequest("Usuario no se encuentra activo.");
             }
 
-            var token = await _authService.GeneratePasswordResetTokenAsync(user).ConfigureAwait(false);
+            var token = await _accountService.GeneratePasswordResetTokenAsync(user).ConfigureAwait(false);
             var encodedToken = Convert.ToBase64String(Encoding.UTF8.GetBytes(token));
 
             var callbackUrl = Url.Action(
@@ -93,14 +94,14 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         [ProducesResponseType(404)]
         [ProducesResponseType(422)]
         [ProducesResponseType(503)]
-        public async Task<ActionResult> SignIn([FromBody] LoginDto dto)
+        public async Task<ActionResult> SignIn([FromBody] UserLoginDto dto)
         {
             try
             {
                 dto.UserName = TryDecrypt(dto.UserName);
                 dto.Password = TryDecrypt(dto.Password);
 
-                var user = await _authService.GetUserByUserNameAsync(dto.UserName).ConfigureAwait(false);
+                var user = await _accountService.GetUserByUserNameAsync(dto.UserName).ConfigureAwait(false);
 
                 if (user is null)
                     return NotFound("Usuario o contraseña incorrecta");
@@ -108,12 +109,12 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 if (!user.IsActive)
                     return NotFound("Usuario no se encuentra activo");
 
-                var signIn = await _authService.SignInAsync(dto).ConfigureAwait(false);
+                var signIn = await _accountService.LoginAsync(dto).ConfigureAwait(false);
 
                 if (!signIn.Succeeded)
                     return NotFound("Usuario o contraseña incorrecta");
 
-                var role = await _authService.GetRoleByUserAsync(user).ConfigureAwait(false);
+                var role = await _accountService.GetRoleByUserAsync(user).ConfigureAwait(false);
 
                 var tokenDto = _jwtTokenService.CreateToken(user, role!);
 

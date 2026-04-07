@@ -1,0 +1,27 @@
+﻿  Determining projects to restore...
+C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\ZynstormECFPlatform.Services.csproj : warning NU1902: Package 'MimeKit' 4.10.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-g7hc-96xr-gvvx [C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Web.Api\ZynstormECFPlatform.Web.Api.csproj]
+C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Web.Api\ZynstormECFPlatform.Web.Api.csproj : warning NU1902: Package 'MimeKit' 4.10.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-g7hc-96xr-gvvx
+  All projects are up-to-date for restore.
+C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Web.Api\ZynstormECFPlatform.Web.Api.csproj : warning NU1902: Package 'MimeKit' 4.10.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-g7hc-96xr-gvvx
+C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\ZynstormECFPlatform.Services.csproj : warning NU1902: Package 'MimeKit' 4.10.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-g7hc-96xr-gvvx
+  ZynstormECFPlatform.Common -> C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Common\bin\Debug\net10.0\ZynstormECFPlatform.Common.dll
+  ZynstormECFPlatform.Core -> C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Core\bin\Debug\net10.0\ZynstormECFPlatform.Core.dll
+  ZynstormECFPlatform.Dtos -> C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Dtos\bin\Debug\net10.0\ZynstormECFPlatform.Dtos.dll
+  ZynstormECFPlatform.Reports -> C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Reports\bin\Debug\net10.0\ZynstormECFPlatform.Reports.dll
+  ZynstormECFPlatform.Mappings -> C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Mappings\bin\Debug\net10.0\ZynstormECFPlatform.Mappings.dll
+  ZynstormECFPlatform.Abstractions -> C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Abstractions\bin\Debug\net10.0\ZynstormECFPlatform.Abstractions.dll
+  ZynstormECFPlatform.Data -> C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\bin\Debug\net10.0\ZynstormECFPlatform.Data.dll
+  ZynstormECFPlatform.Services -> C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\bin\Debug\net10.0\ZynstormECFPlatform.Services.dll
+C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data.Services\AccountService.cs(72,17): error CS0117: 'Role' does not contain a definition for 'GuidId' [C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data.Services\ZynstormECFPlatform.Data.Services.csproj]
+
+Build FAILED.
+
+C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\ZynstormECFPlatform.Services.csproj : warning NU1902: Package 'MimeKit' 4.10.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-g7hc-96xr-gvvx [C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Web.Api\ZynstormECFPlatform.Web.Api.csproj]
+C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Web.Api\ZynstormECFPlatform.Web.Api.csproj : warning NU1902: Package 'MimeKit' 4.10.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-g7hc-96xr-gvvx
+C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Web.Api\ZynstormECFPlatform.Web.Api.csproj : warning NU1902: Package 'MimeKit' 4.10.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-g7hc-96xr-gvvx
+C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\ZynstormECFPlatform.Services.csproj : warning NU1902: Package 'MimeKit' 4.10.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-g7hc-96xr-gvvx
+C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data.Services\AccountService.cs(72,17): error CS0117: 'Role' does not contain a definition for 'GuidId' [C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data.Services\ZynstormECFPlatform.Data.Services.csproj]
+    4 Warning(s)
+    1 Error(s)
+
+Time Elapsed 00:00:01.72

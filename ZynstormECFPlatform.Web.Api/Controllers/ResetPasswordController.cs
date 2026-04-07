@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text;
+using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Core;
 using ZynstormECFPlatform.Dtos;
@@ -12,18 +14,18 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
     [Route("[controller]")]
     public class ResetPasswordController : Controller
     {
-        private readonly IAuthService _authService;
+        private readonly IAccountService _accountService;
         private readonly ILogger<ResetPasswordController> _logger;
         private readonly IEmailService _emailService;
         private readonly AppSettings _appSettings;
 
         public ResetPasswordController(
-            IAuthService authService,
+            IAccountService accountService,
             ILogger<ResetPasswordController> logger,
             IEmailService emailService,
             IOptions<AppSettings> appSettings)
         {
-            _authService = authService;
+            _accountService = accountService;
             _logger = logger;
             _emailService = emailService;
             _appSettings = appSettings.Value;
@@ -64,8 +66,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 var identifier = dto.Identifier.Trim();
 
-                var user = await _authService.GetUserByEmailAsync(identifier).ConfigureAwait(false)
-                           ?? await _authService.GetUserByUserNameAsync(identifier).ConfigureAwait(false);
+                var user = await _accountService.GetUserByEmailAsync(identifier).ConfigureAwait(false)
+                           ?? await _accountService.GetUserByUserNameAsync(identifier).ConfigureAwait(false);
 
                 if (user is null)
                     return Ok();
@@ -92,7 +94,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     // si no viene base64, usar el valor original
                 }
 
-                var result = await _authService.ResetPasswordAsync(user, decodedToken, dto.Password).ConfigureAwait(false);
+                var result = await _accountService.ResetPasswordAsync(user, decodedToken, dto.Password).ConfigureAwait(false);
 
                 if (!result.Succeeded)
                 {

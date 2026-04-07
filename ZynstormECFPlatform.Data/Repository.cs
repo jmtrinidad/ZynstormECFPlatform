@@ -13,20 +13,13 @@ namespace ZynstormECFPlatform.Data;
 // 1. Optimize performance by avoiding the overhead of capturing and returning to the original SynchronizationContext.
 // 2. Prevent potential deadlocks in environments with a specific SynchronizationContext (like UI or legacy ASP.NET).
 // 3. Follow library development best practices to ensure the repository remains host-agnostic.
-public class Repository<TModel> : IRepository<TModel> where TModel : class, IEntityMarker
+public class Repository<TModel>(StorageContext context, ISqlGenerator sqlGenerator) : IRepository<TModel> where TModel : class, IEntityMarker
 {
-    private readonly StorageContext _context;
-    private readonly DbSet<TModel> _dbSet;
-    private readonly ISqlGenerator _sqlGenerator;
+    private readonly StorageContext _context = context;
+    private readonly DbSet<TModel> _dbSet = context.Set<TModel>();
+    private readonly ISqlGenerator _sqlGenerator = sqlGenerator;
 
     private IDbTransaction? ActiveDbTransaction => _context.Database.CurrentTransaction?.GetDbTransaction();
-
-    public Repository(StorageContext context, ISqlGenerator sqlGenerator)
-    {
-        _context = context;
-        _sqlGenerator = sqlGenerator;
-        _dbSet = context.Set<TModel>();
-    }
 
     public IDbConnection Connection => _context.Database.GetDbConnection();
 

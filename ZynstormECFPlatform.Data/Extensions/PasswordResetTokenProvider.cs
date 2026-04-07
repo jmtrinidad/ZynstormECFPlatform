@@ -8,19 +8,9 @@ namespace ZynstormECFPlatform.Data.Extensions
     {
         public PasswordResetTokenProvider(
             IDataProtectionProvider dataProtectionProvider,
-            IOptions<PasswordResetTokenProviderOptions> options,
-            Microsoft.Extensions.Logging.ILogger<DataProtectorTokenProvider<TUser>> logger)
-            : base(dataProtectionProvider, options, logger)
+            IOptions<DataProtectionTokenProviderOptions> options)
+            : base(dataProtectionProvider, options)
         {
-        }
-    }
-
-    public class PasswordResetTokenProviderOptions : DataProtectionTokenProviderOptions
-    {
-        public PasswordResetTokenProviderOptions()
-        {
-            Name = "PasswordResetTokenProvider";
-            TokenLifespan = TimeSpan.FromMinutes(30);
         }
     }
 }

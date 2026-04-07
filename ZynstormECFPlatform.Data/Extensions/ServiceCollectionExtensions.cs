@@ -36,8 +36,9 @@ public static class ServiceCollectionExtensions
           .AddDefaultTokenProviders()
           .AddEntityFrameworkStores<StorageContext>();
 
-        services.Configure<PasswordResetTokenProviderOptions>(options =>
+        services.Configure<DataProtectionTokenProviderOptions>("PasswordResetTokenProvider", options =>
         {
+            options.Name = "PasswordResetTokenProvider";
             options.TokenLifespan = TimeSpan.FromMinutes(30);
         });
 

@@ -11,7 +11,6 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IJwtTokenService, JwtTokenService>();
         services.AddTransient<IEncryptedService, EncryptedService>();
         services.AddTransient<IEmailService, EmailService>();
-        services.AddTransient<IAuthService, AuthService>();
 
         return services;
     }
