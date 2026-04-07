@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
 using ZynstormECFPlatform.Common;
 
@@ -20,6 +20,8 @@ public class User : IdentityUser, IEntityMarker
 
     [ConcurrencyCheck]
     public DateTime? LastUpdateUtc { get; set; }
+
+    public DateTime RegisteredAt { get; set; }
 
     public string FullName => $"{FirstName} {LastName}";
 

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace ZynstormECFPlatform.Dtos;
 
@@ -28,5 +28,5 @@ public class ClientCallBackViewDto : ClientCallBackUpdateDto
 {
     public bool IsActive { get; set; }
 
-    public DateTime CreatedAtUtc { get; set; }
+    public DateTime RegisteredAt { get; set; }
 }

@@ -1,4 +1,4 @@
-﻿using ZynstormECFPlatform.Common;
+using ZynstormECFPlatform.Common;
 
 namespace ZynstormECFPlatform.Core.Entities;
 
@@ -22,7 +22,6 @@ public partial class ClientBranche : BaseEntity
 
     public int StatusId { get; set; }
 
-    public DateTime CreatedAtUtc { get; set; }
 
     public virtual Client Client { get; set; } = null!;
 

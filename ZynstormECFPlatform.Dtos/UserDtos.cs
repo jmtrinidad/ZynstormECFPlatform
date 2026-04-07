@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using ZynstormECFPlatform.Common.Enums;
 
 namespace ZynstormECFPlatform.Dtos;
@@ -58,4 +58,6 @@ public class UserViewDto : UserUpdateDto
     public UserType UserType { get; set; }
 
     public string FullName => $"{FirstName} {LastName}";
+
+    public DateTime RegisteredAt { get; set; }
 }

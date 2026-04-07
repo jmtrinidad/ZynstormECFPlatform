@@ -59,9 +59,6 @@ public partial class EcfDocument : BaseEntity
     public string? HangfireJobId { get; set; }
 
     [XmlIgnore]
-    public DateTime CreatedAtUtc { get; set; }
-
-    [XmlIgnore]
     public virtual ApiKey ApiKey { get; set; } = null!;
 
     [XmlIgnore]

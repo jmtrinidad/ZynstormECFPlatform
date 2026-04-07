@@ -1,4 +1,4 @@
-﻿namespace ZynstormECFPlatform.Core.Entities;
+namespace ZynstormECFPlatform.Core.Entities;
 
 public partial class EcfStatusHistory : BaseEntity
 {
@@ -10,7 +10,6 @@ public partial class EcfStatusHistory : BaseEntity
 
     public string Message { get; set; } = null!;
 
-    public DateTime CreatedAtUtc { get; set; }
 
     public virtual EcfDocument EcfDocument { get; set; } = null!;
 

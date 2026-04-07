@@ -254,7 +254,7 @@ public class Repository<TModel> : IRepository<TModel> where TModel : class, IEnt
         return 0;
     }
 
-    public async Task<TModel?> InsertAsync(TModel model)
+    public virtual async Task<TModel?> InsertAsync(TModel model)
     {
         model.LastUpdateUtc = DateTime.UtcNow;
         await _dbSet.AddAsync(model).ConfigureAwait(false);

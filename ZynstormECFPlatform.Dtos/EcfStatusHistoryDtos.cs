@@ -1,4 +1,4 @@
-﻿namespace ZynstormECFPlatform.Dtos;
+namespace ZynstormECFPlatform.Dtos;
 
 public class EcfStatusHistoryViewDto
 {
@@ -10,5 +10,5 @@ public class EcfStatusHistoryViewDto
 
     public string Message { get; set; } = null!;
 
-    public DateTime CreatedAtUtc { get; set; }
+    public DateTime RegisteredAt { get; set; }
 }

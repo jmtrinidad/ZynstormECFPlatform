@@ -29,5 +29,5 @@ public class ClientUpdateDto : ClientCreateDto
 
 public class ClientViewDto : ClientUpdateDto
 {
-    public DateTime CreatedAt { get; set; }
+    public DateTime RegisteredAt { get; set; }
 }

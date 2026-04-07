@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using ZynstormECFPlatform.Common;
 
@@ -20,7 +20,6 @@ public partial class ClientCallBack : BaseEntity
 
     public int StatusId { get; set; }
 
-    public DateTime CreatedAtUtc { get; set; }
 
     public virtual ApiKey? ApiKey { get; set; }
 

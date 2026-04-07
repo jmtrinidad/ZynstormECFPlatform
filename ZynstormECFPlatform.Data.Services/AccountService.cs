@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using ZynstormECFPlatform.Common.Enums;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Dtos;
@@ -60,7 +60,7 @@ public class AccountService : IAccountService
         await _userManager.AddToRoleAsync(user, roleName);
     }
 
-    public async Task<IdentityResult> ChangePasswordAsync(User user, string oldPassword, string newPassword)
+    public async Task<IdentityResult?> ChangePasswordAsync(User user, string oldPassword, string newPassword)
     {
         return await _userManager.ChangePasswordAsync(user, oldPassword, newPassword);
     }
@@ -78,7 +78,7 @@ public class AccountService : IAccountService
         }
     }
 
-    public async Task<IdentityResult> ConfirmEmailAsync(User user, string token)
+    public async Task<IdentityResult?> ConfirmEmailAsync(User user, string token)
     {
         return await _userManager.ConfirmEmailAsync(user, token);
     }
@@ -144,12 +144,12 @@ public class AccountService : IAccountService
         await _signInManager.SignOutAsync();
     }
 
-    public async Task<IdentityResult> ResetPasswordAsync(User user, string token, string password)
+    public async Task<IdentityResult?> ResetPasswordAsync(User user, string token, string password)
     {
         return await _userManager.ResetPasswordAsync(user, token, password);
     }
 
-    public async Task<IdentityResult> UpdateUserAsync(User user)
+    public async Task<IdentityResult?> UpdateUserAsync(User user)
     {
         return await _userManager.UpdateAsync(user);
     }

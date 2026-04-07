@@ -1,4 +1,4 @@
-﻿namespace ZynstormECFPlatform.Core.Entities;
+namespace ZynstormECFPlatform.Core.Entities;
 
 public partial class ApiKey : BaseEntity
 {
@@ -13,8 +13,6 @@ public partial class ApiKey : BaseEntity
     public string? SecretKey { get; set; }
 
     public int StatusId { get; set; }
-
-    public DateTime CreatedAtUtc { get; set; }
 
     public virtual Client Client { get; set; } = null!;
 

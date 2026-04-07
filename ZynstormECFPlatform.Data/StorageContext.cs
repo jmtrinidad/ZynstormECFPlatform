@@ -13,7 +13,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
     private string DefaultGUIDSqlValue => Database.IsRelational() && Database.IsNpgsql() ? "gen_random_uuid()" : "NEWID()";
 
     //private string DefaultDueDateTimeSqlValue => Database.IsRelational() && Database.IsNpgsql() ? "CURRENT_TIMESTAMP + interval '1 month'" : "DATEADD(month, 1, GETDATE())";
-    private string DateTimeColumnType => Database.IsRelational() && Database.IsNpgsql() ? "timestamp with time zone" : "datetime";
+    private string DateTimeColumnType => Database.IsRelational() && Database.IsNpgsql() ? "timestamp without time zone" : "datetime";
 
     //private string StringColumnType => Database.IsRelational() && Database.IsNpgsql() ? "text" : "NVARCHAR";
 
@@ -35,6 +35,18 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
     {
         base.OnModelCreating(modelBuilder);
 
+        // Apply global PostgreSQL DateTime column type configuration
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            var properties = entityType.GetProperties()
+                .Where(p => p.ClrType == typeof(DateTime) || p.ClrType == typeof(DateTime?));
+
+            foreach (var property in properties)
+            {
+                modelBuilder.Entity(entityType.ClrType).Property(property.Name).HasColumnType(DateTimeColumnType);
+            }
+        }
+
         modelBuilder.Entity<ApiKey>(entity =>
         {
             entity.HasKey(c => c.ApiKeyId);
@@ -42,7 +54,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.Apikey)
                   .IsUnicode(false);
 
-            entity.Property(e => e.CreatedAtUtc)
+            entity.Property(e => e.RegisteredAt)
                   .HasColumnType(DateTimeColumnType)
                   .HasDefaultValueSql(DefaultDateTimeSqlValue);
 
@@ -83,7 +95,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
         {
             entity.HasKey(c => c.ClientId);
 
-            entity.Property(e => e.CreatedAtUtc)
+            entity.Property(e => e.RegisteredAt)
                   .HasColumnType(DateTimeColumnType)
                   .HasDefaultValueSql(DefaultDateTimeSqlValue);
 
@@ -141,7 +153,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasMaxLength(20)
                   .IsUnicode(false);
 
-            entity.Property(e => e.CreatedAtUtc)
+            entity.Property(e => e.RegisteredAt)
                   .HasColumnType(DateTimeColumnType)
                   .HasDefaultValueSql(DefaultDateTimeSqlValue);
 
@@ -192,7 +204,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
         {
             entity.HasKey(c => c.ClientCallBackId);
 
-            entity.Property(e => e.CreatedAtUtc)
+            entity.Property(e => e.RegisteredAt)
                   .HasColumnType(DateTimeColumnType)
                   .HasDefaultValueSql(DefaultDateTimeSqlValue);
 
@@ -249,7 +261,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.HasKey(c => c.ClientCertificateId);
 
             entity.Property(e => e.Certificate).IsUnicode(false);
-            entity.Property(e => e.CreatedAtUtc).HasColumnType(DateTimeColumnType).HasDefaultValueSql(DefaultDateTimeSqlValue);
+            entity.Property(e => e.RegisteredAt).HasColumnType(DateTimeColumnType).HasDefaultValueSql(DefaultDateTimeSqlValue);
             entity.Property(e => e.ExpirationDateUtc).HasColumnType(DateTimeColumnType);
             entity.Property(e => e.Password).IsUnicode(false);
             entity.Property(e => e.Thumbprint).IsUnicode(false);
@@ -343,7 +355,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
         {
             entity.HasKey(c => c.EcfDocumentId);
 
-            entity.Property(e => e.CreatedAtUtc)
+            entity.Property(e => e.RegisteredAt)
                   .HasColumnType(DateTimeColumnType)
                   .HasDefaultValueSql(DefaultDateTimeSqlValue);
 
@@ -604,7 +616,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
         {
             entity.HasKey(c => c.EcfStatusHistoryId);
 
-            entity.Property(e => e.CreatedAtUtc)
+            entity.Property(e => e.RegisteredAt)
                 .HasColumnType(DateTimeColumnType)
                 .HasDefaultValueSql(DefaultDateTimeSqlValue);
             entity.Property(e => e.Message).HasColumnType("text");
@@ -732,7 +744,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
         {
             entity.HasKey(c => c.EcfXmlDocumentId);
 
-            entity.Property(e => e.CreatedAtUtc)
+            entity.Property(e => e.RegisteredAt)
                 .HasColumnType(DateTimeColumnType)
                 .HasDefaultValueSql(DefaultDateTimeSqlValue);
 

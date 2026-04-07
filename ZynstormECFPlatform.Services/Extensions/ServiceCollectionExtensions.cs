@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using ZynstormECFPlatform.Abstractions.Services;
 
 namespace ZynstormECFPlatform.Services.Extensions;
@@ -10,6 +10,7 @@ public static class ServiceCollectionExtensions
         //services.AddTransient<IAuthenticationService, AuthenticationService>();
         services.AddTransient<IJwtTokenService, JwtTokenService>();
         services.AddTransient<IEncryptedService, EncryptedService>();
+        services.AddTransient<IEmailService, EmailService>();
 
         return services;
     }

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace ZynstormECFPlatform.Dtos;
 
@@ -26,5 +26,5 @@ public class ClientCertificateUpdateDto : ClientCertificateCreateDto
 
 public class ClientCertificateViewDto : ClientCertificateUpdateDto
 {
-    public DateTime CreatedAtUtc { get; set; }
+    public DateTime RegisteredAt { get; set; }
 }
