@@ -12,6 +12,8 @@ public class User : IdentityUser, IEntityMarker
     [MaxLength(50)]
     public string LastName { get; set; } = default!;
 
+    public bool IsActive { get; set; } = true;
+
     public bool IsDeleted { get; set; }
 
     public DateTime? DeletedTimeUtc { get; set; }

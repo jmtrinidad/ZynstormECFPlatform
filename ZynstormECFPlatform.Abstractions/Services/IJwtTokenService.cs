@@ -1,5 +1,7 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Identity;
 using ZynstormECFPlatform.Core.Entities;
+using ZynstormECFPlatform.Dtos;
 
 namespace ZynstormECFPlatform.Abstractions.Services;
 
@@ -9,5 +11,5 @@ public interface IJwtTokenService
 
     int GetUserIdFromToken(string token, string secret);
 
-    (string token, DateTime exp) CreateToken(User user, string secret, Role rol);
+    TokenDto CreateToken(User user, IdentityRole rol);
 }

@@ -13,4 +13,6 @@ public class AppSettings
     public string SmtpUsername { get; set; } = null!;
     public string SmtpAppPassword { get; set; } = null!;
     public string SmtpFromName { get; set; } = null!;
+
+    public string PasswordChangeSuccessUrl { get; set; } = string.Empty;
 }

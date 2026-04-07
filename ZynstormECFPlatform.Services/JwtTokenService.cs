@@ -1,16 +1,25 @@
-﻿using Microsoft.IdentityModel.Tokens;
-using System;
-using System.Collections.Generic;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using ZynstormECFPlatform.Abstractions.Services;
+using ZynstormECFPlatform.Core;
 using ZynstormECFPlatform.Core.Entities;
+using ZynstormECFPlatform.Dtos;
 
 namespace ZynstormECFPlatform.Services;
 
 public class JwtTokenService : IJwtTokenService
 {
+    private readonly AppSettings _appSettings;
+
+    public JwtTokenService(IOptions<AppSettings> appSettings)
+    {
+        _appSettings = appSettings.Value;
+    }
+
     public ClaimsPrincipal GetPrincipalClaim(string token, string secret)
     {
         var key = Encoding.ASCII.GetBytes(secret);
@@ -37,41 +46,41 @@ public class JwtTokenService : IJwtTokenService
             ValidateAudience = false
         };
         var claims = handler.ValidateToken(token, validations, out _);
-        return int.Parse(claims.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value);
+        var nameIdentifier = claims.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
+        return string.IsNullOrEmpty(nameIdentifier) ? 0 : int.Parse(nameIdentifier);
     }
 
-    public (string token, DateTime exp) CreateToken(User user, string secret, Role rol)
+    public TokenDto CreateToken(User user, IdentityRole role)
     {
-        var key = Encoding.ASCII.GetBytes(secret);
-        var issuedAt = DateTime.UtcNow;
-        var expirationTime = issuedAt.AddSeconds(43200);
+        var secret = Encoding.UTF8.GetBytes(_appSettings.Secret);
+        var issuedAt = DateTime.Now;
+        var expirationTime = issuedAt.AddDays(1);
+
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(new[]
             {
-                    new Claim(ClaimTypes.NameIdentifier, user.Id),
-                    new Claim(ClaimTypes.Name, user.UserName!),
-                    new Claim(ClaimTypes.GivenName, $"{user.FirstName} {user.LastName}"),
-                    new Claim(ClaimTypes.Email, user.Email!),
-                    new Claim(ClaimTypes.Role, rol.Id),
-                    //new Claim("permissions", JsonConvert.SerializeObject(rol.RolWebViews))
-                }),
+                new Claim(ClaimTypes.NameIdentifier, user.Id),
+                new Claim(ClaimTypes.Name, user.UserName!),
+                new Claim(ClaimTypes.GivenName, $"{user.FirstName} {user.LastName}"),
+                new Claim(ClaimTypes.Email, user.Email!),
+                new Claim(ClaimTypes.Role, role.Name!),
+            }),
             IssuedAt = issuedAt,
             Expires = expirationTime,
-            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(secret), SecurityAlgorithms.HmacSha256Signature)
         };
 
-        return (ProccessCreateToken(tokenDescriptor), expirationTime);
+        var token = ProccessCreateToken(tokenDescriptor);
+
+        return new TokenDto
+        {
+            Token = token,
+            Expiration = expirationTime
+        };
     }
 
-    private string ProccessCreateToken(string token)
-    {
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var securityToken = tokenHandler.ReadToken(token);
-        return tokenHandler.WriteToken(securityToken);
-    }
-
-    private string ProccessCreateToken(SecurityTokenDescriptor tokenDescriptor)
+    private static string ProccessCreateToken(SecurityTokenDescriptor tokenDescriptor)
     {
         var tokenHandler = new JwtSecurityTokenHandler();
         var securityToken = tokenHandler.CreateToken(tokenDescriptor);

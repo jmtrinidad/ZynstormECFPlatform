@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ZynstormECFPlatform.Abstractions.Data;
@@ -29,10 +29,17 @@ public static class ServiceCollectionExtensions
             options.Password.RequireUppercase = true;
             options.Password.RequiredLength = 8;
             options.Password.RequiredUniqueChars = 1;
+            options.Tokens.PasswordResetTokenProvider = "PasswordResetTokenProvider";
         }).AddRoles<Role>()
           .AddSignInManager()
+          .AddTokenProvider<PasswordResetTokenProvider<User>>("PasswordResetTokenProvider")
           .AddDefaultTokenProviders()
           .AddEntityFrameworkStores<StorageContext>();
+
+        services.Configure<PasswordResetTokenProviderOptions>(options =>
+        {
+            options.TokenLifespan = TimeSpan.FromMinutes(30);
+        });
 
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
