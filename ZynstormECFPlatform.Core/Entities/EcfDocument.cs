@@ -94,6 +94,9 @@ public partial class EcfDocument : BaseEntity
     [XmlIgnore]
     public virtual ICollection<EcfXmlDocument> EcfXmlDocuments { get; set; } = [];
 
+    [XmlArray("DescuentosORecargos"), XmlArrayItem("DescuentoORecargo")]
+    public virtual ICollection<EcfGlobalAdjustment> EcfGlobalAdjustments { get; set; } = [];
+
     #region e-CF Extended Properties
 
     [XmlElement("Version")]

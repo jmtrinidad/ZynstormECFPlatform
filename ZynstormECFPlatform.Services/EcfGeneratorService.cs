@@ -69,7 +69,7 @@ public class EcfGeneratorService : IEcfGeneratorService
         };
 
         decimal totalBase = 0;
-        decimal totalDiscount = 0;
+        decimal totalItemDiscounts = 0;
         decimal totalItbis = 0;
         decimal totalExempt = 0;
 
@@ -87,6 +87,7 @@ public class EcfGeneratorService : IEcfGeneratorService
             var baseAmount = Math.Round(item.Quantity * item.UnitPrice, 2);
             var discountAmount = Math.Round(item.Discount, 2);
             var taxableAmount = baseAmount - discountAmount;
+            
             var itbisAmount = item.ItbisAmount > 0 
                 ? item.ItbisAmount 
                 : Math.Round(taxableAmount * (item.TaxPercentage / 100), 2);
@@ -108,7 +109,7 @@ public class EcfGeneratorService : IEcfGeneratorService
             });
 
             totalBase += baseAmount;
-            totalDiscount += discountAmount;
+            totalItemDiscounts += discountAmount;
             totalItbis += itbisAmount;
 
             if (item.TaxPercentage == 0)
@@ -128,22 +129,36 @@ public class EcfGeneratorService : IEcfGeneratorService
             }
         }
 
-        var totalAmount = (totalBase - totalDiscount) + totalItbis;
+        // Manejo de Descuento Global
+        if (dto.GlobalDiscountAmount > 0)
+        {
+            document.EcfGlobalAdjustments.Add(new EcfGlobalAdjustment
+            {
+                LineNumber = 1,
+                AdjustmentType = "D",
+                Description = dto.GlobalDiscountDescription ?? "Descuento Global",
+                ValueType = "$",
+                Amount = dto.GlobalDiscountAmount
+            });
+        }
+
+        var totalBeforeGlobalDiscount = (totalBase - totalItemDiscounts) + totalItbis;
+        var finalTotal = totalBeforeGlobalDiscount - dto.GlobalDiscountAmount;
 
         // Populación del Header principal
         document.SubTotal = totalBase;
-        document.Total = totalAmount;
+        document.Total = finalTotal;
         document.Itbistotal = totalItbis;
 
         // Populación del Bloque de Totales (EcfDocumentTotal)
         var totalEntity = new EcfDocumentTotal
         {
-            TaxableAmount = totalBase - totalDiscount - totalExempt,
-            TaxableTotal = totalBase - totalDiscount,
-            DiscountTotal = totalDiscount,
+            TaxableAmount = totalBase - totalItemDiscounts - totalExempt,
+            TaxableTotal = totalBase - totalItemDiscounts,
+            DiscountTotal = totalItemDiscounts + dto.GlobalDiscountAmount,
             ITBISTotal = totalItbis,
             ExemptTotal = totalExempt,
-            Total = totalAmount,
+            Total = finalTotal,
             
             // Desglose por tasas (Standard DGII)
             TaxableAmountG1 = taxableG1 > 0 ? taxableG1 : null,

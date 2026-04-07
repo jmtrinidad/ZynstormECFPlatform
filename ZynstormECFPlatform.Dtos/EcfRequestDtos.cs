@@ -39,10 +39,12 @@ public class EcfInvoiceRequestDto
     [Required]
     public List<EcfItemRequestDto> Items { get; set; } = [];
 
-    // Totales (Header) - Serán recalculados por el generador si es necesario
+    // Totales (Header)
     public decimal SubTotal { get; set; }
     public decimal TotalItbis { get; set; }
-    public decimal TotalDiscount { get; set; }
+    public decimal TotalDiscount { get; set; } // Sum of item discounts
+    public decimal GlobalDiscountAmount { get; set; } // Whole-invoice discount
+    public string? GlobalDiscountDescription { get; set; }
     public decimal TotalAmount { get; set; }
 }
 
