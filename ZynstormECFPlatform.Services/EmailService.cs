@@ -1,16 +1,47 @@
-using System;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using Microsoft.Extensions.Options;
+using MimeKit;
 using ZynstormECFPlatform.Abstractions.Services;
+using ZynstormECFPlatform.Core;
 
 namespace ZynstormECFPlatform.Services;
 
 public class EmailService : IEmailService
 {
+    private readonly AppSettings _settings;
+
+    public EmailService(IOptions<AppSettings> options)
+    {
+        _settings = options.Value;
+        ValidateSettings(_settings);
+    }
+
+    public async Task SendEmailAsync(string recipientEmail, string subject, string htmlBody, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(recipientEmail))
+            throw new InvalidOperationException("Email service called without a recipient email.");
+
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(_settings.SmtpFromName, _settings.SmtpUsername));
+        message.To.Add(MailboxAddress.Parse(recipientEmail));
+        message.Subject = subject;
+        message.Body = new TextPart("html")
+        {
+            Text = htmlBody
+        };
+
+        using var client = new SmtpClient();
+
+        await client.ConnectAsync(_settings.SmtpHost, _settings.SmtpPort, SecureSocketOptions.StartTls, cancellationToken);
+        await client.AuthenticateAsync(_settings.SmtpUsername, _settings.SmtpAppPassword, cancellationToken);
+        await client.SendAsync(message, cancellationToken);
+        await client.DisconnectAsync(true, cancellationToken);
+    }
+
     public async Task SendApiKeyEmailAsync(string email, string apiKey, string secretKey)
     {
-        // TODO: Configure SMTP or Email Provider (e.g., SendGrid, Mailtrap)
-        // This is a skeleton implementation.
-
-        var message = $@"
+        var htmlBody = $@"
         <div style=""font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f4f7f9; padding: 20px; border-radius: 8px;"">
             <div style=""background-color: #ffffff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);"">
                 <h1 style=""color: #2c3e50; text-align: center; margin-bottom: 30px;"">¡Bienvenido a Zynstorm ECF!</h1>
@@ -45,10 +76,20 @@ public class EmailService : IEmailService
             <div style=""text-align: center; margin-top: 20px; color: #95a5a6; font-size: 12px;"">
                 &copy; {DateTime.UtcNow.Year} Zynstorm ECF Platform. Todos los derechos reservados.
             </div>
-        </div>
-";
+        </div>";
 
-        // Implementation for sending email goes here
-        await Task.CompletedTask;
+        await SendEmailAsync(email, "Tus credenciales de Zynstorm ECF", htmlBody);
+    }
+
+    private static void ValidateSettings(AppSettings settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.SmtpHost) ||
+            settings.SmtpPort <= 0 ||
+            string.IsNullOrWhiteSpace(settings.SmtpUsername) ||
+            string.IsNullOrWhiteSpace(settings.SmtpAppPassword) ||
+            string.IsNullOrWhiteSpace(settings.SmtpFromName))
+        {
+            throw new InvalidOperationException("SMTP email settings are not configured correctly in AppSettings.");
+        }
     }
 }
