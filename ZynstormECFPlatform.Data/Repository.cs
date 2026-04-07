@@ -9,6 +9,10 @@ using ZynstormECFPlatform.Data.Extensions;
 
 namespace ZynstormECFPlatform.Data;
 
+// Note: .ConfigureAwait(false) is used across all asynchronous calls in this repository to:
+// 1. Optimize performance by avoiding the overhead of capturing and returning to the original SynchronizationContext.
+// 2. Prevent potential deadlocks in environments with a specific SynchronizationContext (like UI or legacy ASP.NET).
+// 3. Follow library development best practices to ensure the repository remains host-agnostic.
 public class Repository<TModel> : IRepository<TModel> where TModel : class, IEntityMarker
 {
     private readonly StorageContext _context;
@@ -276,8 +280,8 @@ public class Repository<TModel> : IRepository<TModel> where TModel : class, IEnt
         var entities = models.ToList();
         entities.ForEach(c => c.LastUpdateUtc = DateTime.UtcNow);
 
-        await _dbSet.AddRangeAsync(entities);
-        await _context.SaveChangesAsync();
+        await _dbSet.AddRangeAsync(entities).ConfigureAwait(false);
+        await _context.SaveChangesAsync().ConfigureAwait(false);
     }
 
     public void InsertNoSave(IEnumerable<TModel> models)
@@ -289,7 +293,7 @@ public class Repository<TModel> : IRepository<TModel> where TModel : class, IEnt
 
     public async Task<bool> SoftDeleteAsync(int id)
     {
-        TModel entity = await GetAsync(id) ?? null!;
+        TModel entity = await GetAsync(id).ConfigureAwait(false) ?? null!;
 
         if (entity is null)
             return false;
@@ -297,7 +301,7 @@ public class Repository<TModel> : IRepository<TModel> where TModel : class, IEnt
         entity.IsDeleted = true;
         entity.DeletedTimeUtc = DateTime.UtcNow;
 
-        return await UpdateAsync(entity);
+        return await UpdateAsync(entity).ConfigureAwait(false);
     }
 
     public async Task<bool> SoftDeleteAsync(TModel model)
@@ -305,7 +309,7 @@ public class Repository<TModel> : IRepository<TModel> where TModel : class, IEnt
         model.IsDeleted = true;
         model.DeletedTimeUtc = DateTime.UtcNow;
 
-        return await UpdateAsync(model);
+        return await UpdateAsync(model).ConfigureAwait(false);
     }
 
     public async Task<bool> SoftDeleteAsync(IEnumerable<TModel> models)
@@ -320,18 +324,18 @@ public class Repository<TModel> : IRepository<TModel> where TModel : class, IEnt
 
         _dbSet.UpdateRange(entities);
 
-        return await _context.SaveChangesAsync() >= 1;
+        return await _context.SaveChangesAsync().ConfigureAwait(false) >= 1;
     }
 
     public async Task<bool> HardDeleteAsync(int id)
     {
-        var model = await GetAsync(id);
+        var model = await GetAsync(id).ConfigureAwait(false);
 
         if (model is not null)
         {
             _dbSet.Remove(model);
 
-            return await _context.SaveChangesAsync() >= 1;
+            return await _context.SaveChangesAsync().ConfigureAwait(false) >= 1;
         }
         return false;
     }
@@ -342,7 +346,7 @@ public class Repository<TModel> : IRepository<TModel> where TModel : class, IEnt
         {
             _dbSet.Remove(model);
 
-            return await _context.SaveChangesAsync() >= 1;
+            return await _context.SaveChangesAsync().ConfigureAwait(false) >= 1;
         }
         return false;
     }
@@ -353,7 +357,7 @@ public class Repository<TModel> : IRepository<TModel> where TModel : class, IEnt
         {
             _dbSet.RemoveRange(models);
 
-            return await _context.SaveChangesAsync() >= 1;
+            return await _context.SaveChangesAsync().ConfigureAwait(false) >= 1;
         }
         return false;
     }
@@ -402,7 +406,7 @@ public class Repository<TModel> : IRepository<TModel> where TModel : class, IEnt
 
     public async Task<TModel?> GetAsync(int id, CancellationToken cancellationToken = default)
     {
-        return await _dbSet.FindAsync(id, cancellationToken);
+        return await _dbSet.FindAsync(id, cancellationToken).ConfigureAwait(false);
     }
 
     //public async Task<IPagedCollection<TModel>> GetAllPagedAsync(DataTableFilter filter)
@@ -429,13 +433,13 @@ public class Repository<TModel> : IRepository<TModel> where TModel : class, IEnt
 
     public async Task<TModel?> GetByAsync(Expression<Func<TModel, bool>> predicate, CancellationToken cancellationToken = default)
     {
-        return await _dbSet.FirstOrDefaultAsync(predicate, cancellationToken);
+        return await _dbSet.FirstOrDefaultAsync(predicate, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<TModel?> GetNoTrackingByAsync(Expression<Func<TModel, bool>> predicate, CancellationToken cancellationToken = default)
     {
         return await _dbSet.AsNoTracking()
-                           .FirstOrDefaultAsync(predicate, cancellationToken);
+                           .FirstOrDefaultAsync(predicate, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<TModel?> GetByAsync<TOrderKey>(Expression<Func<TModel, bool>> predicate,
@@ -443,7 +447,7 @@ public class Repository<TModel> : IRepository<TModel> where TModel : class, IEnt
     {
         var query = _dbSet.Where(predicate);
         query = ascending ? query.OrderBy(keySelector) : query.OrderByDescending(keySelector);
-        return await query.FirstOrDefaultAsync();
+        return await query.FirstOrDefaultAsync().ConfigureAwait(false);
     }
 
     public TModel? GetBy(Expression<Func<TModel, bool>> predicate)
@@ -482,13 +486,13 @@ public class Repository<TModel> : IRepository<TModel> where TModel : class, IEnt
 
     public async Task<IPagedCollection<TModel>> GetPagedAsync(int page, int perPage)
     {
-        return await _dbSet.AsPagedCollectionAsync(page, perPage);
+        return await _dbSet.AsPagedCollectionAsync(page, perPage).ConfigureAwait(false);
     }
 
     public async Task<IPagedCollection<TModel>> GetPagedAsync(int page, int perPage,
         Expression<Func<TModel, bool>> predicate)
     {
-        return await _dbSet.Where(predicate).AsPagedCollectionAsync(page, perPage);
+        return await _dbSet.Where(predicate).AsPagedCollectionAsync(page, perPage).ConfigureAwait(false);
     }
 
     public async Task<IPagedCollection<TModel>> GetPagedAsync<TOrderKey>(int page, int perPage,

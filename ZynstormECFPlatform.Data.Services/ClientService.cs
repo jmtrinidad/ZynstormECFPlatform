@@ -19,7 +19,7 @@ public class ClientService(
 
     public override async Task<Client?> InsertAsync(Client model)
     {
-        var client = await base.InsertAsync(model).ConfigureAwait(false);
+        var client = await base.InsertAsync(model);
 
         if (client != null && !string.IsNullOrEmpty(client.Email))
         {
@@ -36,9 +36,9 @@ public class ClientService(
                 GuidId = Guid.NewGuid().ToString()
             };
 
-            await _apiKeyRepository.InsertAsync(apiKeyEntity).ConfigureAwait(false);
+            await _apiKeyRepository.InsertAsync(apiKeyEntity);
 
-            await emailService.SendApiKeyEmailAsync(client.Email, apiKey, secretKey).ConfigureAwait(false);
+            await emailService.SendApiKeyEmailAsync(client.Email, apiKey, secretKey);
         }
 
         return client;
