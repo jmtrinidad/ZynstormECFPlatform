@@ -9,13 +9,18 @@ public static class DateTimeExtensions
     /// <summary>
     /// Converts a UTC DateTime to Dominican Republic local time.
     /// </summary>
-    public static DateTime ToDrTime(this DateTime utcDateTime)
+    public static DateTime ToDrTime(this DateTime dateTime)
     {
-        if (utcDateTime.Kind == DateTimeKind.Unspecified)
+        if (dateTime.Kind == DateTimeKind.Unspecified)
         {
-            utcDateTime = DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc);
+            dateTime = DateTime.SpecifyKind(dateTime, DateTimeKind.Utc);
         }
-        return TimeZoneInfo.ConvertTimeFromUtc(utcDateTime, DrTimeZone);
+        else if (dateTime.Kind == DateTimeKind.Local)
+        {
+            dateTime = dateTime.ToUniversalTime();
+        }
+
+        return TimeZoneInfo.ConvertTimeFromUtc(dateTime, DrTimeZone);
     }
 
     /// <summary>

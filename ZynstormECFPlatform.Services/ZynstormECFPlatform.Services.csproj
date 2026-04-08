@@ -16,6 +16,7 @@
     <ProjectReference Include="..\ZynstormECFPlatform.Abstractions\ZynstormECFPlatform.Abstractions.csproj" />
     <ProjectReference Include="..\ZynstormECFPlatform.Common\ZynstormECFPlatform.Common.csproj" />
     <ProjectReference Include="..\ZynstormECFPlatform.Dtos\ZynstormECFPlatform.Dtos.csproj" />
+    <ProjectReference Include="..\ZynstormECFPlatform.Schemas\ZynstormECFPlatform.Schemas.csproj" />
   </ItemGroup>
 
 </Project>
