@@ -4,6 +4,7 @@ namespace ZynstormECFPlatform.Services.Xml;
 
 /// <summary>
 /// Maps to XSD &lt;Emisor&gt; — issuer data block.
+/// The sequence of elements below is critical for XSD validation.
 /// </summary>
 public class EcfXmlEmisor
 {
@@ -14,23 +15,23 @@ public class EcfXmlEmisor
     public string RazonSocial { get; set; } = null!;
 
     public string? NombreComercial { get; set; }
-    public bool ShouldSerializeNombreComercial() => NombreComercial != null;
+    public bool ShouldSerializeNombreComercial() => !string.IsNullOrWhiteSpace(NombreComercial);
 
     public string? Sucursal { get; set; }
-    public bool ShouldSerializeSucursal() => Sucursal != null;
+    public bool ShouldSerializeSucursal() => !string.IsNullOrWhiteSpace(Sucursal);
 
     [XmlElement("DireccionEmisor")]
     public string Direccion { get; set; } = null!;
 
     public string? Municipio { get; set; }
-    public bool ShouldSerializeMunicipio() => Municipio != null;
+    public bool ShouldSerializeMunicipio() => !string.IsNullOrWhiteSpace(Municipio);
 
     public string? Provincia { get; set; }
-    public bool ShouldSerializeProvincia() => Provincia != null;
+    public bool ShouldSerializeProvincia() => !string.IsNullOrWhiteSpace(Provincia);
 
     [XmlElement("TablaTelefonoEmisor")]
     public TablaTelefono? TelefonoTabla { get; set; }
-    public bool ShouldSerializeTelefonoTabla() => TelefonoTabla != null;
+    public bool ShouldSerializeTelefonoTabla() => TelefonoTabla != null && !string.IsNullOrWhiteSpace(TelefonoTabla.Telefono);
 
     public class TablaTelefono
     {
@@ -39,18 +40,19 @@ public class EcfXmlEmisor
     }
 
     public string? CorreoEmisor { get; set; }
-    public bool ShouldSerializeCorreoEmisor() => CorreoEmisor != null;
+    public bool ShouldSerializeCorreoEmisor() => !string.IsNullOrWhiteSpace(CorreoEmisor);
 
     public string? WebSite { get; set; }
-    public bool ShouldSerializeWebSite() => WebSite != null;
+    public bool ShouldSerializeWebSite() => !string.IsNullOrWhiteSpace(WebSite);
 
     public string? ActividadEconomica { get; set; }
-    public bool ShouldSerializeActividadEconomica() => ActividadEconomica != null;
+    public bool ShouldSerializeActividadEconomica() => !string.IsNullOrWhiteSpace(ActividadEconomica);
 
     public string? CodigoVendedor { get; set; }
-    public bool ShouldSerializeCodigoVendedor() => CodigoVendedor != null;
+    public bool ShouldSerializeCodigoVendedor() => !string.IsNullOrWhiteSpace(CodigoVendedor);
 
-    /// <summary>FechaEmision maps to the invoice issue date.</summary>
+    /// <summary>FechaEmision must appear at the end of the Emisor block per XSD.</summary>
     [XmlElement("FechaEmision")]
     public string FechaEmision { get; set; } = null!;
 }
+

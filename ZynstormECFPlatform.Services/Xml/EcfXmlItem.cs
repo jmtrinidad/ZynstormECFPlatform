@@ -39,6 +39,16 @@ public class EcfXmlItem
     public decimal? DescuentoMonto { get; set; }
     public bool ShouldSerializeDescuentoMonto() => DescuentoMonto.HasValue && DescuentoMonto > 0;
 
+    /// <summary>
+    /// Additional tax type references for this item (TablaImpuestoAdicional).
+    /// Populated when the item is subject to ISC or other additional taxes.
+    /// References the TipoImpuesto codes; actual amounts are aggregated in Totales.
+    /// XSD allows up to 2 entries per item.
+    /// </summary>
+    [XmlElement("TablaImpuestoAdicional")]
+    public EcfXmlTablaImpuestoAdicionalItem? TablaImpuestoAdicional { get; set; }
+    public bool ShouldSerializeTablaImpuestoAdicional() => TablaImpuestoAdicional != null;
+
     [XmlElement("MontoItem")]
     public decimal MontoItem { get; set; }
 }

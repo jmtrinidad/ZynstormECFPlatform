@@ -84,8 +84,17 @@ public class EcfInvoiceRequestDto
     /// <summary>Buyer street address (optional).</summary>
     public string? CustomerAddress { get; set; }
 
-    /// <summary>Buyer phone number (optional).</summary>
+    /// <summary>Buyer phone number in format 000-000-0000 (optional).</summary>
     public string? CustomerTelephone { get; set; }
+
+    /// <summary>Buyer contact person name (optional).</summary>
+    public string? CustomerContact { get; set; }
+
+    /// <summary>Buyer municipality code — 6-digit DGII code (optional).</summary>
+    public string? CustomerMunicipality { get; set; }
+
+    /// <summary>Buyer province code — 6-digit DGII code (optional).</summary>
+    public string? CustomerProvince { get; set; }
 
     // ── Payment ────────────────────────────────────────────────────────────────
 
@@ -142,4 +151,37 @@ public class EcfItemRequestDto
 
     /// <summary>Unit of measure code per DGII catalog (1-62). Defaults to 43 (Unit).</summary>
     public int? UnitOfMeasure { get; set; }
+
+    // ── ISC — Impuesto Selectivo al Consumo ─────────────────────────────────
+
+    /// <summary>
+    /// 3-digit DGII code identifying the additional tax type (ISC).
+    /// Examples: "006"=Cerveza, "013"=Whisky, "014"=Ron, "019"=Cigarrillos.
+    /// See CodificacionTipoImpuestosType in the XSD for the full catalog.
+    /// Leave null if no ISC applies to this item.
+    /// </summary>
+    public string? IscType { get; set; }
+
+    /// <summary>
+    /// ISC Específico: fixed amount per unit (MontoImpuestoSelectivoConsumoEspecifico).
+    /// Used when the ISC is a flat amount regardless of price.
+    /// </summary>
+    public decimal IscSpecificAmount { get; set; }
+
+    /// <summary>
+    /// ISC Ad-valorem: percentage-based amount (MontoImpuestoSelectivoConsumoAdvalorem).
+    /// Used when the ISC is a percentage of the item price.
+    /// </summary>
+    public decimal IscAdvaloremAmount { get; set; }
+
+    /// <summary>
+    /// Other additional tax amounts (OtrosImpuestosAdicionales) not covered by ISC Específico or Ad-valorem.
+    /// </summary>
+    public decimal OtherAdditionalTaxAmount { get; set; }
+
+    /// <summary>
+    /// Additional tax rate (TasaImpuestoAdicional). Required when IscType is set.
+    /// Represents the percentage rate of the additional tax (e.g. 10.00 for 10%).
+    /// </summary>
+    public decimal AdditionalTaxRate { get; set; }
 }

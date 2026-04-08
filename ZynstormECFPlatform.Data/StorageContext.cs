@@ -463,9 +463,11 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.IssuerSellerCode).HasMaxLength(10).IsUnicode(false);
             entity.Property(e => e.IssuerWebSite).HasMaxLength(80).IsUnicode(false);
             entity.Property(e => e.IssuerAdditionalInfo).HasMaxLength(150).IsUnicode(false);
+            entity.Property(e => e.IssuerPhone).HasMaxLength(12).IsUnicode(false);
             entity.Property(e => e.CustomerContact).HasMaxLength(80).IsUnicode(false);
             entity.Property(e => e.CustomerMunicipality).HasMaxLength(6).IsUnicode(false);
             entity.Property(e => e.CustomerProvince).HasMaxLength(6).IsUnicode(false);
+            entity.Property(e => e.CustomerTelephone).HasMaxLength(12).IsUnicode(false);
             entity.Property(e => e.DeliveryDate).HasColumnType(DateTimeColumnType);
             entity.Property(e => e.DeliveryContact).HasMaxLength(100).IsUnicode(false);
             entity.Property(e => e.DeliveryAddress).HasMaxLength(100).IsUnicode(false);
@@ -521,6 +523,13 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.WithholdingItbis).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.WithholdingIsr).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.ItemAmount).HasColumnType("decimal(18, 2)");
+
+            // ISC fields
+            entity.Property(e => e.IscType).HasMaxLength(3).IsUnicode(false);
+            entity.Property(e => e.AdditionalTaxRate).HasColumnType("decimal(5, 2)");
+            entity.Property(e => e.IscSpecificAmount).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.IscAdvaloremAmount).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.OtherAdditionalTaxAmount).HasColumnType("decimal(18, 2)");
         });
 
         modelBuilder.Entity<EcfDocumentTotal>(entity =>
@@ -567,6 +576,46 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.TaxAmount3).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.TotalWithheldItbis).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.TotalWithheldIsr).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.AdditionalTaxTotal).HasColumnType("decimal(18, 2)");
+        });
+
+        modelBuilder.Entity<EcfDocumentAdditionalTax>(entity =>
+        {
+            entity.HasKey(c => c.EcfDocumentAdditionalTaxId);
+
+            entity.Property(e => e.TaxTypeCode)
+                  .HasMaxLength(3)
+                  .IsUnicode(false)
+                  .IsRequired();
+
+            entity.Property(e => e.TaxRate).HasColumnType("decimal(5, 2)");
+            entity.Property(e => e.IscSpecificAmount).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.IscAdvaloremAmount).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.OtherAdditionalTaxAmount).HasColumnType("decimal(18, 2)");
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.EcfDocument)
+                  .WithMany(p => p.EcfDocumentAdditionalTaxes)
+                  .HasForeignKey(d => d.EcfDocumentId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_EcfDocumentAdditionalTax_EcfDocument");
         });
 
         modelBuilder.Entity<EcfStatus>(entity =>

@@ -1,0 +1,9 @@
+﻿C:\Projects\ZynstormECFPlatform\tests\EcfTest\EcfTest.csproj : warning NU1902: Package 'MimeKit' 4.10.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-g7hc-96xr-gvvx
+C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\ZynstormECFPlatform.Services.csproj : warning NU1902: Package 'MimeKit' 4.10.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-g7hc-96xr-gvvx [C:\Projects\ZynstormECFPlatform\tests\EcfTest\EcfTest.csproj]
+C:\Projects\ZynstormECFPlatform\tests\EcfTest\EcfTest.csproj : warning NU1902: Package 'MimeKit' 4.10.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-g7hc-96xr-gvvx
+C:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\ZynstormECFPlatform.Services.csproj : warning NU1902: Package 'MimeKit' 4.10.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-g7hc-96xr-gvvx
+=== Testing Standard Invoice (e-CF 31) ===
+SUCCESS: XML is valid against XSD.
+
+=== Testing Invoice with ISC (e-CF 31) ===
+SUCCESS: XML is valid against XSD.

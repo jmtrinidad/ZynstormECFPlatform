@@ -66,5 +66,42 @@ public partial class EcfDocumentDetail : BaseEntity
     [XmlElement("MontoItem")]
     public decimal ItemAmount { get; set; }
 
+    // ── ISC — Impuesto Selectivo al Consumo ──────────────────────────
+
+    /// <summary>
+    /// 3-digit DGII code identifying the additional tax type for this item.
+    /// E.g. "006" = Cerveza, "013" = Whisky, "014" = Ron, "019" = Cigarrillos.
+    /// Null when no ISC applies. Maps to TipoImpuesto inside TablaImpuestoAdicional.
+    /// </summary>
+    [XmlIgnore]
+    public string? IscType { get; set; }
+
+    /// <summary>
+    /// Additional tax rate percentage (TasaImpuestoAdicional).
+    /// Required when IscType is set.
+    /// </summary>
+    [XmlIgnore]
+    public decimal AdditionalTaxRate { get; set; }
+
+    /// <summary>
+    /// ISC Específico: fixed amount per unit for this item line.
+    /// Contributes to MontoImpuestoSelectivoConsumoEspecifico in totales.
+    /// </summary>
+    [XmlIgnore]
+    public decimal IscSpecificAmount { get; set; }
+
+    /// <summary>
+    /// ISC Ad-valorem: percentage-based amount for this item line.
+    /// Contributes to MontoImpuestoSelectivoConsumoAdvalorem in totales.
+    /// </summary>
+    [XmlIgnore]
+    public decimal IscAdvaloremAmount { get; set; }
+
+    /// <summary>
+    /// Other additional tax amounts for this item line (OtrosImpuestosAdicionales).
+    /// </summary>
+    [XmlIgnore]
+    public decimal OtherAdditionalTaxAmount { get; set; }
+
     #endregion
-}
+}

@@ -66,5 +66,12 @@ public partial class EcfDocumentTotal : BaseEntity
     [XmlElement("TotalISRRetencion")]
     public decimal? TotalWithheldIsr { get; set; }
 
+    /// <summary>
+    /// Total additional taxes (ISC sum) for the document.
+    /// Maps to XSD element <c>MontoImpuestoAdicional</c> in Totales.
+    /// </summary>
+    [XmlElement("MontoImpuestoAdicional")]
+    public decimal? AdditionalTaxTotal { get; set; }
+
     #endregion
 }

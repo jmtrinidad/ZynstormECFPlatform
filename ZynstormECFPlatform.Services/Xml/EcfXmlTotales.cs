@@ -50,6 +50,24 @@ public class EcfXmlTotales
     public decimal? TotalITBIS3 { get; set; }
     public bool ShouldSerializeTotalITBIS3() => TotalITBIS3.HasValue;
 
+    // ── Additional taxes (ISC — Impuesto Selectivo al Consumo) ────────────
+
+    /// <summary>
+    /// Total sum of all additional taxes (ISC Específico + Ad-valorem + Otros)
+    /// across all items. Maps to XSD element <c>MontoImpuestoAdicional</c>.
+    /// Only emitted when at least one item carries an ISC type.
+    /// </summary>
+    public decimal? MontoImpuestoAdicional { get; set; }
+    public bool ShouldSerializeMontoImpuestoAdicional() => MontoImpuestoAdicional.HasValue && MontoImpuestoAdicional > 0;
+
+    /// <summary>
+    /// Detail of additional taxes grouped by TipoImpuesto.
+    /// Maps to XSD element <c>ImpuestosAdicionales</c>.
+    /// Only emitted when MontoImpuestoAdicional is present.
+    /// </summary>
+    public EcfXmlImpuestosAdicionales? ImpuestosAdicionales { get; set; }
+    public bool ShouldSerializeImpuestosAdicionales() => ImpuestosAdicionales != null && ImpuestosAdicionales.Items.Count > 0;
+
     // ── Grand total (required by XSD) ──────────────────────────────────────
 
     [XmlElement("MontoTotal")]

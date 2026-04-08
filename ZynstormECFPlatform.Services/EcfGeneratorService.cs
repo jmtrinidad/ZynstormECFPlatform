@@ -116,14 +116,14 @@ public class EcfGeneratorService : IEcfGeneratorService
     {
         var errors = new List<string>();
 
-        // NCF format validation (also extracts the type)
+        // NCF format validation
         if (string.IsNullOrWhiteSpace(dto.Ncf))
         {
             errors.Add("El eNCF es requerido.");
         }
         else if (!NcfHelper.TryExtractEcfType(dto.Ncf, out _))
         {
-            errors.Add($"El eNCF '{dto.Ncf}' no tiene el formato correcto (E + 2 dígitos de tipo + 10 dígitos). Tipos válidos: 31, 32, 33, 34, 41, 43, 44, 45, 46, 47.");
+            errors.Add($"El eNCF '{dto.Ncf}' no tiene el formato correcto (E + 2 dígitos de tipo + 10 dígitos).");
         }
 
         if (string.IsNullOrWhiteSpace(dto.IssuerRnc))
@@ -142,13 +142,33 @@ public class EcfGeneratorService : IEcfGeneratorService
             errors.Add("El nombre del comprador es requerido.");
 
         if (dto.Items.Count == 0)
+        {
             errors.Add("El documento debe contener al menos un ítem.");
+        }
+        else
+        {
+            for (int i = 0; i < dto.Items.Count; i++)
+            {
+                var itm = dto.Items[i];
+                if (string.IsNullOrWhiteSpace(itm.Name)) errors.Add($"Item {i + 1}: El nombre es requerido.");
+                if (itm.Quantity <= 0) errors.Add($"Item {i + 1}: La cantidad debe ser mayor a cero.");
+                if (itm.UnitPrice < 0) errors.Add($"Item {i + 1}: El precio unitario no puede ser negativo.");
+
+                // ISC validation
+                if (!string.IsNullOrWhiteSpace(itm.IscType))
+                {
+                    if (itm.AdditionalTaxRate <= 0)
+                        errors.Add($"Item {i + 1}: El campo AdditionalTaxRate es requerido cuando se especifica un IscType.");
+                }
+            }
+        }
 
         if (dto.PaymentType == 2 && dto.PaymentDeadline is null)
             errors.Add("La fecha límite de pago es requerida cuando el tipo de pago es Crédito (2).");
 
         return errors;
     }
+
 
     // ═══════════════════════════════════════════════════════════════════════════
     // XML Mapping
@@ -167,6 +187,9 @@ public class EcfGeneratorService : IEcfGeneratorService
         decimal totalBase = 0, totalItemDiscounts = 0, totalItbis = 0, totalExempt = 0;
         decimal taxableG1 = 0, taxableG2 = 0, taxableG3 = 0;
         decimal itbisG1 = 0, itbisG2 = 0, itbisG3 = 0;
+
+        // ISC accumulator: key = TipoImpuesto code, value = accumulated amounts
+        var iscAccumulator = new Dictionary<string, EcfXmlImpuestoAdicional>(StringComparer.Ordinal);
 
         var lineNo = 1;
         foreach (var item in dto.Items)
@@ -187,18 +210,54 @@ public class EcfGeneratorService : IEcfGeneratorService
                   _ => 4  // Exento
             };
 
+            // ── ISC / Additional Tax handling ──────────────────────────────────
+            EcfXmlTablaImpuestoAdicionalItem? tablaImpuesto = null;
+            if (!string.IsNullOrWhiteSpace(item.IscType))
+            {
+                tablaImpuesto = new EcfXmlTablaImpuestoAdicionalItem
+                {
+                    ImpuestoAdicional = [new EcfXmlImpuestoAdicionalRef { TipoImpuesto = item.IscType }]
+                };
+
+                if (!iscAccumulator.TryGetValue(item.IscType, out var entry))
+                {
+                    entry = new EcfXmlImpuestoAdicional
+                    {
+                        TipoImpuesto = item.IscType,
+                        TasaImpuestoAdicional = item.AdditionalTaxRate
+                    };
+                    iscAccumulator[item.IscType] = entry;
+                }
+
+                if (item.IscSpecificAmount > 0)
+                    entry.MontoImpuestoSelectivoConsumoEspecifico =
+                        (entry.MontoImpuestoSelectivoConsumoEspecifico ?? 0) + Math.Round(item.IscSpecificAmount, 2);
+
+                if (item.IscAdvaloremAmount > 0)
+                    entry.MontoImpuestoSelectivoConsumoAdvalorem =
+                        (entry.MontoImpuestoSelectivoConsumoAdvalorem ?? 0) + Math.Round(item.IscAdvaloremAmount, 2);
+
+                if (item.OtherAdditionalTaxAmount > 0)
+                    entry.OtrosImpuestosAdicionales =
+                        (entry.OtrosImpuestosAdicionales ?? 0) + Math.Round(item.OtherAdditionalTaxAmount, 2);
+            }
+
+            // ISC total per item to include in MontoItem
+            var iscItemTotal = item.IscSpecificAmount + item.IscAdvaloremAmount + item.OtherAdditionalTaxAmount;
+
             xmlItems.Add(new EcfXmlItem
             {
-                NumeroLinea        = lineNo++,
+                NumeroLinea          = lineNo++,
                 IndicadorFacturacion = billingIndicator,
-                Name               = item.Name,
-                ItemType           = item.ItemType,
-                DescripcionItem    = item.Description,
-                CantidadItem       = item.Quantity,
-                UnidadMedida       = item.UnitOfMeasure ?? 43, // 43 = Unidad
-                PrecioUnitarioItem = item.UnitPrice,
-                DescuentoMonto     = discountAmount > 0 ? discountAmount : null,
-                MontoItem          = taxableAmount + itbisAmount
+                Name                 = item.Name,
+                ItemType             = item.ItemType,
+                DescripcionItem      = item.Description,
+                CantidadItem         = item.Quantity,
+                UnidadMedida         = item.UnitOfMeasure ?? 43, // 43 = Unidad
+                PrecioUnitarioItem   = item.UnitPrice,
+                DescuentoMonto       = discountAmount > 0 ? discountAmount : null,
+                TablaImpuestoAdicional = tablaImpuesto,
+                MontoItem            = taxableAmount + itbisAmount + iscItemTotal
             });
 
             totalBase          += baseAmount;
@@ -211,6 +270,24 @@ public class EcfGeneratorService : IEcfGeneratorService
                 case 18m: taxableG1   += taxableAmount; itbisG1   += itbisAmount;    break;
                 case 16m: taxableG2   += taxableAmount; itbisG2   += itbisAmount;    break;
             }
+        }
+
+        // ── ISC Totales ────────────────────────────────────────────────────────
+
+        decimal totalIsc = 0;
+        EcfXmlImpuestosAdicionales? impuestosAdicionales = null;
+
+        if (iscAccumulator.Count > 0)
+        {
+            totalIsc = iscAccumulator.Values.Sum(e =>
+                (e.MontoImpuestoSelectivoConsumoEspecifico ?? 0) +
+                (e.MontoImpuestoSelectivoConsumoAdvalorem ?? 0) +
+                (e.OtrosImpuestosAdicionales ?? 0));
+
+            impuestosAdicionales = new EcfXmlImpuestosAdicionales
+            {
+                Items = [.. iscAccumulator.Values]
+            };
         }
 
         // ── Global adjustments ─────────────────────────────────────────────────
@@ -228,7 +305,7 @@ public class EcfGeneratorService : IEcfGeneratorService
             });
         }
 
-        var finalTotal = (totalBase - totalItemDiscounts + totalItbis) - dto.GlobalDiscountAmount;
+        var finalTotal = (totalBase - totalItemDiscounts + totalItbis + totalIsc) - dto.GlobalDiscountAmount;
 
         // ── Totales block ──────────────────────────────────────────────────────
 
@@ -251,6 +328,9 @@ public class EcfGeneratorService : IEcfGeneratorService
             TotalITBIS2 = itbisG2 > 0 ? itbisG2 : null,
             TotalITBIS3 = itbisG3 > 0 ? itbisG3 : null,
 
+            MontoImpuestoAdicional = totalIsc > 0 ? totalIsc : null,
+            ImpuestosAdicionales   = impuestosAdicionales,
+
             MontoTotal = finalTotal
         };
 
@@ -271,27 +351,30 @@ public class EcfGeneratorService : IEcfGeneratorService
                 },
                 Emisor = new EcfXmlEmisor
                 {
-                    RncEmisor         = dto.IssuerRnc,
-                    RazonSocial       = dto.IssuerName,
-                    NombreComercial   = dto.IssuerCommercialName,
-                    Sucursal          = dto.IssuerBranchCode,
-                    Direccion         = dto.IssuerAddress,
-                    Municipio         = dto.IssuerMunicipality,
-                    Provincia         = dto.IssuerProvince,
-                    TelefonoTabla     = string.IsNullOrWhiteSpace(dto.IssuerPhone) ? null : new EcfXmlEmisor.TablaTelefono { Telefono = dto.IssuerPhone },
-                    CorreoEmisor      = dto.IssuerEmail,
-                    WebSite           = dto.IssuerWebSite,
+                    RncEmisor          = dto.IssuerRnc,
+                    RazonSocial        = dto.IssuerName,
+                    NombreComercial    = dto.IssuerCommercialName,
+                    Sucursal           = dto.IssuerBranchCode,
+                    Direccion          = dto.IssuerAddress,
+                    Municipio          = dto.IssuerMunicipality,
+                    Provincia          = dto.IssuerProvince,
+                    TelefonoTabla      = string.IsNullOrWhiteSpace(dto.IssuerPhone) ? null : new EcfXmlEmisor.TablaTelefono { Telefono = dto.IssuerPhone },
+                    CorreoEmisor       = dto.IssuerEmail,
+                    WebSite            = dto.IssuerWebSite,
                     ActividadEconomica = dto.IssuerActivityCode,
-                    CodigoVendedor    = dto.IssuerSellerCode,
-                    FechaEmision      = issueDate
+                    CodigoVendedor     = dto.IssuerSellerCode,
+                    FechaEmision       = issueDate
                 },
                 Comprador = new EcfXmlComprador
                 {
-                    RncComprador      = dto.CustomerRnc,
-                    RazonSocial       = dto.CustomerName,
-                    CorreoComprador   = dto.CustomerEmail,
+                    RncComprador       = dto.CustomerRnc,
+                    RazonSocial        = dto.CustomerName,
+                    ContactoComprador  = dto.CustomerContact,
+                    CorreoComprador    = dto.CustomerEmail,
                     DireccionComprador = dto.CustomerAddress,
-                    TelefonoAdicional = dto.CustomerTelephone
+                    TelefonoAdicional  = dto.CustomerTelephone,
+                    MunicipioComprador = dto.CustomerMunicipality,
+                    ProvinciaComprador = dto.CustomerProvince
                 },
                 Totales = totales
             },

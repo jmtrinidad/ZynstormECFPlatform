@@ -97,6 +97,9 @@ public partial class EcfDocument : BaseEntity
     [XmlArray("DescuentosORecargos"), XmlArrayItem("DescuentoORecargo")]
     public virtual ICollection<EcfGlobalAdjustment> EcfGlobalAdjustments { get; set; } = [];
 
+    [XmlIgnore]
+    public virtual ICollection<EcfDocumentAdditionalTax> EcfDocumentAdditionalTaxes { get; set; } = [];
+
     #region e-CF Extended Properties
 
     [XmlElement("Version")]
@@ -170,6 +173,14 @@ public partial class EcfDocument : BaseEntity
 
     [XmlElement("TelefonoAdicional")]
     public string? AdditionalPhone { get; set; }
+
+    /// <summary>Issuer telephone in format 000-000-0000 (optional).</summary>
+    [XmlIgnore]
+    public string? IssuerPhone { get; set; }
+
+    /// <summary>Customer/buyer telephone in format 000-000-0000 (optional).</summary>
+    [XmlIgnore]
+    public string? CustomerTelephone { get; set; }
 
     [XmlElement("FechaOrdenCompra")]
     public DateTime? PurchaseOrderDate { get; set; }
