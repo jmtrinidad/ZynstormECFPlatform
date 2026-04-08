@@ -56,22 +56,27 @@ public class EcfGeneratorService : IEcfGeneratorService
 
         var settings = new XmlWriterSettings
         {
-            Encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            Encoding = Encoding.UTF8,
             Indent = true,
-            OmitXmlDeclaration = false,
-            NewLineHandling = NewLineHandling.Replace
+            OmitXmlDeclaration = false
         };
 
-        using var memoryStream = new MemoryStream();
-        using (var xmlWriter = XmlWriter.Create(memoryStream, settings))
+        using var stringWriter = new Utf8StringWriter();
+        using (var xmlWriter = XmlWriter.Create(stringWriter, settings))
         {
             _serializer.Serialize(xmlWriter, root, _noNamespaces);
         }
 
-        return Encoding.UTF8.GetString(memoryStream.ToArray());
+        return stringWriter.ToString();
+    }
+
+    private class Utf8StringWriter : StringWriter
+    {
+        public override Encoding Encoding => Encoding.UTF8;
     }
 
     /// <inheritdoc />
+
     public List<string> ValidateXmlAgainstSchema(string xml, int ecfType)
     {
         var errors = new List<string>();
@@ -247,6 +252,7 @@ public class EcfGeneratorService : IEcfGeneratorService
 
             xmlItems.Add(new EcfXmlItem
             {
+                EcfType              = ecfType,
                 NumeroLinea          = lineNo++,
                 IndicadorFacturacion = billingIndicator,
                 Name                 = item.Name,
@@ -257,8 +263,18 @@ public class EcfGeneratorService : IEcfGeneratorService
                 PrecioUnitarioItem   = item.UnitPrice,
                 DescuentoMonto       = discountAmount > 0 ? discountAmount : null,
                 TablaImpuestoAdicional = tablaImpuesto,
-                MontoItem            = taxableAmount + itbisAmount + iscItemTotal
+                MontoItem            = taxableAmount + itbisAmount + iscItemTotal,
+
+                // ── Retentions handling (For Purchase 41 and International Payment 47)
+                Retencion = (ecfType == 41 || ecfType == 47) ? new EcfXmlItemRetencion
+                {
+                    Indicador = 1, // Retención
+                    MontoITBISRetenido = ecfType == 41 ? itbisAmount : null,
+                    MontoISRRetenido = item.IsrRetentionAmount ?? 0
+                } : null
             });
+
+
 
             totalBase          += baseAmount;
             totalItemDiscounts += discountAmount;
@@ -313,6 +329,7 @@ public class EcfGeneratorService : IEcfGeneratorService
 
         var totales = new EcfXmlTotales
         {
+            EcfType           = ecfType,
             MontoGravadoTotal = taxableGravado > 0 ? taxableGravado : null,
             MontoGravadoI1    = taxableG1 > 0 ? taxableG1 : null,
             MontoGravadoI2    = taxableG2 > 0 ? taxableG2 : null,
@@ -367,19 +384,35 @@ public class EcfGeneratorService : IEcfGeneratorService
                 },
                 Comprador = new EcfXmlComprador
                 {
+                    EcfType            = ecfType,
                     RncComprador       = dto.CustomerRnc,
+                    IdentificadorExtranjero = dto.CustomerForeignId,
                     RazonSocial        = dto.CustomerName,
                     ContactoComprador  = dto.CustomerContact,
                     CorreoComprador    = dto.CustomerEmail,
                     DireccionComprador = dto.CustomerAddress,
+                    PaisComprador      = dto.CustomerCountry,
                     TelefonoAdicional  = dto.CustomerTelephone,
                     MunicipioComprador = dto.CustomerMunicipality,
                     ProvinciaComprador = dto.CustomerProvince
                 },
+
                 Totales = totales
             },
             Items           = xmlItems,
             Adjustments     = adjustments,
+            
+            // ── Reference Information (33, 34) ──────────────────────────────────
+            InformacionReferencia = (ecfType == 33 || ecfType == 34) && !string.IsNullOrWhiteSpace(dto.ReferenceNcf)
+                ? new EcfXmlInformacionReferencia
+                {
+                    NCFModificado = dto.ReferenceNcf,
+                    RNCOtroContribuyente = dto.ReferenceCustomerRnc,
+                    FechaNCFModificado = (dto.ReferenceIssueDate ?? DateTime.UtcNow).ToDrTime().ToString(DateFormat),
+                    CodigoModificacion = dto.ReferenceReasonCode ?? 1,
+                    RazonModificacion = dto.ReferenceReasonDescription
+                } : null,
+
             FechaHoraFirma  = signatureDateTime
         };
 

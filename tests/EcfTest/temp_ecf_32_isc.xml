@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ECF>
+  <Encabezado>
+    <Version>1.0</Version>
+    <IdDoc>
+      <TipoeCF>32</TipoeCF>
+      <eNCF>E320000000001</eNCF>
+      <FechaVencimientoSecuencia>08-04-2027</FechaVencimientoSecuencia>
+      <TipoIngresos>01</TipoIngresos>
+      <TipoPago>1</TipoPago>
+    </IdDoc>
+    <Emisor>
+      <RNCEmisor>101000001</RNCEmisor>
+      <RazonSocialEmisor>EMPRESA DE PRUEBA SAS</RazonSocialEmisor>
+      <DireccionEmisor>Calle Central 45, Santo Domingo</DireccionEmisor>
+      <TablaTelefonoEmisor>
+        <TelefonoEmisor>809-555-0000</TelefonoEmisor>
+      </TablaTelefonoEmisor>
+      <FechaEmision>08-04-2026</FechaEmision>
+    </Emisor>
+    <Comprador>
+      <RNCComprador>101683457</RNCComprador>
+      <RazonSocialComprador>CLIENTE FINAL PRUEBA</RazonSocialComprador>
+      <DireccionComprador>Av. Winston Churchill</DireccionComprador>
+    </Comprador>
+    <Totales>
+      <MontoGravadoTotal>200</MontoGravadoTotal>
+      <MontoGravadoI1>200</MontoGravadoI1>
+      <ITBIS1>18</ITBIS1>
+      <TotalITBIS>36.00</TotalITBIS>
+      <TotalITBIS1>36.00</TotalITBIS1>
+      <MontoImpuestoAdicional>10.00</MontoImpuestoAdicional>
+      <ImpuestosAdicionales>
+        <ImpuestoAdicional>
+          <TipoImpuesto>006</TipoImpuesto>
+          <TasaImpuestoAdicional>10.00</TasaImpuestoAdicional>
+          <MontoImpuestoSelectivoConsumoEspecifico>10.00</MontoImpuestoSelectivoConsumoEspecifico>
+        </ImpuestoAdicional>
+      </ImpuestosAdicionales>
+      <MontoTotal>246.00</MontoTotal>
+    </Totales>
+  </Encabezado>
+  <DetallesItems>
+    <Item>
+      <NumeroLinea>1</NumeroLinea>
+      <IndicadorFacturacion>1</IndicadorFacturacion>
+      <NombreItem>Item de Prueba</NombreItem>
+      <IndicadorBienoServicio>1</IndicadorBienoServicio>
+      <CantidadItem>2</CantidadItem>
+      <UnidadMedida>43</UnidadMedida>
+      <PrecioUnitarioItem>100</PrecioUnitarioItem>
+      <TablaImpuestoAdicional>
+        <ImpuestoAdicional>
+          <TipoImpuesto>006</TipoImpuesto>
+        </ImpuestoAdicional>
+      </TablaImpuestoAdicional>
+      <MontoItem>246.00</MontoItem>
+    </Item>
+  </DetallesItems>
+  <FechaHoraFirma>08-04-2026 14:43:03</FechaHoraFirma>
+  <Signature xmlns="http://www.w3.org/2000/09/xmldsig#" />
+</ECF>

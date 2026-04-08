@@ -23,6 +23,10 @@ public class EcfXmlRoot
     public List<EcfXmlDescuentoORecargo> Adjustments { get; set; } = [];
     public bool ShouldSerializeAdjustments() => Adjustments.Count > 0;
 
+    [XmlElement("InformacionReferencia")]
+    public EcfXmlInformacionReferencia? InformacionReferencia { get; set; }
+    public bool ShouldSerializeInformacionReferencia() => InformacionReferencia != null;
+
     /// <summary>
     /// Signature date-time in DGII format "YYYY-MM-DDTHH:mm:ss".
     /// Required by XSD before the xs:any Signature element.
@@ -30,6 +34,7 @@ public class EcfXmlRoot
     /// </summary>
     [XmlElement("FechaHoraFirma")]
     public string FechaHoraFirma { get; set; } = null!;
+
 
     /// <summary>
     /// Placeholder for the digital signature. 

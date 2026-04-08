@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ECF>
+  <Encabezado>
+    <Version>1.0</Version>
+    <IdDoc>
+      <TipoeCF>47</TipoeCF>
+      <eNCF>E470000000001</eNCF>
+      <FechaVencimientoSecuencia>08-04-2027</FechaVencimientoSecuencia>
+      <TipoPago>1</TipoPago>
+    </IdDoc>
+    <Emisor>
+      <RNCEmisor>101000001</RNCEmisor>
+      <RazonSocialEmisor>EMPRESA DE PRUEBA SAS</RazonSocialEmisor>
+      <DireccionEmisor>Calle Central 45, Santo Domingo</DireccionEmisor>
+      <TablaTelefonoEmisor>
+        <TelefonoEmisor>809-555-0000</TelefonoEmisor>
+      </TablaTelefonoEmisor>
+      <FechaEmision>08-04-2026</FechaEmision>
+    </Emisor>
+    <Comprador>
+      <RazonSocialComprador>CLIENTE FINAL PRUEBA</RazonSocialComprador>
+    </Comprador>
+    <Totales>
+      <MontoTotal>236.00</MontoTotal>
+    </Totales>
+  </Encabezado>
+  <DetallesItems>
+    <Item>
+      <NumeroLinea>1</NumeroLinea>
+      <IndicadorFacturacion>1</IndicadorFacturacion>
+      <Retencion>
+        <IndicadorAgenteRetencionoPercepcion>1</IndicadorAgenteRetencionoPercepcion>
+        <MontoISRRetenido>0</MontoISRRetenido>
+      </Retencion>
+      <NombreItem>Item de Prueba</NombreItem>
+      <IndicadorBienoServicio>1</IndicadorBienoServicio>
+      <CantidadItem>2</CantidadItem>
+      <UnidadMedida>43</UnidadMedida>
+      <PrecioUnitarioItem>100</PrecioUnitarioItem>
+      <MontoItem>236.00</MontoItem>
+    </Item>
+  </DetallesItems>
+  <FechaHoraFirma>08-04-2026 16:46:45</FechaHoraFirma>
+  <Signature xmlns="http://www.w3.org/2000/09/xmldsig#" />
+</ECF>

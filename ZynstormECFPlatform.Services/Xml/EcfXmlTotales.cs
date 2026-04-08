@@ -8,19 +8,22 @@ namespace ZynstormECFPlatform.Services.Xml;
 /// </summary>
 public class EcfXmlTotales
 {
+    [XmlIgnore]
+    public int EcfType { get; set; }
+
     // ── Taxable amounts ────────────────────────────────────────────────────
 
     public decimal? MontoGravadoTotal { get; set; }
-    public bool ShouldSerializeMontoGravadoTotal() => MontoGravadoTotal.HasValue;
+    public bool ShouldSerializeMontoGravadoTotal() => MontoGravadoTotal.HasValue && EcfType <= 34;
 
     public decimal? MontoGravadoI1 { get; set; }
-    public bool ShouldSerializeMontoGravadoI1() => MontoGravadoI1.HasValue;
+    public bool ShouldSerializeMontoGravadoI1() => MontoGravadoI1.HasValue && EcfType <= 34;
 
     public decimal? MontoGravadoI2 { get; set; }
-    public bool ShouldSerializeMontoGravadoI2() => MontoGravadoI2.HasValue;
+    public bool ShouldSerializeMontoGravadoI2() => MontoGravadoI2.HasValue && EcfType <= 34;
 
     public decimal? MontoGravadoI3 { get; set; }
-    public bool ShouldSerializeMontoGravadoI3() => MontoGravadoI3.HasValue;
+    public bool ShouldSerializeMontoGravadoI3() => MontoGravadoI3.HasValue && EcfType <= 34;
 
     public decimal? MontoExento { get; set; }
     public bool ShouldSerializeMontoExento() => MontoExento.HasValue && MontoExento > 0;
@@ -28,45 +31,35 @@ public class EcfXmlTotales
     // ── ITBIS rates ────────────────────────────────────────────────────────
 
     public int? ITBIS1 { get; set; }
-    public bool ShouldSerializeITBIS1() => ITBIS1.HasValue;
+    public bool ShouldSerializeITBIS1() => ITBIS1.HasValue && EcfType <= 34;
 
     public int? ITBIS2 { get; set; }
-    public bool ShouldSerializeITBIS2() => ITBIS2.HasValue;
+    public bool ShouldSerializeITBIS2() => ITBIS2.HasValue && EcfType <= 34;
 
     public int? ITBIS3 { get; set; }
-    public bool ShouldSerializeITBIS3() => ITBIS3.HasValue;
+    public bool ShouldSerializeITBIS3() => ITBIS3.HasValue && EcfType <= 34;
 
     // ── ITBIS totals ───────────────────────────────────────────────────────
 
     public decimal? TotalITBIS { get; set; }
-    public bool ShouldSerializeTotalITBIS() => TotalITBIS.HasValue;
+    public bool ShouldSerializeTotalITBIS() => TotalITBIS.HasValue && EcfType <= 34;
 
     public decimal? TotalITBIS1 { get; set; }
-    public bool ShouldSerializeTotalITBIS1() => TotalITBIS1.HasValue;
+    public bool ShouldSerializeTotalITBIS1() => TotalITBIS1.HasValue && EcfType <= 34;
 
     public decimal? TotalITBIS2 { get; set; }
-    public bool ShouldSerializeTotalITBIS2() => TotalITBIS2.HasValue;
+    public bool ShouldSerializeTotalITBIS2() => TotalITBIS2.HasValue && EcfType <= 34;
 
     public decimal? TotalITBIS3 { get; set; }
-    public bool ShouldSerializeTotalITBIS3() => TotalITBIS3.HasValue;
+    public bool ShouldSerializeTotalITBIS3() => TotalITBIS3.HasValue && EcfType <= 34;
 
     // ── Additional taxes (ISC — Impuesto Selectivo al Consumo) ────────────
 
-    /// <summary>
-    /// Total sum of all additional taxes (ISC Específico + Ad-valorem + Otros)
-    /// across all items. Maps to XSD element <c>MontoImpuestoAdicional</c>.
-    /// Only emitted when at least one item carries an ISC type.
-    /// </summary>
     public decimal? MontoImpuestoAdicional { get; set; }
-    public bool ShouldSerializeMontoImpuestoAdicional() => MontoImpuestoAdicional.HasValue && MontoImpuestoAdicional > 0;
+    public bool ShouldSerializeMontoImpuestoAdicional() => MontoImpuestoAdicional.HasValue && MontoImpuestoAdicional > 0 && EcfType <= 34;
 
-    /// <summary>
-    /// Detail of additional taxes grouped by TipoImpuesto.
-    /// Maps to XSD element <c>ImpuestosAdicionales</c>.
-    /// Only emitted when MontoImpuestoAdicional is present.
-    /// </summary>
     public EcfXmlImpuestosAdicionales? ImpuestosAdicionales { get; set; }
-    public bool ShouldSerializeImpuestosAdicionales() => ImpuestosAdicionales != null && ImpuestosAdicionales.Items.Count > 0;
+    public bool ShouldSerializeImpuestosAdicionales() => ImpuestosAdicionales != null && ImpuestosAdicionales.Items.Count > 0 && EcfType <= 34;
 
     // ── Grand total (required by XSD) ──────────────────────────────────────
 
@@ -76,8 +69,9 @@ public class EcfXmlTotales
     // ── Retentions (optional) ──────────────────────────────────────────────
 
     public decimal? TotalITBISRetenido { get; set; }
-    public bool ShouldSerializeTotalITBISRetenido() => TotalITBISRetenido.HasValue;
+    public bool ShouldSerializeTotalITBISRetenido() => TotalITBISRetenido.HasValue && EcfType != 43;
 
     public decimal? TotalISRRetencion { get; set; }
-    public bool ShouldSerializeTotalISRRetencion() => TotalISRRetencion.HasValue;
+    public bool ShouldSerializeTotalISRRetencion() => TotalISRRetencion.HasValue && EcfType != 43;
 }
+

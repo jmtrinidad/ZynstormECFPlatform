@@ -10,27 +10,50 @@ class Program
     static void Main(string[] args)
     {
         var service = new EcfGeneratorService();
+        var typesToTest = new[] { 31, 32, 33, 34, 41, 43, 44, 45, 46, 47 };
 
-        Console.WriteLine("=== Testing Standard Invoice (e-CF 31) ===");
-        TestStandardInvoice(service);
+        Console.WriteLine("===============================================================");
+        Console.WriteLine("   VERIFICACIÓN INTEGRAL DE TODOS LOS TIPOS DE e-CF (XSD)");
+        Console.WriteLine("===============================================================");
 
-        Console.WriteLine("\n=== Testing Invoice with ISC (e-CF 31) ===");
-        TestIscInvoice(service);
+        foreach (var type in typesToTest)
+        {
+            Console.WriteLine($"\n--- Probando tipo e-CF {type} ---");
+            TestEcfType(service, type);
+        }
     }
 
-    static void TestStandardInvoice(EcfGeneratorService service)
+    static void TestEcfType(EcfGeneratorService service, int type)
     {
+        // 1. Prueba Estándar (Sin ISC)
+        var standardDto = CreateBaseDto(type, false);
+        Console.Write($" [Estándar] Validando... ");
+        RunTest(service, standardDto, type);
+
+        // 2. Prueba con ISC (Solo si es tipo 31, 32, 33, 34 que son los más comunes para este impuesto)
+        // En teoría el XSD permite ISC en otros, pero validaremos principalmente estos.
+        if (type <= 34)
+        {
+            var iscDto = CreateBaseDto(type, true);
+            Console.Write($" [Con ISC]  Validando... ");
+            RunTest(service, iscDto, type);
+        }
+    }
+
+    static EcfInvoiceRequestDto CreateBaseDto(int type, bool withIsc)
+    {
+        var ncfPrefix = $"E{type}";
+        var ncf = $"{ncfPrefix}0000000001";
+
         var dto = new EcfInvoiceRequestDto
         {
-            Ncf = "E310000000001",
+            Ncf = ncf,
             IssuerRnc = "101000001",
             IssuerName = "EMPRESA DE PRUEBA SAS",
             IssuerAddress = "Calle Central 45, Santo Domingo",
-            IssuerProvince = "100000",
-            IssuerMunicipality = "100100",
             IssuerPhone = "809-555-0000",
-            CustomerRnc = "101000002",
-            CustomerName = "JUAN PEREZ",
+            CustomerRnc = "101683457",
+            CustomerName = "CLIENTE FINAL PRUEBA",
             CustomerAddress = "Av. Winston Churchill",
             IssueDate = DateTime.UtcNow,
             IncomeType = "01",
@@ -39,64 +62,69 @@ class Program
             {
                 new EcfItemRequestDto
                 {
-                    Name = "Producto 1",
+                    Name = "Item de Prueba",
                     Quantity = 2,
                     UnitPrice = 100,
-                    TaxPercentage = 18
+                    TaxPercentage = (type == 43) ? 0 : 18 // Gasto menor suele ser exento
                 }
             }
         };
 
-        RunTest(service, dto);
-    }
-
-    static void TestIscInvoice(EcfGeneratorService service)
-    {
-        var dto = new EcfInvoiceRequestDto
+        // ── Reference for NC / ND ──────────────────────────────────────────
+        if (type == 33 || type == 34)
         {
-            Ncf = "E310000012345",
-            IssuerRnc = "101000001",
-            IssuerName = "DISTRIBUIDORA DE BEBIDAS SAS",
-            IssuerAddress = "Zona Industrial Haina",
-            IssuerProvince = "100000",
-            IssuerMunicipality = "100100",
-            IssuerPhone = "809-555-1111",
-            CustomerRnc = "101000002",
-            CustomerName = "SUPERMERCADO NACIONAL",
-            CustomerAddress = "Av. 27 de Febrero",
-            CustomerTelephone = "809-222-3333", // New field check
-            IssueDate = DateTime.UtcNow,
-            IncomeType = "01",
-            PaymentType = 1,
-            Items = new List<EcfItemRequestDto>
+            dto.ReferenceNcf = "E310000000005";
+            dto.ReferenceIssueDate = DateTime.UtcNow.AddDays(-5);
+            dto.ReferenceReasonCode = 3; // Corrige montos
+        }
+
+        if (withIsc)
+        {
+            var item = dto.Items[0];
+            item.IscType = "006"; // Cerveza
+            item.AdditionalTaxRate = 10.00m;
+            item.IscSpecificAmount = 10.00m;
+        }
+
+        return dto;
+    }
+
+
+    static void RunTest(EcfGeneratorService service, EcfInvoiceRequestDto dto, int type)
+    {
+        try
+        {
+            var xml = service.GenerateUnsignedXml(dto);
+            
+            // Guardar para inspección
+            var filename = $"temp_ecf_{type}.xml";
+            if (dto.Items.Count > 0 && !string.IsNullOrWhiteSpace(dto.Items[0].IscType))
+                filename = $"temp_ecf_{type}_isc.xml";
+            
+            File.WriteAllText(filename, xml);
+
+            var xsdErrors = service.ValidateXmlAgainstSchema(xml, type);
+
+            if (xsdErrors.Count == 0)
             {
-                new EcfItemRequestDto
+                Console.WriteLine("✅ OK");
+            }
+            else
+            {
+                Console.WriteLine($"❌ ERROR (Ver {filename})");
+                foreach (var err in xsdErrors)
                 {
-                    Name = "Cerveza Presidente 12oz",
-                    Quantity = 24,
-                    UnitPrice = 150.00m,
-                    TaxPercentage = 18,
-                    IscType = "006", // Cerveza
-                    AdditionalTaxRate = 10.00m,
-                    IscSpecificAmount = 120.00m, // 5.00 x 24
-                    IscAdvaloremAmount = 0.00m
-                },
-                new EcfItemRequestDto
-                {
-                    Name = "Ron Barcelo Gran Añejo",
-                    Quantity = 12,
-                    UnitPrice = 800.00m,
-                    TaxPercentage = 18,
-                    IscType = "014", // Ron
-                    AdditionalTaxRate = 10.00m,
-                    IscSpecificAmount = 0.00m,
-                    IscAdvaloremAmount = 960.00m // 10% de (12 * 800)
+                    Console.WriteLine($"   - {err}");
                 }
             }
-        };
-
-        RunTest(service, dto);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"💥 EXCEPTION: {ex.Message}");
+        }
     }
+
+
 
 
     static void RunTest(EcfGeneratorService service, EcfInvoiceRequestDto dto)

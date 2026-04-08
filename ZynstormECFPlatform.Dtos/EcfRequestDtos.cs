@@ -96,6 +96,13 @@ public class EcfInvoiceRequestDto
     /// <summary>Buyer province code — 6-digit DGII code (optional).</summary>
     public string? CustomerProvince { get; set; }
 
+    /// <summary>Foreign identifier for customers outside DR (e.g. Passport, Tax ID) - Required for Type 46/47.</summary>
+    public string? CustomerForeignId { get; set; }
+
+    /// <summary>Country name for foreign customers (optional).</summary>
+    public string? CustomerCountry { get; set; }
+
+
     // ── Payment ────────────────────────────────────────────────────────────────
 
     /// <summary>1: Contado, 2: Crédito, 3: Gratuito.</summary>
@@ -122,7 +129,28 @@ public class EcfInvoiceRequestDto
 
     /// <summary>Description of the global discount.</summary>
     public string? GlobalDiscountDescription { get; set; }
+
+    // ── Reference Information (Required for NC/ND - Types 33, 34) ──────────────
+
+    /// <summary>The original NCF being modified (e.g. "E310000000001").</summary>
+    public string? ReferenceNcf { get; set; }
+
+    /// <summary>RNC of the other taxpayer if the reference is not for the same customer (optional).</summary>
+    public string? ReferenceCustomerRnc { get; set; }
+
+    /// <summary>Issue date of the modified NCF.</summary>
+    public DateTime? ReferenceIssueDate { get; set; }
+
+    /// <summary>
+    /// Modification reason code:
+    /// 1 = Anula, 2 = Corrige texto, 3 = Corrige montos, 4 = Reemplazo contingencia.
+    /// </summary>
+    public int? ReferenceReasonCode { get; set; }
+
+    /// <summary>Text description of the modification reason (optional).</summary>
+    public string? ReferenceReasonDescription { get; set; }
 }
+
 
 public class EcfItemRequestDto
 {
@@ -148,6 +176,10 @@ public class EcfItemRequestDto
 
     /// <summary>1: Bien (Good), 2: Servicio (Service).</summary>
     public int ItemType { get; set; } = 1;
+
+    /// <summary>ISR Retention amount (used in types 41, 47) (optional).</summary>
+    public decimal? IsrRetentionAmount { get; set; }
+
 
     /// <summary>Unit of measure code per DGII catalog (1-62). Defaults to 43 (Unit).</summary>
     public int? UnitOfMeasure { get; set; }

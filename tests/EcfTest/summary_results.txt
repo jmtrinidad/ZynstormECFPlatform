@@ -1,0 +1,216 @@
+﻿
+> --- Probando tipo e-CF 
+31 ---
+   [Est├índar] 
+Validando... Ô£à OK
+   [Con ISC]  Validando... 
+Ô£à OK
+> --- Probando tipo e-CF 
+32 ---
+>  [Est├índar] 
+Validando... ÔØî ERROR
+>    - [ERROR] L├¡nea 8, 
+Pos 8: The element 'IdDoc' 
+has invalid child element '
+FechaVencimientoSecuencia'.
+ List of possible elements 
+expected: 
+'IndicadorEnvioDiferido, 
+IndicadorMontoGravado, Indi
+cadorServicioTodoIncluido, 
+TipoIngresos'.
+>  [Con ISC]  Validando... 
+ÔØî ERROR
+>    - [ERROR] L├¡nea 8, 
+Pos 8: The element 'IdDoc' 
+has invalid child element '
+FechaVencimientoSecuencia'.
+ List of possible elements 
+expected: 
+'IndicadorEnvioDiferido, 
+IndicadorMontoGravado, Indi
+cadorServicioTodoIncluido, 
+TipoIngresos'.
+  
+> --- Probando tipo e-CF 
+33 ---
+>  [Est├índar] 
+Validando... ÔØî ERROR
+>    - [ERROR] L├¡nea 47, 
+Pos 4: The element 'ECF' 
+has invalid child element 
+'FechaHoraFirma'. List of 
+possible elements 
+expected: 'Subtotales, 
+DescuentosORecargos, 
+Paginacion, 
+InformacionReferencia'.
+>  [Con ISC]  Validando... 
+ÔØî ERROR
+>    - [ERROR] L├¡nea 60, 
+Pos 4: The element 'ECF' 
+has invalid child element 
+'FechaHoraFirma'. List of 
+possible elements 
+expected: 'Subtotales, 
+DescuentosORecargos, 
+Paginacion, 
+InformacionReferencia'.
+  
+> --- Probando tipo e-CF 
+34 ---
+>  [Est├índar] 
+Validando... ÔØî ERROR
+>    - [ERROR] L├¡nea 8, 
+Pos 8: The element 'IdDoc' 
+has invalid child element '
+FechaVencimientoSecuencia'.
+ List of possible elements 
+expected: 
+'IndicadorNotaCredito'.
+>    - [ERROR] L├¡nea 47, 
+Pos 4: The element 'ECF' 
+has invalid child element 
+'FechaHoraFirma'. List of 
+possible elements 
+expected: 'Subtotales, 
+DescuentosORecargos, 
+Paginacion, 
+InformacionReferencia'.
+>  [Con ISC]  Validando... 
+ÔØî ERROR
+>    - [ERROR] L├¡nea 8, 
+Pos 8: The element 'IdDoc' 
+has invalid child element '
+FechaVencimientoSecuencia'.
+ List of possible elements 
+expected: 
+'IndicadorNotaCredito'.
+>    - [ERROR] L├¡nea 60, 
+Pos 4: The element 'ECF' 
+has invalid child element 
+'FechaHoraFirma'. List of 
+possible elements 
+expected: 'Subtotales, 
+DescuentosORecargos, 
+Paginacion, 
+InformacionReferencia'.
+  
+> --- Probando tipo e-CF 
+41 ---
+>  [Est├índar] 
+Validando... ÔØî ERROR
+>    - [ERROR] L├¡nea 9, 
+Pos 8: The element 'IdDoc' 
+has invalid child element 
+'TipoIngresos'. List of 
+possible elements 
+expected: 
+'IndicadorMontoGravado, 
+TipoPago, FechaLimitePago, 
+TerminoPago, 
+TablaFormasPago, 
+TipoCuentaPago, 
+NumeroCuentaPago, 
+BancoPago, TotalPaginas'.
+>    - [ERROR] L├¡nea 39, 
+Pos 8: The element 'Item' 
+has invalid child element 
+'NombreItem'. List of 
+possible elements 
+expected: 'Retencion'.
+  
+> --- Probando tipo e-CF 
+43 ---
+>  [Est├índar] 
+Validando... ÔØî ERROR
+>    - [ERROR] L├¡nea 9, 
+Pos 8: The element 'IdDoc' 
+has invalid child element 
+'TipoIngresos'. List of 
+possible elements 
+expected: 'TipoPago, 
+TotalPaginas'.
+>    - [ERROR] L├¡nea 21, 
+Pos 6: The element 
+'Encabezado' has invalid 
+child element 'Comprador'. 
+List of possible elements 
+expected: 'Totales'.
+  
+> --- Probando tipo e-CF 
+44 ---
+>  [Est├índar] 
+Validando... ÔØî ERROR
+>    - [ERROR] L├¡nea 27, 
+Pos 8: The element 
+'Totales' has invalid 
+child element 
+'MontoGravadoTotal'. List 
+of possible elements 
+expected: 'MontoExento, 
+MontoImpuestoAdicional, 
+ImpuestosAdicionales, 
+MontoTotal'.
+  
+> --- Probando tipo e-CF 
+45 ---
+   [Est├índar] 
+Validando... Ô£à OK
+  
+> --- Probando tipo e-CF 
+46 ---
+>  [Est├índar] 
+Validando... ÔØî ERROR
+>    - [ERROR] L├¡nea 28, 
+Pos 8: The element 
+'Totales' has invalid 
+child element 
+'MontoGravadoI1'. List of 
+possible elements 
+expected: 'MontoGravadoI3, 
+ITBIS3, TotalITBIS, 
+TotalITBIS3, MontoTotal'.
+  
+> --- Probando tipo e-CF 
+47 ---
+>  [Est├índar] 
+Validando... ÔØî ERROR
+>    - [ERROR] L├¡nea 9, 
+Pos 8: The element 'IdDoc' 
+has invalid child element 
+'TipoIngresos'. List of 
+possible elements 
+expected: 'TipoPago, 
+FechaLimitePago, 
+TerminoPago, 
+TablaFormasPago, 
+TipoCuentaPago, 
+NumeroCuentaPago, 
+BancoPago, FechaDesde, 
+FechaHasta, TotalPaginas'.
+>    - [ERROR] L├¡nea 22, 
+Pos 8: The element 
+'Comprador' has invalid 
+child element 
+'RNCComprador'. List of 
+possible elements 
+expected: 
+'IdentificadorExtranjero, 
+RazonSocialComprador'.
+>    - [ERROR] L├¡nea 27, 
+Pos 8: The element 
+'Totales' has invalid 
+child element 
+'MontoGravadoTotal'. List 
+of possible elements 
+expected: 'MontoExento, 
+MontoTotal'.
+>    - [ERROR] L├¡nea 39, 
+Pos 8: The element 'Item' 
+has invalid child element 
+'NombreItem'. List of 
+possible elements 
+expected: 'Retencion'.
+
+

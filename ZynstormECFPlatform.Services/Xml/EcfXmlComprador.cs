@@ -8,30 +8,50 @@ namespace ZynstormECFPlatform.Services.Xml;
 /// </summary>
 public class EcfXmlComprador
 {
+    [XmlIgnore]
+    public int EcfType { get; set; }
+
     [XmlElement("RNCComprador")]
-    public string RncComprador { get; set; } = null!;
+    public string? RncComprador { get; set; }
+
+    public bool ShouldSerializeRncComprador() => !string.IsNullOrEmpty(RncComprador) && EcfType != 47;
+
+
+    [XmlElement("IdentificadorExtranjero")]
+    public string? IdentificadorExtranjero { get; set; }
+    public bool ShouldSerializeIdentificadorExtranjero() => !string.IsNullOrEmpty(IdentificadorExtranjero);
 
     [XmlElement("RazonSocialComprador")]
     public string RazonSocial { get; set; } = null!;
 
+    [XmlElement("ContactoComprador")]
     public string? ContactoComprador { get; set; }
-    public bool ShouldSerializeContactoComprador() => !string.IsNullOrWhiteSpace(ContactoComprador);
+    public bool ShouldSerializeContactoComprador() => !string.IsNullOrWhiteSpace(ContactoComprador) && EcfType != 47;
 
+    [XmlElement("CorreoComprador")]
     public string? CorreoComprador { get; set; }
-    public bool ShouldSerializeCorreoComprador() => !string.IsNullOrWhiteSpace(CorreoComprador);
+    public bool ShouldSerializeCorreoComprador() => !string.IsNullOrWhiteSpace(CorreoComprador) && EcfType != 47;
 
+    [XmlElement("DireccionComprador")]
     public string? DireccionComprador { get; set; }
-    public bool ShouldSerializeDireccionComprador() => !string.IsNullOrWhiteSpace(DireccionComprador);
+    public bool ShouldSerializeDireccionComprador() => !string.IsNullOrWhiteSpace(DireccionComprador) && EcfType != 47;
 
+    [XmlElement("MunicipioComprador")]
     public string? MunicipioComprador { get; set; }
-    public bool ShouldSerializeMunicipioComprador() => !string.IsNullOrWhiteSpace(MunicipioComprador);
+    public bool ShouldSerializeMunicipioComprador() => !string.IsNullOrWhiteSpace(MunicipioComprador) && EcfType != 47;
 
+    [XmlElement("ProvinciaComprador")]
     public string? ProvinciaComprador { get; set; }
-    public bool ShouldSerializeProvinciaComprador() => !string.IsNullOrWhiteSpace(ProvinciaComprador);
+    public bool ShouldSerializeProvinciaComprador() => !string.IsNullOrWhiteSpace(ProvinciaComprador) && EcfType != 47;
 
-    // Note: Other optional fields like FechaEntrega, ContactoEntrega belong here in XSD order.
+    [XmlElement("PaisComprador")]
+    public string? PaisComprador { get; set; }
+    public bool ShouldSerializePaisComprador() => !string.IsNullOrWhiteSpace(PaisComprador) && EcfType != 47;
 
+    [XmlElement("TelefonoAdicional")]
     public string? TelefonoAdicional { get; set; }
-    public bool ShouldSerializeTelefonoAdicional() => !string.IsNullOrWhiteSpace(TelefonoAdicional);
+    public bool ShouldSerializeTelefonoAdicional() => !string.IsNullOrWhiteSpace(TelefonoAdicional) && EcfType != 47;
+
+
 }
 
