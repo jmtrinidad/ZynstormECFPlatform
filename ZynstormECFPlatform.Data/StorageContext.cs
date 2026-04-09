@@ -478,6 +478,16 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.ModifiedNcfDate).HasColumnType(DateTimeColumnType);
             entity.Property(e => e.ModificationReason).HasMaxLength(90).IsUnicode(false);
             entity.Property(e => e.SignatureDateTime).HasColumnType(DateTimeColumnType);
+
+            // Foreign customer fields (Types 46/47)
+            entity.Property(e => e.CustomerForeignId).HasMaxLength(50).IsUnicode(false);
+            entity.Property(e => e.CustomerCountry).HasMaxLength(60).IsUnicode(false);
+
+            // Issuer email
+            entity.Property(e => e.IssuerEmail).HasMaxLength(80).IsUnicode(false);
+
+            // Reference customer RNC (NC/ND against a different taxpayer)
+            entity.Property(e => e.ReferenceCustomerRnc).HasMaxLength(25).IsUnicode(false);
         });
 
         modelBuilder.Entity<EcfDocumentDetail>(entity =>

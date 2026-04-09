@@ -5,7 +5,7 @@
     <IdDoc>
       <TipoeCF>47</TipoeCF>
       <eNCF>E470000000001</eNCF>
-      <FechaVencimientoSecuencia>08-04-2027</FechaVencimientoSecuencia>
+      <FechaVencimientoSecuencia>09-04-2027</FechaVencimientoSecuencia>
       <TipoPago>1</TipoPago>
     </IdDoc>
     <Emisor>
@@ -15,7 +15,7 @@
       <TablaTelefonoEmisor>
         <TelefonoEmisor>809-555-0000</TelefonoEmisor>
       </TablaTelefonoEmisor>
-      <FechaEmision>08-04-2026</FechaEmision>
+      <FechaEmision>09-04-2026</FechaEmision>
     </Emisor>
     <Comprador>
       <RazonSocialComprador>CLIENTE FINAL PRUEBA</RazonSocialComprador>
@@ -40,6 +40,6 @@
       <MontoItem>236.00</MontoItem>
     </Item>
   </DetallesItems>
-  <FechaHoraFirma>08-04-2026 16:46:45</FechaHoraFirma>
+  <FechaHoraFirma>09-04-2026 07:51:46</FechaHoraFirma>
   <Signature xmlns="http://www.w3.org/2000/09/xmldsig#" />
 </ECF>

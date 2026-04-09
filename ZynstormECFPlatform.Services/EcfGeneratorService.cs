@@ -361,6 +361,7 @@ public class EcfGeneratorService : IEcfGeneratorService
                     EcfType                = ecfType,
                     Ncf                    = dto.Ncf,
                     SequenceExpirationDate = expirationDate,
+                    IndicadorNotaCredito   = ecfType == 34 ? 1 : null,
                     IncomeType             = dto.IncomeType,
                     PaymentType            = dto.PaymentType,
                     FechaLimitePago        = dto.PaymentDeadline?.ToDrTime().ToString(DateFormat),

@@ -5,8 +5,7 @@
     <IdDoc>
       <TipoeCF>43</TipoeCF>
       <eNCF>E430000000001</eNCF>
-      <FechaVencimientoSecuencia>08-04-2027</FechaVencimientoSecuencia>
-      <TipoIngresos>01</TipoIngresos>
+      <FechaVencimientoSecuencia>09-04-2027</FechaVencimientoSecuencia>
       <TipoPago>1</TipoPago>
     </IdDoc>
     <Emisor>
@@ -16,13 +15,8 @@
       <TablaTelefonoEmisor>
         <TelefonoEmisor>809-555-0000</TelefonoEmisor>
       </TablaTelefonoEmisor>
-      <FechaEmision>08-04-2026</FechaEmision>
+      <FechaEmision>09-04-2026</FechaEmision>
     </Emisor>
-    <Comprador>
-      <RNCComprador>101683457</RNCComprador>
-      <RazonSocialComprador>CLIENTE FINAL PRUEBA</RazonSocialComprador>
-      <DireccionComprador>Av. Winston Churchill</DireccionComprador>
-    </Comprador>
     <Totales>
       <MontoExento>200</MontoExento>
       <MontoTotal>200</MontoTotal>
@@ -40,6 +34,6 @@
       <MontoItem>200</MontoItem>
     </Item>
   </DetallesItems>
-  <FechaHoraFirma>08-04-2026 16:46:45</FechaHoraFirma>
+  <FechaHoraFirma>09-04-2026 07:51:46</FechaHoraFirma>
   <Signature xmlns="http://www.w3.org/2000/09/xmldsig#" />
 </ECF>

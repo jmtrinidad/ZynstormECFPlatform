@@ -17,7 +17,9 @@ public class EcfXmlEncabezado
     public EcfXmlEmisor Emisor { get; set; } = null!;
 
     [XmlElement("Comprador")]
-    public EcfXmlComprador Comprador { get; set; } = null!;
+    public EcfXmlComprador? Comprador { get; set; }
+    // Type 43 (Gastos Menores) does not include Comprador in its XSD — the buyer is anonymous.
+    public bool ShouldSerializeComprador() => Comprador != null && IdDoc?.EcfType != 43;
 
     [XmlElement("Totales")]
     public EcfXmlTotales Totales { get; set; } = null!;

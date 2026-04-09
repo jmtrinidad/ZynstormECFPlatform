@@ -28,11 +28,20 @@ public partial class EcfDocument : BaseEntity
     [XmlElement("RNCComprador")]
     public string CustomerRnc { get; set; } = null!;
 
+    [XmlElement("IdentificadorExtranjero")]
+    public string? CustomerForeignId { get; set; }
+
+    [XmlElement("PaisComprador")]
+    public string? CustomerCountry { get; set; }
+
     [XmlElement("RazonSocialComprador")]
     public string CustomerName { get; set; } = null!;
 
     [XmlElement("CorreoComprador")]
     public string? CustomerEmail { get; set; }
+
+    [XmlElement("CorreoEmisor")]
+    public string? IssuerEmail { get; set; }
 
     [XmlElement("DireccionComprador")]
     public string? CustomerAddress { get; set; }
@@ -190,6 +199,9 @@ public partial class EcfDocument : BaseEntity
 
     [XmlElement("NCFModificado")]
     public string? ModifiedNcf { get; set; }
+
+    [XmlElement("RNCOtroContribuyente")]
+    public string? ReferenceCustomerRnc { get; set; }
 
     [XmlElement("FechaNCFModificado")]
     public DateTime? ModifiedNcfDate { get; set; }

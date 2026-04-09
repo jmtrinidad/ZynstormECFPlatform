@@ -5,7 +5,7 @@
     <IdDoc>
       <TipoeCF>31</TipoeCF>
       <eNCF>E310000000001</eNCF>
-      <FechaVencimientoSecuencia>08-04-2027</FechaVencimientoSecuencia>
+      <FechaVencimientoSecuencia>09-04-2027</FechaVencimientoSecuencia>
       <TipoIngresos>01</TipoIngresos>
       <TipoPago>1</TipoPago>
     </IdDoc>
@@ -16,7 +16,7 @@
       <TablaTelefonoEmisor>
         <TelefonoEmisor>809-555-0000</TelefonoEmisor>
       </TablaTelefonoEmisor>
-      <FechaEmision>08-04-2026</FechaEmision>
+      <FechaEmision>09-04-2026</FechaEmision>
     </Emisor>
     <Comprador>
       <RNCComprador>101683457</RNCComprador>
@@ -44,6 +44,6 @@
       <MontoItem>236.00</MontoItem>
     </Item>
   </DetallesItems>
-  <FechaHoraFirma>08-04-2026 16:46:45</FechaHoraFirma>
+  <FechaHoraFirma>09-04-2026 07:51:46</FechaHoraFirma>
   <Signature xmlns="http://www.w3.org/2000/09/xmldsig#" />
 </ECF>
