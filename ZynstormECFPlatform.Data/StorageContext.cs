@@ -17,6 +17,8 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
     //private string StringColumnType => Database.IsRelational() && Database.IsNpgsql() ? "text" : "NVARCHAR";
 
+    public virtual DbSet<IncomingEcfDocument> IncomingEcfDocuments { get; set; } = null!;
+
     public StorageContext(DbContextOptions<StorageContext> options) : base(options)
     {
     }
@@ -752,6 +754,25 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                 .HasForeignKey(d => d.EcfStatusId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_EcfTransmission_EcfStatus");
+        });
+
+        modelBuilder.Entity<IncomingEcfDocument>(entity =>
+        {
+            entity.HasKey(c => c.IncomingEcfDocumentId);
+
+            entity.Property(e => e.RncEmisor).HasMaxLength(25).IsUnicode(false);
+            entity.Property(e => e.ENcf).HasMaxLength(20).IsUnicode(false);
+            entity.Property(e => e.TrackId).HasMaxLength(100).IsUnicode(false);
+            entity.Property(e => e.RawXml).HasColumnType("text");
+            entity.Property(e => e.ReceivedAtUtc).HasColumnType(DateTimeColumnType).HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(c => c.LastUpdateUtc).HasColumnType(DateTimeColumnType);
+            entity.Property(c => c.DeletedTimeUtc).HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false).IsRequired();
+            entity.Property(e => e.GuidId).IsRequired().HasMaxLength(450).IsUnicode(false).HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
         });
 
         modelBuilder.Entity<EcfType>(entity =>

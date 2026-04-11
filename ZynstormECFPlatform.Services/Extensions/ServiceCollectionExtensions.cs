@@ -15,6 +15,7 @@ public static class ServiceCollectionExtensions
         
         services.AddMemoryCache();
         services.AddSingleton<ICacheService, CacheService>();
+        services.AddTransient<IInboundEcfService, InboundEcfService>();
         
         services.AddTransient<IXmlSignatureService, XmlSignatureService>();
         services.AddHttpClient<IDgiiAuthService, DgiiAuthService>();
