@@ -12,6 +12,10 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IEncryptedService, EncryptedService>();
         services.AddTransient<IEmailService, EmailService>();
         services.AddTransient<IEcfGeneratorService, EcfGeneratorService>();
+        
+        services.AddTransient<IXmlSignatureService, XmlSignatureService>();
+        services.AddHttpClient<IDgiiAuthService, DgiiAuthService>();
+        services.AddHttpClient<IDgiiTransmissionService, DgiiTransmissionService>();
 
         return services;
     }

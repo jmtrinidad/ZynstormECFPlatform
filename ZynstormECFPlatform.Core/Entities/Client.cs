@@ -18,6 +18,8 @@ public partial class Client : BaseEntity
 
     public int StatusId { get; set; }
 
+    public bool IsDgiiProduction { get; set; }
+
 
     public virtual Status Status { get; set; } = null!;
 
