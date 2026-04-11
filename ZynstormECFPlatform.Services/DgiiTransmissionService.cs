@@ -5,21 +5,26 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using ZynstormECFPlatform.Abstractions.Services;
+using Microsoft.Extensions.Configuration;
 
 namespace ZynstormECFPlatform.Services;
 
 public class DgiiTransmissionService : IDgiiTransmissionService
 {
     private readonly HttpClient _httpClient;
+    private readonly IConfiguration _configuration;
 
-    public DgiiTransmissionService(HttpClient httpClient)
+    public DgiiTransmissionService(HttpClient httpClient, IConfiguration configuration)
     {
         _httpClient = httpClient;
+        _configuration = configuration;
     }
 
     public async Task<DgiiTransmissionResult> SendEcfAsync(bool isProduction, string token, string signedXml, int ecfType, decimal totalAmount, string rncEmisor, string eNcf)
     {
-        string baseUrl = isProduction ? "https://ecf.dgii.gov.do" : "https://ecf.dgii.gov.do/testecf";
+        string envKey = isProduction ? "Production" : "Test";
+        string baseUrl = _configuration[$"DgiiUrls:{envKey}"] 
+            ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey} no fue encontrada en appsettings.json");
         
         // Determine endpoint based on logic:
         // "Resumen de Factura de Consumo para tipo 32 con monto <250,000 -> endpoint diferente"

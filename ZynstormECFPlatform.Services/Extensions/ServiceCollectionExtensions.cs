@@ -13,6 +13,9 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IEmailService, EmailService>();
         services.AddTransient<IEcfGeneratorService, EcfGeneratorService>();
         
+        services.AddMemoryCache();
+        services.AddSingleton<ICacheService, CacheService>();
+        
         services.AddTransient<IXmlSignatureService, XmlSignatureService>();
         services.AddHttpClient<IDgiiAuthService, DgiiAuthService>();
         services.AddHttpClient<IDgiiTransmissionService, DgiiTransmissionService>();
