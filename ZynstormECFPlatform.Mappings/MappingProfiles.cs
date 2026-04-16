@@ -1,6 +1,7 @@
 using AutoMapper;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Dtos;
+using Enums = ZynstormECFPlatform.Core.Enums;
 
 namespace ZynstormECFPlatform.Mappings;
 
@@ -12,7 +13,9 @@ public class MappingProfiles : Profile
         CreateMap<ApiKeyViewDto, ApiKey>();
 
         // Client
-        CreateMap<ClientCreateDto, Client>();
+        CreateMap<ClientCreateDto, Client>()
+            .ForMember(dest => dest.StatusId, opt => opt.MapFrom(src => (int)Enums.StatusEnum.Active));
+
         CreateMap<ClientUpdateDto, Client>();
         CreateMap<Client, ClientViewDto>();
 

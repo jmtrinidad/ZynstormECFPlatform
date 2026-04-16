@@ -1,46 +1,15 @@
 using ZynstormECFPlatform.Abstractions.Data;
 using ZynstormECFPlatform.Abstractions.DataServices;
-using ZynstormECFPlatform.Abstractions.Services;
-using ZynstormECFPlatform.Common.Utilities;
 using ZynstormECFPlatform.Core.Entities;
-using ZynstormECFPlatform.Core.Enums;
 
 namespace ZynstormECFPlatform.Data.Services;
 
 public class ClientService(
-    IRepository<ApiKey> apiKeyRepository,
     StorageContext context,
-    ISqlGenerator sqlGenerator,
-    IEmailService emailService,
-    IEncryptedService encryptedService) : Repository<Client>(context, sqlGenerator), IClientService
+    ISqlGenerator sqlGenerator) : Repository<Client>(context, sqlGenerator), IClientService
 {
-    private readonly IRepository<ApiKey> _apiKeyRepository = apiKeyRepository;
-    private readonly IEncryptedService _encryptedService = encryptedService;
-
     public override async Task<Client?> InsertAsync(Client model)
     {
-        var client = await base.InsertAsync(model);
-
-        if (client != null && !string.IsNullOrEmpty(client.Email))
-        {
-            var apiKey = KeyGenerator.GenerateApiKey();
-            var secretKey = KeyGenerator.GenerateSecretKey();
-
-            var apiKeyEntity = new ApiKey
-            {
-                ClientId = client.ClientId,
-                Apikey = apiKey,
-                SecretKey = _encryptedService.EncryptString(secretKey),
-                StatusId = (int)StatusEnum.Active,
-                RegisteredAt = DateTime.UtcNow,
-                GuidId = Guid.NewGuid().ToString()
-            };
-
-            await _apiKeyRepository.InsertAsync(apiKeyEntity);
-
-            await emailService.SendApiKeyEmailAsync(client.Email, apiKey, secretKey);
-        }
-
-        return client;
+        return await base.InsertAsync(model);
     }
 }

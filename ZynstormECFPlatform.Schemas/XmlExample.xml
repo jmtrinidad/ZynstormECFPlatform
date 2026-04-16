@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ECF>
+  <Encabezado>
+    <Version>1.0</Version>
+    <IdDoc>
+      <TipoeCF>31</TipoeCF>
+      <eNCF>E310000000058</eNCF>
+      <FechaVencimientoSecuencia>31-12-2027</FechaVencimientoSecuencia>
+      <TipoIngresos>01</TipoIngresos>
+      <TipoPago>2</TipoPago>
+      <FechaLimitePago>16-03-2026</FechaLimitePago>
+      <TerminoPago>15 DIAS</TerminoPago>
+    </IdDoc>
+    <Emisor>
+      <RNCEmisor>133009889</RNCEmisor>
+      <RazonSocialEmisor>TRANSPORTE NJ, SRL</RazonSocialEmisor>
+      <DireccionEmisor>ENSANCHE GREGORIO LUPERON, SANTIAGO DE LOS CABALLEROS</DireccionEmisor>
+      <Municipio>250100</Municipio>
+      <Provincia>250000</Provincia>
+      <TablaTelefonoEmisor>
+        <TelefonoEmisor>809-876-4046</TelefonoEmisor>
+      </TablaTelefonoEmisor>
+      <FechaEmision>01-03-2026</FechaEmision>
+    </Emisor>
+    <Comprador>
+      <RNCComprador>102620717</RNCComprador>
+      <RazonSocialComprador>MORTEROS DE EUROPA</RazonSocialComprador>
+      <TelefonoAdicional>809-233-6060</TelefonoAdicional>
+      <DireccionComprador>CARRETERA JANICO, LAS CHARCAS, SANTIAGO, R.D.</DireccionComprador>
+    </Comprador>
+    <Totales>
+      <MontoExento>158000.00</MontoExento>
+      <MontoTotal>158000.00</MontoTotal>
+    </Totales>
+  </Encabezado>
+  <DetallesItems>
+    <Item>
+      <NumeroLinea>1</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 33084 06/03/2026 MORTEROS SANTIAGO - MORTEROS COTUI</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>14000.00</PrecioUnitarioItem>
+      <MontoItem>14000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>2</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310012165/310012168 04/03/2026 TILES IMPORT Y EXPORT - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>3</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 3 06/03/2026 F.OCHOA (AV IMBERT) - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>4</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310012316 07/03/2026 TILES IMPORT Y EXPORT - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>5</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310012542/310012543 12/03/2026 TILES IMPORT Y EXPORT - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>6</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310012659 16/03/2026 TILES IMPORT Y EXPORT - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>7</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310012869 20/03/2026 TILES IMPORT Y EXPORT - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>8</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310012872 20/03/2026 TILES IMPORT Y EXPORT - MORTEROS SANTIAGO (VILLA GONZALES)</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>9</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310012920 23/03/2026 F.OCHOA (LAS CHARCAS) - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>10</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310012972 24/03/2026 F.OCHOA (LAS CHARCAS) - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>11</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310012983 24/03/2026 F.OCHOA (LAS CHARCAS) - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>12</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310013013/310013012/310013011 24/03/2026 TILES IMPORT Y EXPORT - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>13</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 108020 25/03/2026 F.OCHOA (LAS CHARCAS) - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>14</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310013026 25/03/2026 F.OCHOA (LAS CHARCAS) - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>15</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310013038 25/03/2026 F.OCHOA (LAS CHARCAS) - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>16</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310013039 25/03/2026 F.OCHOA (LAS CHARCAS) - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>17</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310013043 25/03/2026 F.OCHOA (LAS CHARCAS) - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>18</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310013044 25/03/2026 F.OCHOA (LAS CHARCAS) - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>19</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310013102 26/03/2026 BELLON (AV IMBERT) - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>20</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310013113 26/03/2026 TILES IMPORT Y EXPORT - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>21</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310013177 28/03/2026 F.OCHOA (LAS CHARCAS) - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>22</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310013183 30/03/2026 F.OCHOA (AV IMBERT) - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>23</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 33356 30/03/2026 NATIONAL SERVICE - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>24</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 310013206/310013208 30/03/2026 TILES IMPORT Y EXPORT - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+    <Item>
+      <NumeroLinea>25</NumeroLinea>
+      <IndicadorFacturacion>4</IndicadorFacturacion>
+      <NombreItem>FLETE 33368 31/03/2026 NATIONAL SERVICE - MORTEROS SANTIAGO</NombreItem>
+      <IndicadorBienoServicio>2</IndicadorBienoServicio>
+      <CantidadItem>1</CantidadItem>
+      <PrecioUnitarioItem>6000.00</PrecioUnitarioItem>
+      <MontoItem>6000.00</MontoItem>
+    </Item>
+  </DetallesItems>
+  <FechaHoraFirma>01-03-2026 00:00:00</FechaHoraFirma>
+  <Signature xmlns="http://www.w3.org/2000/09/xmldsig#" />
+</ECF>
+

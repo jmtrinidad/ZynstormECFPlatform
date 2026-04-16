@@ -18,7 +18,7 @@ public class ClientCreateDto
     [Phone]
     public string? Phone { get; set; }
 
-    public int StatusId { get; set; }
+    //public int StatusId { get; set; }
 }
 
 public class ClientUpdateDto : ClientCreateDto

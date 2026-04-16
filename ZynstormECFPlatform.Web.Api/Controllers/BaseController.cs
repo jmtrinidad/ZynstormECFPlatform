@@ -10,7 +10,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers;
 
 //[JsonConverter(typeof(JsonInheritanceConverter), "discriminator")]
 //[KnownType(typeof(UserController))]
-[Authorize]
+//[Authorize]
 [Route("[controller]")]
 [ApiController]
 public abstract class BaseController<TController, TModel, TCreateDto, TUpdateDto, TViewDto>(

@@ -5,7 +5,7 @@ namespace ZynstormECFPlatform.Common.Utilities;
 
 public static class KeyGenerator
 {
-    private const string Chars = "abcdefghijklMMMMnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    private const string Chars = "abcdefghijklMnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
     public static string GenerateApiKey(int length = 32)
     {

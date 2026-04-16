@@ -25,6 +25,7 @@ builder.Services.AddControllersWithViews()
         options.JsonSerializerOptions.Converters.Add(new DrDateTimeConverter());
         options.JsonSerializerOptions.Converters.Add(new DrNullableDateTimeConverter());
     });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

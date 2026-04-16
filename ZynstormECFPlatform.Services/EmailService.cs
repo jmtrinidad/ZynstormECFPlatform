@@ -1,7 +1,9 @@
-using MailKit.Net.Smtp;
-using MailKit.Security;
+using System;
+using System.Net;
+using System.Net.Mail;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using MimeKit;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Core;
 
@@ -22,21 +24,18 @@ public class EmailService : IEmailService
         if (string.IsNullOrWhiteSpace(recipientEmail))
             throw new InvalidOperationException("Email service called without a recipient email.");
 
-        var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(_settings.SmtpFromName, _settings.SmtpUsername));
-        message.To.Add(MailboxAddress.Parse(recipientEmail));
+        using var message = new MailMessage();
+        message.From = new MailAddress(_settings.SmtpUsername, _settings.SmtpFromName);
+        message.To.Add(new MailAddress(recipientEmail));
         message.Subject = subject;
-        message.Body = new TextPart("html")
-        {
-            Text = htmlBody
-        };
+        message.IsBodyHtml = true;
+        message.Body = htmlBody;
 
-        using var client = new SmtpClient();
+        using var client = new SmtpClient(_settings.SmtpHost, _settings.SmtpPort);
+        client.EnableSsl = true; 
+        client.Credentials = new NetworkCredential(_settings.SmtpUsername, _settings.SmtpAppPassword);
 
-        await client.ConnectAsync(_settings.SmtpHost, _settings.SmtpPort, SecureSocketOptions.StartTls, cancellationToken);
-        await client.AuthenticateAsync(_settings.SmtpUsername, _settings.SmtpAppPassword, cancellationToken);
-        await client.SendAsync(message, cancellationToken);
-        await client.DisconnectAsync(true, cancellationToken);
+        await client.SendMailAsync(message, cancellationToken);
     }
 
     public async Task SendApiKeyEmailAsync(string email, string apiKey, string secretKey)
