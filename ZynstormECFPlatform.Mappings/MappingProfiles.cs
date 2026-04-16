@@ -31,7 +31,6 @@ public class MappingProfiles : Profile
 
         // ClientCertificate
         CreateMap<ClientCertificateCreateDto, ClientCertificate>();
-        CreateMap<ClientCertificateUpdateDto, ClientCertificate>();
         CreateMap<ClientCertificate, ClientCertificateViewDto>();
 
         // Currency

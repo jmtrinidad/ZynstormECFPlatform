@@ -32,16 +32,6 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         {
             try
             {
-                /*
-
-                {
-                  "name": "TRANSPORTE NJ SRL",
-                  "rnc": "133009889",
-                  "email": "JM.TRINIDAD.99@HOTMAIL.COM",
-                  "phone": "809-876-4046"
-                }
-
-                 */
                 Client? model = null;
 
                 await unitOfWork.ExecuteInTransactionAsync(async ct =>

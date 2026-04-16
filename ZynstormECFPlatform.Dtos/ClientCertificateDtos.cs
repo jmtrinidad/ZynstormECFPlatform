@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using System.ComponentModel.DataAnnotations;
 
 namespace ZynstormECFPlatform.Dtos;
@@ -5,26 +6,20 @@ namespace ZynstormECFPlatform.Dtos;
 public class ClientCertificateCreateDto
 {
     [Required]
-    public int ClientId { get; set; }
+    public string ClientGuidId { get; set; } = null!;
 
     [Required]
-    public string Certificate { get; set; } = null!;
+    public IFormFile Certificate { get; set; } = null!;
 
     [Required]
     public string Password { get; set; } = null!;
-
-    public string? Thumbprint { get; set; }
-
-    public DateTime? ExpirationDateUtc { get; set; }
 }
 
-public class ClientCertificateUpdateDto : ClientCertificateCreateDto
+public class ClientCertificateViewDto
 {
-    [Required]
     public int ClientCertificateId { get; set; }
-}
-
-public class ClientCertificateViewDto : ClientCertificateUpdateDto
-{
+    public int ClientId { get; set; }
+    public string? Thumbprint { get; set; }
+    public DateTime? ExpirationDateUtc { get; set; }
     public DateTime RegisteredAt { get; set; }
 }
