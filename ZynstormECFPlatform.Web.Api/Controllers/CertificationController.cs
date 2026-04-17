@@ -30,6 +30,10 @@ public class CertificationController : ControllerBase
     [HttpPost("run/{index}")]
     public async Task<ActionResult<DgiiTransmissionResult>> RunTest(int index)
     {
+        /*
+        CON PROBLEMAS:
+        5, 18,19,20,25,26,27
+        */
         var result = await _certificationService.RunTestAsync(index);
 
         if (result.Success)

@@ -25,7 +25,7 @@ public class EcfGeneratorService : IEcfGeneratorService
 
     // ── Cached serializer (thread-safe after first use) ────────────────────────
 
-    private static readonly XmlSerializer _serializer = new(typeof(EcfXmlRoot));
+    private readonly XmlSerializer _serializer = new(typeof(EcfXmlRoot));
     private static readonly XmlSerializerNamespaces _noNamespaces;
 
     // ── Schema assembly (Schemas project) ─────────────────────────────────────
@@ -275,7 +275,7 @@ public class EcfGeneratorService : IEcfGeneratorService
                 {
                     Indicador = 1, // Retención
                     MontoITBISRetenido = ecfType == 41 ? itbisAmount : null,
-                    MontoISRRetenido = item.IsrRetentionAmount ?? 0
+                    MontoISRRetenido = item.ManualMontoISRRetenido ?? (item.IsrRetentionAmount ?? 0)
                 } : null
             });
 
@@ -352,11 +352,14 @@ public class EcfGeneratorService : IEcfGeneratorService
             TotalITBIS2 = dto.ManualTotalITBIS2 ?? (taxableG2 > 0.00m ? itbisG2 : null),
             TotalITBIS3 = dto.ManualTotalITBIS3 ?? (taxableG3 > 0.00m ? itbisG3 : null),
 
-            MontoPeriodo = dto.ManualMontoPeriodo ?? (ecfType == 32 ? finalTotal : null),
-            ValorPagar = dto.ManualValorPagar ?? (ecfType == 32 ? finalTotal : null),
+            MontoPeriodo = dto.ManualMontoPeriodo,
+            ValorPagar = dto.ManualValorPagar,
 
             MontoImpuestoAdicional = totalIsc > 0 ? totalIsc : null,
             ImpuestosAdicionales = impuestosAdicionales,
+
+            TotalITBISRetenido = dto.ManualTotalITBISRetenido,
+            TotalISRRetencion = dto.ManualTotalISRRetencion,
 
             MontoTotal = dto.ManualMontoTotal ?? finalTotal
         };

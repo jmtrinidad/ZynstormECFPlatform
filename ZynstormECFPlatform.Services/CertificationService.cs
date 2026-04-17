@@ -213,6 +213,9 @@ public class CertificationService : ICertificationService
             // ── 3. Generate & sign XML ─────────────────────────────────────────
             string unsignedXml = _generatorService.GenerateUnsignedXml(requestDto);
             string signedXml   = _signerService.SignXml(unsignedXml, certBase64, certPass);
+            
+            // ── DEBUG: Save the exact XML being sent for inspection ───────────
+            try { File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "temp_last_request.xml"), signedXml); } catch { }
 
             // ── 4. Verify XML Schema (XSD) BEFORE transmitting ────────────────
             var validationErrors = _generatorService.ValidateXmlAgainstSchema(signedXml, int.Parse(test.EcfType));
@@ -363,6 +366,8 @@ public class CertificationService : ICertificationService
             ManualMontoPeriodo      = GetDec(row, "MontoPeriodo"),
             ManualValorPagar        = GetDec(row, "ValorPagar"),
             ManualIndicadorMontoGravado = int.TryParse(GetStr(row, "IndicadorMontoGravado"), out int img) ? img : null,
+            ManualTotalITBISRetenido = GetDec(row, "TotalITBISRetenido"),
+            ManualTotalISRRetencion  = GetDec(row, "TotalISRRetencion"),
 
             // ── Reference (NC/ND types 33/34) ──────────────────────────────
             ReferenceNcf         = GetStr(row, "NCFModificado"),
@@ -438,13 +443,15 @@ public class CertificationService : ICertificationService
             var item = new EcfItemRequestDto
             {
                 Name             = nombre,
+                Description      = GetStr(row, $"DescripcionItem[{i}]"),
                 Quantity         = cantidad,
                 UnitPrice        = precio,
                 ItemType         = itemType,
                 UnitOfMeasure    = unitOfMeasure,
                 TaxPercentage    = taxPct,
                 BillingIndicator = indicadorFact,  // Pass exact Excel indicator (4=exento, 0=no facturable)
-                ManualMontoItem  = GetDec(row, $"MontoItem[{i}]")
+                ManualMontoItem  = GetDec(row, $"MontoItem[{i}]"),
+                ManualMontoISRRetenido = GetDec(row, $"MontoISRRetenido[{i}]")
             };
 
             dto.Items.Add(item);

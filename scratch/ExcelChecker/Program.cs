@@ -1,68 +1,31 @@
 using System;
-using System.Data;
-using System.Threading.Tasks;
-using Npgsql;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using MiniExcelLibs;
 
 namespace ExcelInspector
 {
     class Program
     {
-        static async Task Main()
+        static void Main(string[] args)
         {
             try
             {
-                // Connect to the default database (usually 'postgres' or the default platform db) to run CREATE DATABASE
-                string connString = "Host=217.216.91.10;Port=8087;Database=postgres;Username=zynstorm_ecf;Password='ZynstormECFPlatform'";
-                
-                using (var conn = new NpgsqlConnection(connString))
+                string excelPath = "c:\\Projects\\ZynstormECFPlatform\\133009889-16042026193727.xlsx";
+                var rows = MiniExcel.Query(excelPath, useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
+                var r = rows.FirstOrDefault(x => (x["ENCF"]?.ToString() ?? "") == "E410000000001");
+                if (r != null)
                 {
-                    await conn.OpenAsync();
-                    
-                    // Check if db exists
-                    bool exists;
-                    using (var cmd = new NpgsqlCommand("SELECT 1 FROM pg_database WHERE datname = 'zynstorm_ecf_hangfire_db'", conn))
+                    foreach (var kv in r)
                     {
-                        var result = await cmd.ExecuteScalarAsync();
-                        exists = result != null;
-                    }
-                    
-                    if (!exists)
-                    {
-                        Console.WriteLine("Creating database zynstorm_ecf_hangfire_db...");
-                        using (var cmd = new NpgsqlCommand("CREATE DATABASE zynstorm_ecf_hangfire_db", conn))
-                        {
-                            await cmd.ExecuteNonQueryAsync();
-                        }
-                        Console.WriteLine("Database created successfully.");
-                    }
-                    else
-                    {
-                        Console.WriteLine("Database already exists.");
+                        Console.WriteLine($"{kv.Key}: {kv.Value}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error connecting to postgres default DB: " + ex.Message);
-                Console.WriteLine("Attempting to connect to app DB instead...");
-                
-                try
-                {
-                string connString2 = "Host=217.216.91.10;Port=8087;Database=zynstorm_ecf_platform_db;Username=zynstorm_ecf;Password='ZynstormECFPlatform'";
-                using (var conn = new NpgsqlConnection(connString2))
-                {
-                    await conn.OpenAsync();
-                    using (var cmd = new NpgsqlCommand("CREATE DATABASE zynstorm_ecf_hangfire_db", conn))
-                    {
-                        await cmd.ExecuteNonQueryAsync();
-                    }
-                    Console.WriteLine("Database created successfully from app DB.");
-                }
-                }
-                catch (Exception appDbEx)
-                {
-                    Console.WriteLine("Error: " + appDbEx.Message);
-                }
+                Console.WriteLine("Error: " + ex.Message);
             }
         }
     }
