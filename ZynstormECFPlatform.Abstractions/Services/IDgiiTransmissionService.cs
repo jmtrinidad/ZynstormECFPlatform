@@ -1,4 +1,5 @@
-using System.Threading.Tasks;
+using ZynstormECFPlatform.Core.Enums;
+using ZynstormECFPlatform.Dtos;
 
 namespace ZynstormECFPlatform.Abstractions.Services;
 
@@ -18,5 +19,10 @@ public interface IDgiiTransmissionService
     /// <summary>
     /// Sends a signed e-CF to the corresponding DGII endpoint depending on the document type and amount.
     /// </summary>
-    Task<DgiiTransmissionResult> SendEcfAsync(bool isProduction, string token, string signedXml, int ecfType, decimal totalAmount, string rncEmisor, string eNcf);
+    Task<DgiiTransmissionResult> SendEcfAsync(DgiiEnvironment environment, string token, string signedXml, int ecfType, decimal totalAmount, string rncEmisor, string eNcf, bool isSummary = false);
+
+    /// <summary>
+    /// Queries the status of a document by its trackId from the DGII Consulta result endpoint.
+    /// </summary>
+    Task<DgiiStatusResponse> GetStatusAsync(DgiiEnvironment environment, string token, string trackId);
 }

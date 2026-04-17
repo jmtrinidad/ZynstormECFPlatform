@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using ZynstormECFPlatform.Abstractions.Services;
+using ZynstormECFPlatform.Core.Enums;
 using Microsoft.Extensions.Configuration;
 
 namespace ZynstormECFPlatform.Services;
@@ -23,9 +24,9 @@ public class DgiiAuthService : IDgiiAuthService
         _configuration = configuration;
     }
 
-    public async Task<string> GetTokenAsync(string rncEmisor, bool isProduction, string certificateBase64, string certificatePassword)
+    public async Task<string> GetTokenAsync(string rncEmisor, DgiiEnvironment environment, string certificateBase64, string certificatePassword)
     {
-        string cacheKey = $"{rncEmisor}_DgiiToken";
+        string cacheKey = $"{rncEmisor}_{environment}_DgiiToken";
 
         string? cachedToken = _cacheService.Get<string>(cacheKey);
         if (!string.IsNullOrEmpty(cachedToken))
@@ -33,12 +34,34 @@ public class DgiiAuthService : IDgiiAuthService
             return cachedToken;
         }
 
-        string envKey = isProduction ? "Production" : "Test";
-        string baseUrl = _configuration[$"DgiiUrls:{envKey}"] 
-            ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey} no fue encontrada en appsettings.json");
+        string envKey = environment.ToString();
+        string baseAuthUrl;
 
-        string semillaUrl = $"{baseUrl}/autenticacion/api/semilla";
-        string validacionUrl = $"{baseUrl}/autenticacion/api/validacioncertificado";
+        if (environment == DgiiEnvironment.CerteCF)
+        {
+            baseAuthUrl = _configuration["DgiiUrls:CerteCF:Auth"]
+                ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:Auth no fue encontrada.");
+        }
+        else
+        {
+            string baseUrl = _configuration[$"DgiiUrls:{envKey}"]
+                ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey} no fue encontrada.");
+            baseAuthUrl = $"{baseUrl}/autenticacion";
+        }
+
+        string semillaUrl;
+        string validacionUrl;
+
+        if (environment == DgiiEnvironment.CerteCF)
+        {
+            semillaUrl = $"{baseAuthUrl}/api/Autenticacion/Semilla";
+            validacionUrl = $"{baseAuthUrl}/api/Autenticacion/ValidarSemilla";
+        }
+        else
+        {
+            semillaUrl = $"{baseAuthUrl}/api/semilla";
+            validacionUrl = $"{baseAuthUrl}/api/validacioncertificado";
+        }
 
         // 1. Get Semilla
         var semillaResponse = await _httpClient.GetAsync(semillaUrl);
@@ -49,12 +72,25 @@ public class DgiiAuthService : IDgiiAuthService
         var signedSemillaXml = _xmlSignatureService.SignXml(semillaXml, certificateBase64, certificatePassword);
 
         // 3. Request Token
-        using var requestContent = new StringContent(signedSemillaXml, Encoding.UTF8, "application/xml");
-        var tokenResponse = await _httpClient.PostAsync(validacionUrl, requestContent);
+        HttpResponseMessage tokenResponse;
+
+        if (environment == DgiiEnvironment.CerteCF)
+        {
+            var multipartContent = new MultipartFormDataContent();
+            var xmlFileContent = new StringContent(signedSemillaXml, Encoding.UTF8, "application/xml");
+            multipartContent.Add(xmlFileContent, "xml", "semilla.xml");
+            tokenResponse = await _httpClient.PostAsync(validacionUrl, multipartContent);
+        }
+        else
+        {
+            using var requestContent = new StringContent(signedSemillaXml, Encoding.UTF8, "application/xml");
+            tokenResponse = await _httpClient.PostAsync(validacionUrl, requestContent);
+        }
+
         tokenResponse.EnsureSuccessStatusCode();
 
         var tokenResponseData = await tokenResponse.Content.ReadAsStringAsync();
-        
+
         string finalToken = tokenResponseData;
 
         try
@@ -73,4 +109,3 @@ public class DgiiAuthService : IDgiiAuthService
         return finalToken;
     }
 }
-

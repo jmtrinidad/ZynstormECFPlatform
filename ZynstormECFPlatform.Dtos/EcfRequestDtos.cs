@@ -130,6 +130,30 @@ public class EcfInvoiceRequestDto
     /// <summary>Description of the global discount.</summary>
     public string? GlobalDiscountDescription { get; set; }
 
+    /// <summary>Internal invoice number from the integrating system (optional).</summary>
+    public string? InternalInvoiceNumber { get; set; }
+
+    /// <summary>Internal order/purchase number from the integrating system (optional).</summary>
+    public string? InternalOrderNumber { get; set; }
+
+    /// <summary>Sales zone (optional).</summary>
+    public string? SalesZone { get; set; }
+
+    /// <summary>Delivery date (optional).</summary>
+    public DateTime? DeliveryDate { get; set; }
+
+    /// <summary>Purchase order date (optional).</summary>
+    public DateTime? OrderDate { get; set; }
+
+    /// <summary>Purchase order number (optional).</summary>
+    public string? OrderNumber { get; set; }
+
+    /// <summary>Buyer's internal code for the seller (optional).</summary>
+    public string? BuyerInternalCode { get; set; }
+
+    /// <summary>Amount not billable (non-taxed service included for info only, e.g. type 33 exento).</summary>
+    public decimal? MontoNoFacturable { get; set; }
+
     // ── Reference Information (Required for NC/ND - Types 33, 34) ──────────────
 
     /// <summary>The original NCF being modified (e.g. "E310000000001").</summary>
@@ -176,6 +200,13 @@ public class EcfItemRequestDto
 
     /// <summary>1: Bien (Good), 2: Servicio (Service).</summary>
     public int ItemType { get; set; } = 1;
+
+    /// <summary>
+    /// Explicit billing indicator from DGII catalog (IndicadorFacturacion).
+    /// 1=ITBIS18%, 2=ITBIS16%, 3=ITBIS0%, 4=Exento, 0=NoFacturable.
+    /// When set, overrides the TaxPercentage-derived billing indicator in the generator.
+    /// </summary>
+    public int? BillingIndicator { get; set; }
 
     /// <summary>ISR Retention amount (used in types 41, 47) (optional).</summary>
     public decimal? IsrRetentionAmount { get; set; }

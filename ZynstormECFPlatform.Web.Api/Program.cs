@@ -12,6 +12,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using ZynstormECFPlatform.Services.Extensions;
 using ZynstormECFPlatform.Web.Api.Converters;
+using Hangfire;
+using Hangfire.PostgreSql;
 
 // Program.cs
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -35,6 +37,19 @@ builder.Services.AddDbContextData(builder.Configuration.GetConnectionString("Def
 
 builder.Services.AddDataServices();
 builder.Services.AddServices();
+
+// Hangfire configuration
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UsePostgreSqlStorage(options =>
+    {
+        options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("DefaultConnection"));
+    }));
+
+builder.Services.AddHangfireServer();
+
 builder.Services.Configure<AppSettings>(options => builder.Configuration.GetSection("AppSettings").Bind(options));
 
 var appSettingsSection = builder.Configuration.GetSection("AppSettings");
@@ -148,9 +163,11 @@ _ = SeedData(app);
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
+
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "Zynstorm ECF API v1");
+        options.EnablePersistAuthorization();
     });
 }
 
@@ -159,6 +176,8 @@ app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseHangfireDashboard();
 
 app.MapControllers();
 

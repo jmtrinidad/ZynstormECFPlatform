@@ -207,13 +207,19 @@ public class EcfGeneratorService : IEcfGeneratorService
                 ? item.ItbisAmount
                 : Math.Round(taxableAmount * (item.TaxPercentage / 100m), 2);
 
-            var billingIndicator = item.TaxPercentage switch
+            // Use explicit BillingIndicator from DTO if provided (e.g. from Excel certification data),
+            // otherwise derive it from TaxPercentage as before.
+            var billingIndicator = item.BillingIndicator ?? item.TaxPercentage switch
             {
                 18m => 1,
                 16m => 2,
                  0m => 3,
-                  _ => 4  // Exento
+                  _ => 4
             };
+
+            // For exento (4) and no-facturable (0), force ITBIS to 0 regardless of TaxPercentage.
+            if (billingIndicator is 4 or 0)
+                itbisAmount = 0;
 
             // ── ISC / Additional Tax handling ──────────────────────────────────
             EcfXmlTablaImpuestoAdicionalItem? tablaImpuesto = null;
@@ -280,11 +286,15 @@ public class EcfGeneratorService : IEcfGeneratorService
             totalItemDiscounts += discountAmount;
             totalItbis         += itbisAmount;
 
-            switch (item.TaxPercentage)
+            switch (billingIndicator)
             {
-                case 0m:  totalExempt += taxableAmount; taxableG3 += taxableAmount; break;
-                case 18m: taxableG1   += taxableAmount; itbisG1   += itbisAmount;    break;
-                case 16m: taxableG2   += taxableAmount; itbisG2   += itbisAmount;    break;
+                case 4:  // Exento
+                case 0:  // No facturable
+                    totalExempt += taxableAmount; break;
+                case 3:  // ITBIS 0%
+                    totalExempt += taxableAmount; taxableG3 += taxableAmount; break;
+                case 1:  taxableG1 += taxableAmount; itbisG1 += itbisAmount; break;
+                case 2:  taxableG2 += taxableAmount; itbisG2 += itbisAmount; break;
             }
         }
 
@@ -369,33 +379,40 @@ public class EcfGeneratorService : IEcfGeneratorService
                 },
                 Emisor = new EcfXmlEmisor
                 {
-                    RncEmisor          = dto.IssuerRnc,
-                    RazonSocial        = dto.IssuerName,
-                    NombreComercial    = dto.IssuerCommercialName,
-                    Sucursal           = dto.IssuerBranchCode,
-                    Direccion          = dto.IssuerAddress,
-                    Municipio          = dto.IssuerMunicipality,
-                    Provincia          = dto.IssuerProvince,
-                    TelefonoTabla      = string.IsNullOrWhiteSpace(dto.IssuerPhone) ? null : new EcfXmlEmisor.TablaTelefono { Telefono = dto.IssuerPhone },
-                    CorreoEmisor       = dto.IssuerEmail,
-                    WebSite            = dto.IssuerWebSite,
-                    ActividadEconomica = dto.IssuerActivityCode,
-                    CodigoVendedor     = dto.IssuerSellerCode,
-                    FechaEmision       = issueDate
+                    RncEmisor             = dto.IssuerRnc,
+                    RazonSocial           = dto.IssuerName,
+                    NombreComercial       = dto.IssuerCommercialName,
+                    Sucursal              = dto.IssuerBranchCode,
+                    Direccion             = dto.IssuerAddress,
+                    Municipio             = dto.IssuerMunicipality,
+                    Provincia             = dto.IssuerProvince,
+                    TelefonoTabla         = string.IsNullOrWhiteSpace(dto.IssuerPhone) ? null : new EcfXmlEmisor.TablaTelefono { Telefono = dto.IssuerPhone },
+                    CorreoEmisor          = dto.IssuerEmail,
+                    WebSite               = dto.IssuerWebSite,
+                    ActividadEconomica    = dto.IssuerActivityCode,
+                    CodigoVendedor        = dto.IssuerSellerCode,
+                    NumeroFacturaInterna  = dto.InternalInvoiceNumber,
+                    NumeroPedidoInterno   = dto.InternalOrderNumber,
+                    ZonaVenta             = dto.SalesZone,
+                    FechaEmision          = issueDate
                 },
                 Comprador = new EcfXmlComprador
                 {
-                    EcfType            = ecfType,
-                    RncComprador       = dto.CustomerRnc,
+                    EcfType                = ecfType,
+                    RncComprador           = dto.CustomerRnc,
                     IdentificadorExtranjero = dto.CustomerForeignId,
-                    RazonSocial        = dto.CustomerName,
-                    ContactoComprador  = dto.CustomerContact,
-                    CorreoComprador    = dto.CustomerEmail,
-                    DireccionComprador = dto.CustomerAddress,
-                    PaisComprador      = dto.CustomerCountry,
-                    TelefonoAdicional  = dto.CustomerTelephone,
-                    MunicipioComprador = dto.CustomerMunicipality,
-                    ProvinciaComprador = dto.CustomerProvince
+                    RazonSocial            = dto.CustomerName,
+                    ContactoComprador      = dto.CustomerContact,
+                    CorreoComprador        = dto.CustomerEmail,
+                    DireccionComprador     = dto.CustomerAddress,
+                    PaisComprador          = dto.CustomerCountry,
+                    TelefonoAdicional      = dto.CustomerTelephone,
+                    MunicipioComprador     = dto.CustomerMunicipality,
+                    ProvinciaComprador     = dto.CustomerProvince,
+                    FechaEntrega           = dto.DeliveryDate?.ToDrTime().ToString(DateFormat),
+                    FechaOrdenCompra       = dto.OrderDate?.ToDrTime().ToString(DateFormat),
+                    NumeroOrdenCompra      = dto.OrderNumber,
+                    CodigoInternoComprador = dto.BuyerInternalCode
                 },
 
                 Totales = totales

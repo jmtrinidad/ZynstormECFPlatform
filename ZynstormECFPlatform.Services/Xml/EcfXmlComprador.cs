@@ -52,6 +52,20 @@ public class EcfXmlComprador
     public string? TelefonoAdicional { get; set; }
     public bool ShouldSerializeTelefonoAdicional() => !string.IsNullOrWhiteSpace(TelefonoAdicional) && EcfType != 47;
 
+    [XmlElement("FechaEntrega")]
+    public string? FechaEntrega { get; set; }
+    public bool ShouldSerializeFechaEntrega() => !string.IsNullOrWhiteSpace(FechaEntrega);
 
+    [XmlElement("FechaOrdenCompra")]
+    public string? FechaOrdenCompra { get; set; }
+    public bool ShouldSerializeFechaOrdenCompra() => !string.IsNullOrWhiteSpace(FechaOrdenCompra);
+
+    [XmlElement("NumeroOrdenCompra")]
+    public string? NumeroOrdenCompra { get; set; }
+    public bool ShouldSerializeNumeroOrdenCompra() => !string.IsNullOrWhiteSpace(NumeroOrdenCompra);
+
+    [XmlElement("CodigoInternoComprador")]
+    public string? CodigoInternoComprador { get; set; }
+    public bool ShouldSerializeCodigoInternoComprador() => !string.IsNullOrWhiteSpace(CodigoInternoComprador);
 }
 

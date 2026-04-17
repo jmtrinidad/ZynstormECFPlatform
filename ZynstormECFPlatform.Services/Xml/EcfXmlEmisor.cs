@@ -51,6 +51,15 @@ public class EcfXmlEmisor
     public string? CodigoVendedor { get; set; }
     public bool ShouldSerializeCodigoVendedor() => !string.IsNullOrWhiteSpace(CodigoVendedor);
 
+    public string? NumeroFacturaInterna { get; set; }
+    public bool ShouldSerializeNumeroFacturaInterna() => !string.IsNullOrWhiteSpace(NumeroFacturaInterna);
+
+    public string? NumeroPedidoInterno { get; set; }
+    public bool ShouldSerializeNumeroPedidoInterno() => !string.IsNullOrWhiteSpace(NumeroPedidoInterno);
+
+    public string? ZonaVenta { get; set; }
+    public bool ShouldSerializeZonaVenta() => !string.IsNullOrWhiteSpace(ZonaVenta);
+
     /// <summary>FechaEmision must appear at the end of the Emisor block per XSD.</summary>
     [XmlElement("FechaEmision")]
     public string FechaEmision { get; set; } = null!;
