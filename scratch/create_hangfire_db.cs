@@ -3,7 +3,7 @@ using System.Data;
 using System.Threading.Tasks;
 using Npgsql;
 
-namespace ExcelInspector
+namespace CreateHangfireDb
 {
     class Program
     {
@@ -43,26 +43,7 @@ namespace ExcelInspector
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error connecting to postgres default DB: " + ex.Message);
-                Console.WriteLine("Attempting to connect to app DB instead...");
-                
-                try
-                {
-                string connString2 = "Host=217.216.91.10;Port=8087;Database=zynstorm_ecf_platform_db;Username=zynstorm_ecf;Password='ZynstormECFPlatform'";
-                using (var conn = new NpgsqlConnection(connString2))
-                {
-                    await conn.OpenAsync();
-                    using (var cmd = new NpgsqlCommand("CREATE DATABASE zynstorm_ecf_hangfire_db", conn))
-                    {
-                        await cmd.ExecuteNonQueryAsync();
-                    }
-                    Console.WriteLine("Database created successfully from app DB.");
-                }
-                }
-                catch (Exception appDbEx)
-                {
-                    Console.WriteLine("Error: " + appDbEx.Message);
-                }
+                Console.WriteLine("Error: " + ex.Message);
             }
         }
     }

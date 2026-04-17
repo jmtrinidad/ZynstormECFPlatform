@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="MiniExcel" Version="1.43.0" />
+    <PackageReference Include="Npgsql" Version="10.0.2" />
   </ItemGroup>
 
 </Project>
