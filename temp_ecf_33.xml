@@ -5,7 +5,8 @@
     <IdDoc>
       <TipoeCF>33</TipoeCF>
       <eNCF>E330000000001</eNCF>
-      <FechaVencimientoSecuencia>09-04-2027</FechaVencimientoSecuencia>
+      <FechaVencimientoSecuencia>17-04-2027</FechaVencimientoSecuencia>
+      <IndicadorMontoGravado>1</IndicadorMontoGravado>
       <TipoIngresos>01</TipoIngresos>
       <TipoPago>1</TipoPago>
     </IdDoc>
@@ -16,7 +17,7 @@
       <TablaTelefonoEmisor>
         <TelefonoEmisor>809-555-0000</TelefonoEmisor>
       </TablaTelefonoEmisor>
-      <FechaEmision>09-04-2026</FechaEmision>
+      <FechaEmision>17-04-2026</FechaEmision>
     </Emisor>
     <Comprador>
       <RNCComprador>101683457</RNCComprador>
@@ -24,12 +25,12 @@
       <DireccionComprador>Av. Winston Churchill</DireccionComprador>
     </Comprador>
     <Totales>
-      <MontoGravadoTotal>200</MontoGravadoTotal>
-      <MontoGravadoI1>200</MontoGravadoI1>
+      <MontoGravadoTotal>185.00</MontoGravadoTotal>
+      <MontoGravadoI1>185.00</MontoGravadoI1>
       <ITBIS1>18</ITBIS1>
-      <TotalITBIS>36.00</TotalITBIS>
-      <TotalITBIS1>36.00</TotalITBIS1>
-      <MontoTotal>236.00</MontoTotal>
+      <TotalITBIS>33.30</TotalITBIS>
+      <TotalITBIS1>33.30</TotalITBIS1>
+      <MontoTotal>218.30</MontoTotal>
     </Totales>
   </Encabezado>
   <DetallesItems>
@@ -41,14 +42,22 @@
       <CantidadItem>2</CantidadItem>
       <UnidadMedida>43</UnidadMedida>
       <PrecioUnitarioItem>100</PrecioUnitarioItem>
-      <MontoItem>236.00</MontoItem>
+      <DescuentoMonto>15.00</DescuentoMonto>
+      <TablaSubDescuento>
+        <SubDescuento>
+          <TipoSubDescuento>$</TipoSubDescuento>
+          <ValorSubDescuento>15.00</ValorSubDescuento>
+          <MontoSubDescuento>15.00</MontoSubDescuento>
+        </SubDescuento>
+      </TablaSubDescuento>
+      <MontoItem>218.30</MontoItem>
     </Item>
   </DetallesItems>
   <InformacionReferencia>
     <NCFModificado>E310000000005</NCFModificado>
-    <FechaNCFModificado>04-04-2026</FechaNCFModificado>
+    <FechaNCFModificado>12-04-2026</FechaNCFModificado>
     <CodigoModificacion>3</CodigoModificacion>
   </InformacionReferencia>
-  <FechaHoraFirma>09-04-2026 07:51:46</FechaHoraFirma>
+  <FechaHoraFirma>17-04-2026 17:02:53</FechaHoraFirma>
   <Signature xmlns="http://www.w3.org/2000/09/xmldsig#" />
 </ECF>

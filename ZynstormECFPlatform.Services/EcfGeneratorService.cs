@@ -206,6 +206,8 @@ public class EcfGeneratorService : IEcfGeneratorService
                 ? item.ItbisAmount
                 : Math.Round(taxableAmount * (item.TaxPercentage / 100m), 2);
 
+            var itbisRetenido = item.ManualMontoITBISRetenido ?? 0;
+
             // Use explicit BillingIndicator from DTO if provided (e.g. from Excel certification data),
             // otherwise derive it from TaxPercentage as before.
             var billingIndicator = item.BillingIndicator ?? item.TaxPercentage switch
@@ -255,6 +257,25 @@ public class EcfGeneratorService : IEcfGeneratorService
             // ISC total per item to include in MontoItem
             var iscItemTotal = item.IscSpecificAmount + item.IscAdvaloremAmount + item.OtherAdditionalTaxAmount;
 
+            var itemDiscountTotal = item.ManualDescuentoMonto ?? (discountAmount > 0 ? discountAmount : 0);
+            EcfXmlTablaSubDescuento? tablaSubDescuento = null;
+
+            if (itemDiscountTotal > 0)
+            {
+                tablaSubDescuento = new EcfXmlTablaSubDescuento
+                {
+                    SubDescuentos = new List<EcfXmlSubDescuento>
+                    {
+                        new EcfXmlSubDescuento
+                        {
+                            TipoSubDescuento = "$",
+                            ValorSubDescuento = itemDiscountTotal,
+                            MontoSubDescuento = itemDiscountTotal
+                        }
+                    }
+                };
+            }
+
             xmlItems.Add(new EcfXmlItem
             {
                 EcfType = ecfType,
@@ -266,15 +287,16 @@ public class EcfGeneratorService : IEcfGeneratorService
                 CantidadItem = item.Quantity,
                 UnidadMedida = item.UnitOfMeasure ?? 43, // 43 = Unidad
                 PrecioUnitarioItem = item.UnitPrice,
-                DescuentoMonto = discountAmount > 0 ? discountAmount : null,
+                DescuentoMonto = itemDiscountTotal > 0 ? itemDiscountTotal : null,
+                TablaSubDescuento = tablaSubDescuento,
                 TablaImpuestoAdicional = tablaImpuesto,
                 MontoItem = item.ManualMontoItem ?? (taxableAmount + itbisAmount + iscItemTotal),
 
-                // ── Retentions handling (For Purchase 41 and International Payment 47)
-                Retencion = (ecfType == 41 || ecfType == 47) ? new EcfXmlItemRetencion
+                // ── Retentions handling (For Purchase 41, Gastos Menores 43 and International Payment 47)
+                Retencion = (ecfType == 41 || ecfType == 43 || ecfType == 47) ? new EcfXmlItemRetencion
                 {
                     Indicador = 1, // Retención
-                    MontoITBISRetenido = ecfType == 41 ? itbisAmount : null,
+                    MontoITBISRetenido = (ecfType == 41 || ecfType == 43) ? itbisRetenido : null,
                     MontoISRRetenido = item.ManualMontoISRRetenido ?? (item.IsrRetentionAmount ?? 0)
                 } : null
             });
@@ -338,9 +360,9 @@ public class EcfGeneratorService : IEcfGeneratorService
         {
             EcfType = ecfType,
             MontoGravadoTotal = dto.ManualMontoGravadoTotal ?? (taxableGravado > 0 ? taxableGravado : null),
-            MontoGravadoI1 = taxableG1 > 0 ? taxableG1 : null,
-            MontoGravadoI2 = taxableG2 > 0 ? taxableG2 : null,
-            MontoGravadoI3 = taxableG3 > 0 ? taxableG3 : null,
+            MontoGravadoI1 = dto.ManualMontoGravadoI1 ?? (taxableG1 > 0 ? taxableG1 : null),
+            MontoGravadoI2 = dto.ManualMontoGravadoI2 ?? (taxableG2 > 0 ? taxableG2 : null),
+            MontoGravadoI3 = dto.ManualMontoGravadoI3 ?? (taxableG3 > 0 ? taxableG3 : null),
             MontoExento = dto.ManualMontoExento ?? (totalExempt > 0 ? totalExempt : null),
 
             ITBIS1 = (taxableG1 > 0 || dto.ManualTotalITBIS1.HasValue) ? 18 : null,

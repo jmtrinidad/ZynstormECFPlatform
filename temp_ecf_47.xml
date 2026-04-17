@@ -5,7 +5,7 @@
     <IdDoc>
       <TipoeCF>47</TipoeCF>
       <eNCF>E470000000001</eNCF>
-      <FechaVencimientoSecuencia>09-04-2027</FechaVencimientoSecuencia>
+      <FechaVencimientoSecuencia>17-04-2027</FechaVencimientoSecuencia>
       <TipoPago>1</TipoPago>
     </IdDoc>
     <Emisor>
@@ -15,13 +15,18 @@
       <TablaTelefonoEmisor>
         <TelefonoEmisor>809-555-0000</TelefonoEmisor>
       </TablaTelefonoEmisor>
-      <FechaEmision>09-04-2026</FechaEmision>
+      <FechaEmision>17-04-2026</FechaEmision>
     </Emisor>
     <Comprador>
       <RazonSocialComprador>CLIENTE FINAL PRUEBA</RazonSocialComprador>
     </Comprador>
     <Totales>
-      <MontoTotal>236.00</MontoTotal>
+      <MontoGravadoTotal>185.00</MontoGravadoTotal>
+      <MontoGravadoI1>185.00</MontoGravadoI1>
+      <ITBIS1>18</ITBIS1>
+      <TotalITBIS>33.30</TotalITBIS>
+      <TotalITBIS1>33.30</TotalITBIS1>
+      <MontoTotal>218.30</MontoTotal>
     </Totales>
   </Encabezado>
   <DetallesItems>
@@ -37,9 +42,17 @@
       <CantidadItem>2</CantidadItem>
       <UnidadMedida>43</UnidadMedida>
       <PrecioUnitarioItem>100</PrecioUnitarioItem>
-      <MontoItem>236.00</MontoItem>
+      <DescuentoMonto>15.00</DescuentoMonto>
+      <TablaSubDescuento>
+        <SubDescuento>
+          <TipoSubDescuento>$</TipoSubDescuento>
+          <ValorSubDescuento>15.00</ValorSubDescuento>
+          <MontoSubDescuento>15.00</MontoSubDescuento>
+        </SubDescuento>
+      </TablaSubDescuento>
+      <MontoItem>218.30</MontoItem>
     </Item>
   </DetallesItems>
-  <FechaHoraFirma>09-04-2026 07:51:46</FechaHoraFirma>
+  <FechaHoraFirma>17-04-2026 17:02:54</FechaHoraFirma>
   <Signature xmlns="http://www.w3.org/2000/09/xmldsig#" />
 </ECF>

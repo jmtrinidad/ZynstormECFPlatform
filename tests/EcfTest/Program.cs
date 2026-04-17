@@ -65,7 +65,8 @@ class Program
                     Name = "Item de Prueba",
                     Quantity = 2,
                     UnitPrice = 100,
-                    TaxPercentage = (type == 43) ? 0 : 18 // Gasto menor suele ser exento
+                    TaxPercentage = (type == 43) ? 0 : 18, // Gasto menor suele ser exento
+                    Discount = 15.00m
                 }
             }
         };

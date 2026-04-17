@@ -188,6 +188,9 @@ public class EcfInvoiceRequestDto
     public int? ManualIndicadorMontoGravado { get; set; }
     public decimal? ManualTotalITBISRetenido { get; set; }
     public decimal? ManualTotalISRRetencion { get; set; }
+    public decimal? ManualMontoGravadoI1 { get; set; }
+    public decimal? ManualMontoGravadoI2 { get; set; }
+    public decimal? ManualMontoGravadoI3 { get; set; }
 }
 
 
@@ -265,5 +268,7 @@ public class EcfItemRequestDto
 
     // ── Manual Overrides for Certification ──────────────────────────────────
     public decimal? ManualMontoItem { get; set; }
+    public decimal? ManualDescuentoMonto { get; set; }
+    public decimal? ManualMontoITBISRetenido { get; set; }
     public decimal? ManualMontoISRRetenido { get; set; }
 }

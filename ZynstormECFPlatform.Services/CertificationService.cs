@@ -368,6 +368,9 @@ public class CertificationService : ICertificationService
             ManualIndicadorMontoGravado = int.TryParse(GetStr(row, "IndicadorMontoGravado"), out int img) ? img : null,
             ManualTotalITBISRetenido = GetDec(row, "TotalITBISRetenido"),
             ManualTotalISRRetencion  = GetDec(row, "TotalISRRetencion"),
+            ManualMontoGravadoI1     = GetDec(row, "MontoGravadoI1"),
+            ManualMontoGravadoI2     = GetDec(row, "MontoGravadoI2"),
+            ManualMontoGravadoI3     = GetDec(row, "MontoGravadoI3"),
 
             // ── Reference (NC/ND types 33/34) ──────────────────────────────
             ReferenceNcf         = GetStr(row, "NCFModificado"),
@@ -451,6 +454,8 @@ public class CertificationService : ICertificationService
                 TaxPercentage    = taxPct,
                 BillingIndicator = indicadorFact,  // Pass exact Excel indicator (4=exento, 0=no facturable)
                 ManualMontoItem  = GetDec(row, $"MontoItem[{i}]"),
+                ManualDescuentoMonto = GetDec(row, $"DescuentoMonto[{i}]"),
+                ManualMontoITBISRetenido = GetDec(row, $"MontoITBISRetenido[{i}]"),
                 ManualMontoISRRetenido = GetDec(row, $"MontoISRRetenido[{i}]")
             };
 

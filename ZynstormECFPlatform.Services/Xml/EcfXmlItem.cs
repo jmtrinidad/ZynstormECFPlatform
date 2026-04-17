@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Xml.Serialization;
 
 namespace ZynstormECFPlatform.Services.Xml;
@@ -18,7 +19,7 @@ public class EcfXmlItem
 
     [XmlElement("Retencion")]
     public EcfXmlItemRetencion? Retencion { get; set; }
-    public bool ShouldSerializeRetencion() => Retencion != null && (EcfType == 41 || EcfType == 47 || EcfType <= 34);
+    public bool ShouldSerializeRetencion() => Retencion != null && (EcfType == 41 || EcfType == 43 || EcfType == 47 || EcfType <= 34);
 
 
     [XmlElement("NombreItem")]
@@ -41,8 +42,13 @@ public class EcfXmlItem
     [XmlElement("PrecioUnitarioItem")]
     public decimal PrecioUnitarioItem { get; set; }
 
+    [XmlElement("DescuentoMonto")]
     public decimal? DescuentoMonto { get; set; }
     public bool ShouldSerializeDescuentoMonto() => DescuentoMonto.HasValue && DescuentoMonto > 0;
+
+    [XmlElement("TablaSubDescuento")]
+    public EcfXmlTablaSubDescuento? TablaSubDescuento { get; set; }
+    public bool ShouldSerializeTablaSubDescuento() => TablaSubDescuento != null && TablaSubDescuento.SubDescuentos.Count > 0;
 
     [XmlElement("TablaImpuestoAdicional")]
     public EcfXmlTablaImpuestoAdicionalItem? TablaImpuestoAdicional { get; set; }
@@ -50,6 +56,24 @@ public class EcfXmlItem
 
     [XmlElement("MontoItem")]
     public decimal MontoItem { get; set; }
+}
+
+public class EcfXmlTablaSubDescuento
+{
+    [XmlElement("SubDescuento")]
+    public List<EcfXmlSubDescuento> SubDescuentos { get; set; } = new();
+}
+
+public class EcfXmlSubDescuento
+{
+    [XmlElement("TipoSubDescuento")]
+    public string TipoSubDescuento { get; set; } = "$"; // "$" for amount, "%" for percentage
+
+    [XmlElement("ValorSubDescuento")]
+    public decimal ValorSubDescuento { get; set; }
+
+    [XmlElement("MontoSubDescuento")]
+    public decimal MontoSubDescuento { get; set; }
 }
 
 public class EcfXmlItemRetencion
@@ -65,4 +89,3 @@ public class EcfXmlItemRetencion
     public decimal? MontoISRRetenido { get; set; }
     public bool ShouldSerializeMontoISRRetenido() => MontoISRRetenido.HasValue;
 }
-
