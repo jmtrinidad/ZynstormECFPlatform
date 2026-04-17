@@ -12,8 +12,8 @@ using ZynstormECFPlatform.Services.Xml;
 namespace ZynstormECFPlatform.Services;
 
 /// <summary>
-/// Generates and validates unsigned e-CF XML documents compliant with DGII specifications.
-/// The XML structure is derived from the official XSD schemas for each TipoeCF.
+/// Generates and validates unsigned e-CF XML documents compliant with DGII specifications. The XML structure is derived
+/// from the official XSD schemas for each TipoeCF.
 /// </summary>
 public class EcfGeneratorService : IEcfGeneratorService
 {
@@ -31,10 +31,10 @@ public class EcfGeneratorService : IEcfGeneratorService
     // ── Schema assembly (Schemas project) ─────────────────────────────────────
 
     /// <summary>
-    /// We locate the Schemas assembly reliably by its name. 
-    /// If it's not currently loaded in the AppDomain, we load it explicitly.
+    /// We locate the Schemas assembly reliably by its name. If it's not currently loaded in the AppDomain, we load it
+    /// explicitly.
     /// </summary>
-    private static readonly Assembly _schemasAssembly = 
+    private static readonly Assembly _schemasAssembly =
         AppDomain.CurrentDomain.GetAssemblies()
             .FirstOrDefault(a => a.GetName().Name == "ZynstormECFPlatform.Schemas")
             ?? Assembly.Load("ZynstormECFPlatform.Schemas");
@@ -174,7 +174,6 @@ public class EcfGeneratorService : IEcfGeneratorService
         return errors;
     }
 
-
     // ═══════════════════════════════════════════════════════════════════════════
     // XML Mapping
     // ═══════════════════════════════════════════════════════════════════════════
@@ -213,8 +212,8 @@ public class EcfGeneratorService : IEcfGeneratorService
             {
                 18m => 1,
                 16m => 2,
-                 0m => 3,
-                  _ => 4
+                0m => 3,
+                _ => 4
             };
 
             // For exento (4) and no-facturable (0), force ITBIS to 0 regardless of TaxPercentage.
@@ -258,18 +257,18 @@ public class EcfGeneratorService : IEcfGeneratorService
 
             xmlItems.Add(new EcfXmlItem
             {
-                EcfType              = ecfType,
-                NumeroLinea          = lineNo++,
+                EcfType = ecfType,
+                NumeroLinea = lineNo++,
                 IndicadorFacturacion = billingIndicator,
-                Name                 = item.Name,
-                ItemType             = item.ItemType,
-                DescripcionItem      = item.Description,
-                CantidadItem         = item.Quantity,
-                UnidadMedida         = item.UnitOfMeasure ?? 43, // 43 = Unidad
-                PrecioUnitarioItem   = item.UnitPrice,
-                DescuentoMonto       = discountAmount > 0 ? discountAmount : null,
+                Name = item.Name,
+                ItemType = item.ItemType,
+                DescripcionItem = item.Description,
+                CantidadItem = item.Quantity,
+                UnidadMedida = item.UnitOfMeasure ?? 43, // 43 = Unidad
+                PrecioUnitarioItem = item.UnitPrice,
+                DescuentoMonto = discountAmount > 0 ? discountAmount : null,
                 TablaImpuestoAdicional = tablaImpuesto,
-                MontoItem            = taxableAmount + itbisAmount + iscItemTotal,
+                MontoItem = item.ManualMontoItem ?? (taxableAmount + itbisAmount + iscItemTotal),
 
                 // ── Retentions handling (For Purchase 41 and International Payment 47)
                 Retencion = (ecfType == 41 || ecfType == 47) ? new EcfXmlItemRetencion
@@ -280,21 +279,19 @@ public class EcfGeneratorService : IEcfGeneratorService
                 } : null
             });
 
-
-
-            totalBase          += baseAmount;
+            totalBase += baseAmount;
             totalItemDiscounts += discountAmount;
-            totalItbis         += itbisAmount;
+            totalItbis += itbisAmount;
 
             switch (billingIndicator)
             {
                 case 4:  // Exento
                 case 0:  // No facturable
                     totalExempt += taxableAmount; break;
-                case 3:  // ITBIS 0%
-                    totalExempt += taxableAmount; taxableG3 += taxableAmount; break;
-                case 1:  taxableG1 += taxableAmount; itbisG1 += itbisAmount; break;
-                case 2:  taxableG2 += taxableAmount; itbisG2 += itbisAmount; break;
+                case 3:  // ITBIS 0% (Gravado 0%)
+                    taxableG3 += taxableAmount; break;
+                case 1: taxableG1 += taxableAmount; itbisG1 += itbisAmount; break;
+                case 2: taxableG2 += taxableAmount; itbisG2 += itbisAmount; break;
             }
         }
 
@@ -323,11 +320,11 @@ public class EcfGeneratorService : IEcfGeneratorService
         {
             adjustments.Add(new EcfXmlDescuentoORecargo
             {
-                NumeroLinea              = 1,
-                TipoAjuste               = "D",
+                NumeroLinea = 1,
+                TipoAjuste = "D",
                 DescripcionDescuentooRecargo = dto.GlobalDiscountDescription ?? "Descuento Global",
-                TipoValor                = "$",
-                MontoDescuentooRecargo   = dto.GlobalDiscountAmount
+                TipoValor = "$",
+                MontoDescuentooRecargo = dto.GlobalDiscountAmount
             });
         }
 
@@ -339,24 +336,27 @@ public class EcfGeneratorService : IEcfGeneratorService
 
         var totales = new EcfXmlTotales
         {
-            EcfType           = ecfType,
+            EcfType = ecfType,
             MontoGravadoTotal = taxableGravado > 0 ? taxableGravado : null,
-            MontoGravadoI1    = taxableG1 > 0 ? taxableG1 : null,
-            MontoGravadoI2    = taxableG2 > 0 ? taxableG2 : null,
-            MontoGravadoI3    = taxableG3 > 0 ? taxableG3 : null,
-            MontoExento       = totalExempt > 0 ? totalExempt : null,
+            MontoGravadoI1 = taxableG1 > 0 ? taxableG1 : null,
+            MontoGravadoI2 = taxableG2 > 0 ? taxableG2 : null,
+            MontoGravadoI3 = taxableG3 > 0 ? taxableG3 : null,
+            MontoExento = totalExempt > 0 ? totalExempt : null,
 
             ITBIS1 = taxableG1 > 0 ? 18 : null,
             ITBIS2 = taxableG2 > 0 ? 16 : null,
-            ITBIS3 = taxableG3 > 0 ? 0  : null,
+            ITBIS3 = taxableG3 > 0 ? 0 : null,
 
-            TotalITBIS  = totalItbis > 0 ? totalItbis : null,
-            TotalITBIS1 = itbisG1 > 0 ? itbisG1 : null,
-            TotalITBIS2 = itbisG2 > 0 ? itbisG2 : null,
-            TotalITBIS3 = itbisG3 > 0 ? itbisG3 : null,
+            TotalITBIS = totalItbis > 0.00m ? totalItbis : null,
+            TotalITBIS1 = taxableG1 > 0.00m ? itbisG1 : null,
+            TotalITBIS2 = taxableG2 > 0.00m ? itbisG2 : null,
+            TotalITBIS3 = taxableG3 > 0.00m ? itbisG3 : null,
+
+            MontoPeriodo = ecfType == 32 ? finalTotal : null,
+            ValorPagar = ecfType == 32 ? finalTotal : null,
 
             MontoImpuestoAdicional = totalIsc > 0 ? totalIsc : null,
-            ImpuestosAdicionales   = impuestosAdicionales,
+            ImpuestosAdicionales = impuestosAdicionales,
 
             MontoTotal = finalTotal
         };
@@ -368,58 +368,59 @@ public class EcfGeneratorService : IEcfGeneratorService
                 Version = 1.0m,
                 IdDoc = new EcfXmlIdDoc
                 {
-                    EcfType                = ecfType,
-                    Ncf                    = dto.Ncf,
+                    EcfType = ecfType,
+                    Ncf = dto.Ncf,
                     SequenceExpirationDate = expirationDate,
-                    IndicadorNotaCredito   = ecfType == 34 ? 1 : null,
-                    IncomeType             = dto.IncomeType,
-                    PaymentType            = dto.PaymentType,
-                    FechaLimitePago        = dto.PaymentDeadline?.ToDrTime().ToString(DateFormat),
-                    TerminoPago            = dto.PaymentTerms
+                    IndicadorNotaCredito = ecfType == 34 ? 1 : null,
+                    IndicadorMontoGravado = dto.ManualIndicadorMontoGravado ?? ((totalBase - totalExempt > 0) ? 1 : 0),
+                    IncomeType = dto.IncomeType,
+                    PaymentType = dto.PaymentType,
+                    FechaLimitePago = dto.PaymentDeadline?.ToDrTime().ToString(DateFormat),
+                    TerminoPago = dto.PaymentTerms
                 },
                 Emisor = new EcfXmlEmisor
                 {
-                    RncEmisor             = dto.IssuerRnc,
-                    RazonSocial           = dto.IssuerName,
-                    NombreComercial       = dto.IssuerCommercialName,
-                    Sucursal              = dto.IssuerBranchCode,
-                    Direccion             = dto.IssuerAddress,
-                    Municipio             = dto.IssuerMunicipality,
-                    Provincia             = dto.IssuerProvince,
-                    TelefonoTabla         = string.IsNullOrWhiteSpace(dto.IssuerPhone) ? null : new EcfXmlEmisor.TablaTelefono { Telefono = dto.IssuerPhone },
-                    CorreoEmisor          = dto.IssuerEmail,
-                    WebSite               = dto.IssuerWebSite,
-                    ActividadEconomica    = dto.IssuerActivityCode,
-                    CodigoVendedor        = dto.IssuerSellerCode,
-                    NumeroFacturaInterna  = dto.InternalInvoiceNumber,
-                    NumeroPedidoInterno   = dto.InternalOrderNumber,
-                    ZonaVenta             = dto.SalesZone,
-                    FechaEmision          = issueDate
+                    RncEmisor = dto.IssuerRnc,
+                    RazonSocial = dto.IssuerName,
+                    NombreComercial = dto.IssuerCommercialName,
+                    Sucursal = dto.IssuerBranchCode,
+                    Direccion = dto.IssuerAddress,
+                    Municipio = dto.IssuerMunicipality,
+                    Provincia = dto.IssuerProvince,
+                    TelefonoTabla = string.IsNullOrWhiteSpace(dto.IssuerPhone) ? null : new EcfXmlEmisor.TablaTelefono { Telefono = dto.IssuerPhone },
+                    CorreoEmisor = dto.IssuerEmail,
+                    WebSite = dto.IssuerWebSite,
+                    ActividadEconomica = dto.IssuerActivityCode,
+                    CodigoVendedor = dto.IssuerSellerCode,
+                    NumeroFacturaInterna = dto.InternalInvoiceNumber,
+                    NumeroPedidoInterno = dto.InternalOrderNumber,
+                    ZonaVenta = dto.SalesZone,
+                    FechaEmision = issueDate
                 },
                 Comprador = new EcfXmlComprador
                 {
-                    EcfType                = ecfType,
-                    RncComprador           = dto.CustomerRnc,
+                    EcfType = ecfType,
+                    RncComprador = dto.CustomerRnc,
                     IdentificadorExtranjero = dto.CustomerForeignId,
-                    RazonSocial            = dto.CustomerName,
-                    ContactoComprador      = dto.CustomerContact,
-                    CorreoComprador        = dto.CustomerEmail,
-                    DireccionComprador     = dto.CustomerAddress,
-                    PaisComprador          = dto.CustomerCountry,
-                    TelefonoAdicional      = dto.CustomerTelephone,
-                    MunicipioComprador     = dto.CustomerMunicipality,
-                    ProvinciaComprador     = dto.CustomerProvince,
-                    FechaEntrega           = dto.DeliveryDate?.ToDrTime().ToString(DateFormat),
-                    FechaOrdenCompra       = dto.OrderDate?.ToDrTime().ToString(DateFormat),
-                    NumeroOrdenCompra      = dto.OrderNumber,
+                    RazonSocial = dto.CustomerName,
+                    ContactoComprador = dto.CustomerContact,
+                    CorreoComprador = dto.CustomerEmail,
+                    DireccionComprador = dto.CustomerAddress,
+                    PaisComprador = dto.CustomerCountry,
+                    TelefonoAdicional = dto.CustomerTelephone,
+                    MunicipioComprador = dto.CustomerMunicipality,
+                    ProvinciaComprador = dto.CustomerProvince,
+                    FechaEntrega = dto.DeliveryDate?.ToDrTime().ToString(DateFormat),
+                    FechaOrdenCompra = dto.OrderDate?.ToDrTime().ToString(DateFormat),
+                    NumeroOrdenCompra = dto.OrderNumber,
                     CodigoInternoComprador = dto.BuyerInternalCode
                 },
 
                 Totales = totales
             },
-            Items           = xmlItems,
-            Adjustments     = adjustments,
-            
+            Items = xmlItems,
+            Adjustments = adjustments,
+
             // ── Reference Information (33, 34) ──────────────────────────────────
             InformacionReferencia = (ecfType == 33 || ecfType == 34) && !string.IsNullOrWhiteSpace(dto.ReferenceNcf)
                 ? new EcfXmlInformacionReferencia
@@ -431,7 +432,7 @@ public class EcfGeneratorService : IEcfGeneratorService
                     RazonModificacion = dto.ReferenceReasonDescription
                 } : null,
 
-            FechaHoraFirma  = signatureDateTime
+            FechaHoraFirma = signatureDateTime
         };
 
         // ── Placeholder Signature (Required for XSD structural validation only) ──
@@ -447,9 +448,8 @@ public class EcfGeneratorService : IEcfGeneratorService
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Loads the XmlSchemaSet for the given TipoeCF from the embedded resources
-    /// in the ZynstormECFPlatform.Schemas assembly.
-    /// Resource name example: "ZynstormECFPlatform.Schemas.XSD.e-CF 31 v.1.0.xsd"
+    /// Loads the XmlSchemaSet for the given TipoeCF from the embedded resources in the ZynstormECFPlatform.Schemas
+    /// assembly. Resource name example: "ZynstormECFPlatform.Schemas.XSD.e-CF 31 v.1.0.xsd"
     /// </summary>
     private static XmlSchemaSet? LoadSchemaSetForType(int ecfType)
     {

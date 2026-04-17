@@ -73,5 +73,13 @@ public class EcfXmlTotales
 
     public decimal? TotalISRRetencion { get; set; }
     public bool ShouldSerializeTotalISRRetencion() => TotalISRRetencion.HasValue && EcfType != 43;
+
+    // ── Additional fields for Type 32 ─────────────────────────────────────
+
+    public decimal? MontoPeriodo { get; set; }
+    public bool ShouldSerializeMontoPeriodo() => MontoPeriodo.HasValue && EcfType == 32;
+
+    public decimal? ValorPagar { get; set; }
+    public bool ShouldSerializeValorPagar() => ValorPagar.HasValue && EcfType == 32;
 }
 

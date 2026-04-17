@@ -30,6 +30,7 @@ public class CertificationService : ICertificationService
     // In-memory store for certification state
     private static List<CertificationTestDto>? _cachedTests;
     private static Dictionary<string, DateTime>? _typeExpirationDates;
+    private static TimeSpan? _dateOffset;
 
     public CertificationService(
         IConfiguration configuration,
@@ -73,6 +74,10 @@ public class CertificationService : ICertificationService
             .Select(r => GetStr(r, "NCFModificado"))
             .Where(n => !string.IsNullOrEmpty(n))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // ── 1.5 Calculate Global Date Offset if not already done ──────────
+        // DISABLED: Raw Excel dates used as requested by USER
+        _dateOffset = TimeSpan.Zero;
 
         // ── 2. Identify primary expiration dates by type ──────────────────
         _typeExpirationDates = new Dictionary<string, DateTime>();
@@ -271,6 +276,14 @@ public class CertificationService : ICertificationService
         return string.IsNullOrWhiteSpace(val) || val == "#e" ? null : val.Trim();
     }
 
+    private static decimal? GetDec(IDictionary<string, object> row, string key)
+    {
+        var val = GetStr(row, key);
+        if (decimal.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal d))
+            return d;
+        return null;
+    }
+
     // ── Helper: parse DD-MM-YYYY dates (DGII format) ──────────────────────────
     // IMPORTANT: Excel dates are already in Dominican Republic local time.
     // Mark them as DateTimeKind.Local so ToDrTime() doesn't subtract 4 hours.
@@ -285,6 +298,17 @@ public class CertificationService : ICertificationService
             System.Globalization.DateTimeStyles.None, out dt))
             return DateTime.SpecifyKind(dt, DateTimeKind.Local);
         return null;
+    }
+
+    private static DateTime ApplyDateOffset(DateTime date)
+    {
+        return _dateOffset.HasValue ? date.Add(_dateOffset.Value) : date;
+    }
+
+    private static DateTime? ApplyDateOffset(DateTime? date)
+    {
+        if (!date.HasValue) return null;
+        return _dateOffset.HasValue ? date.Value.Add(_dateOffset.Value) : date;
     }
 
     private EcfInvoiceRequestDto MapRowToRequest(IDictionary<string, object> row, int currentStep)
@@ -325,7 +349,20 @@ public class CertificationService : ICertificationService
 
             // ── Payment ────────────────────────────────────────────────────
             PaymentType = int.TryParse(GetStr(row, "TipoPago"), out int p) ? p : 1,
+            PaymentDeadline = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaLimitePago"))),
             IncomeType  = GetStr(row, "TipoIngresos") ?? "01",
+
+            // ── Manual Overrides for Certification (Raw Excel Data) ────────
+            ManualMontoGravadoTotal = GetDec(row, "MontoGravadoTotal"),
+            ManualMontoExento       = GetDec(row, "MontoExento"),
+            ManualMontoTotal        = GetDec(row, "MontoTotal"),
+            ManualTotalITBIS        = GetDec(row, "TotalITBIS"),
+            ManualTotalITBIS1       = GetDec(row, "TotalITBIS1"),
+            ManualTotalITBIS2       = GetDec(row, "TotalITBIS2"),
+            ManualTotalITBIS3       = GetDec(row, "TotalITBIS3"),
+            ManualMontoPeriodo      = GetDec(row, "MontoPeriodo"),
+            ManualValorPagar        = GetDec(row, "ValorPagar"),
+            ManualIndicadorMontoGravado = int.TryParse(GetStr(row, "IndicadorMontoGravado"), out int img) ? img : null,
 
             // ── Reference (NC/ND types 33/34) ──────────────────────────────
             ReferenceNcf         = GetStr(row, "NCFModificado"),
@@ -336,7 +373,7 @@ public class CertificationService : ICertificationService
         };
 
         // ── Dates ──────────────────────────────────────────────────────────
-        dto.IssueDate = ParseDgiiDate(GetStr(row, "FechaEmision")) ?? DateTime.Now;
+        dto.IssueDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaEmision")) ?? DateTime.Now);
 
         var expDate = ParseDgiiDate(GetStr(row, "FechaVencimientoSecuencia"));
         string typeStr = GetStr(row, "TipoeCF") ?? "";
@@ -344,11 +381,11 @@ public class CertificationService : ICertificationService
         {
             expDate = fallback;
         }
-        dto.SequenceExpirationDate = expDate;
+        dto.SequenceExpirationDate = ApplyDateOffset(expDate);
 
-        dto.DeliveryDate           = ParseDgiiDate(GetStr(row, "FechaEntrega"));
-        dto.OrderDate              = ParseDgiiDate(GetStr(row, "FechaOrdenCompra"));
-        dto.ReferenceIssueDate     = ParseDgiiDate(GetStr(row, "FechaNCFModificado"));
+        dto.DeliveryDate           = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaEntrega")));
+        dto.OrderDate              = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaOrdenCompra")));
+        dto.ReferenceIssueDate     = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaNCFModificado")));
 
         // ── MontoNoFacturable (type 33 exento) ────────────────────────────
         var montoNoFacturableStr = GetStr(row, "MontoNoFacturable");
@@ -406,7 +443,8 @@ public class CertificationService : ICertificationService
                 ItemType         = itemType,
                 UnitOfMeasure    = unitOfMeasure,
                 TaxPercentage    = taxPct,
-                BillingIndicator = indicadorFact  // Pass exact Excel indicator (4=exento, 0=no facturable)
+                BillingIndicator = indicadorFact,  // Pass exact Excel indicator (4=exento, 0=no facturable)
+                ManualMontoItem  = GetDec(row, $"MontoItem[{i}]")
             };
 
             dto.Items.Add(item);

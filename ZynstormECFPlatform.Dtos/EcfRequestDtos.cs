@@ -173,6 +173,19 @@ public class EcfInvoiceRequestDto
 
     /// <summary>Text description of the modification reason (optional).</summary>
     public string? ReferenceReasonDescription { get; set; }
+
+    // ── Manual Overrides for Certification (Raw Excel Data) ──────────────────
+
+    public decimal? ManualMontoGravadoTotal { get; set; }
+    public decimal? ManualMontoExento { get; set; }
+    public decimal? ManualMontoTotal { get; set; }
+    public decimal? ManualTotalITBIS { get; set; }
+    public decimal? ManualTotalITBIS1 { get; set; }
+    public decimal? ManualTotalITBIS2 { get; set; }
+    public decimal? ManualTotalITBIS3 { get; set; }
+    public decimal? ManualMontoPeriodo { get; set; }
+    public decimal? ManualValorPagar { get; set; }
+    public int? ManualIndicadorMontoGravado { get; set; }
 }
 
 
@@ -247,4 +260,7 @@ public class EcfItemRequestDto
     /// Represents the percentage rate of the additional tax (e.g. 10.00 for 10%).
     /// </summary>
     public decimal AdditionalTaxRate { get; set; }
+
+    // ── Manual Overrides for Certification ──────────────────────────────────
+    public decimal? ManualMontoItem { get; set; }
 }

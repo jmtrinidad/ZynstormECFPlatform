@@ -14,31 +14,21 @@ namespace ExcelInspector
             try
             {
                 string excelPath = "c:\\Projects\\ZynstormECFPlatform\\133009889-16042026193727.xlsx";
-                if (!File.Exists(excelPath))
-                {
-                    Console.WriteLine("File not found: " + excelPath);
-                    return;
-                }
-
                 var rows = MiniExcel.Query(excelPath, useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
                 
-                var expirationLog = new Dictionary<string, List<string>>();
-
-                foreach (var row in rows)
+                var firstRow = rows.FirstOrDefault();
+                if (firstRow != null)
                 {
-                    var type = row.ContainsKey("TipoeCF") ? row["TipoeCF"]?.ToString() : "Unknown";
-                    var date = row.ContainsKey("FechaVencimientoSecuencia") ? row["FechaVencimientoSecuencia"]?.ToString() : "Missing";
-                    
-                    if (string.IsNullOrEmpty(type)) continue;
-
-                    if (!expirationLog.ContainsKey(type)) expirationLog[type] = new List<string>();
-                    expirationLog[type].Add(date ?? "null");
-                }
-
-                Console.WriteLine("Sequence Expiration Dates by EcfType:");
-                foreach (var kvp in expirationLog)
-                {
-                    Console.WriteLine($"Type {kvp.Key}: {string.Join(", ", kvp.Value.Distinct())}");
+                    Console.WriteLine("--- RELEVANT COLUMNS FOR TOTALS ---");
+                    var keys = firstRow.Keys.ToList();
+                    string[] targets = { "Monto", "Total", "ITBIS", "Pagar", "Periodo", "Gravado", "Exento", "Indicador" };
+                    foreach (var key in keys)
+                    {
+                        if (targets.Any(t => key.Contains(t, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            Console.WriteLine(key);
+                        }
+                    }
                 }
             }
             catch (Exception ex)
