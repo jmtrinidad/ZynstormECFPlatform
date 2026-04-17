@@ -337,28 +337,28 @@ public class EcfGeneratorService : IEcfGeneratorService
         var totales = new EcfXmlTotales
         {
             EcfType = ecfType,
-            MontoGravadoTotal = taxableGravado > 0 ? taxableGravado : null,
+            MontoGravadoTotal = dto.ManualMontoGravadoTotal ?? (taxableGravado > 0 ? taxableGravado : null),
             MontoGravadoI1 = taxableG1 > 0 ? taxableG1 : null,
             MontoGravadoI2 = taxableG2 > 0 ? taxableG2 : null,
             MontoGravadoI3 = taxableG3 > 0 ? taxableG3 : null,
-            MontoExento = totalExempt > 0 ? totalExempt : null,
+            MontoExento = dto.ManualMontoExento ?? (totalExempt > 0 ? totalExempt : null),
 
-            ITBIS1 = taxableG1 > 0 ? 18 : null,
-            ITBIS2 = taxableG2 > 0 ? 16 : null,
-            ITBIS3 = taxableG3 > 0 ? 0 : null,
+            ITBIS1 = (taxableG1 > 0 || dto.ManualTotalITBIS1.HasValue) ? 18 : null,
+            ITBIS2 = (taxableG2 > 0 || dto.ManualTotalITBIS2.HasValue) ? 16 : null,
+            ITBIS3 = (taxableG3 > 0 || dto.ManualTotalITBIS3.HasValue) ? 0 : null,
 
-            TotalITBIS = totalItbis > 0.00m ? totalItbis : null,
-            TotalITBIS1 = taxableG1 > 0.00m ? itbisG1 : null,
-            TotalITBIS2 = taxableG2 > 0.00m ? itbisG2 : null,
-            TotalITBIS3 = taxableG3 > 0.00m ? itbisG3 : null,
+            TotalITBIS = dto.ManualTotalITBIS ?? (totalItbis > 0.00m ? totalItbis : null),
+            TotalITBIS1 = dto.ManualTotalITBIS1 ?? (taxableG1 > 0.00m ? itbisG1 : null),
+            TotalITBIS2 = dto.ManualTotalITBIS2 ?? (taxableG2 > 0.00m ? itbisG2 : null),
+            TotalITBIS3 = dto.ManualTotalITBIS3 ?? (taxableG3 > 0.00m ? itbisG3 : null),
 
-            MontoPeriodo = ecfType == 32 ? finalTotal : null,
-            ValorPagar = ecfType == 32 ? finalTotal : null,
+            MontoPeriodo = dto.ManualMontoPeriodo ?? (ecfType == 32 ? finalTotal : null),
+            ValorPagar = dto.ManualValorPagar ?? (ecfType == 32 ? finalTotal : null),
 
             MontoImpuestoAdicional = totalIsc > 0 ? totalIsc : null,
             ImpuestosAdicionales = impuestosAdicionales,
 
-            MontoTotal = finalTotal
+            MontoTotal = dto.ManualMontoTotal ?? finalTotal
         };
 
         var root = new EcfXmlRoot

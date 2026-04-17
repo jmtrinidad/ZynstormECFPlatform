@@ -1,9 +1,4 @@
-
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using MiniExcelLibs;
 
 namespace ExcelInspector
 {
@@ -11,30 +6,23 @@ namespace ExcelInspector
     {
         static void Main(string[] args)
         {
-            try
+            string val = "0.00";
+            if (decimal.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal d))
             {
-                string excelPath = "c:\\Projects\\ZynstormECFPlatform\\133009889-16042026193727.xlsx";
-                var rows = MiniExcel.Query(excelPath, useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
-                
-                var firstRow = rows.FirstOrDefault();
-                if (firstRow != null)
-                {
-                    Console.WriteLine("--- RELEVANT COLUMNS FOR TOTALS ---");
-                    var keys = firstRow.Keys.ToList();
-                    string[] targets = { "Monto", "Total", "ITBIS", "Pagar", "Periodo", "Gravado", "Exento", "Indicador" };
-                    foreach (var key in keys)
-                    {
-                        if (targets.Any(t => key.Contains(t, StringComparison.OrdinalIgnoreCase)))
-                        {
-                            Console.WriteLine(key);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error: " + ex.Message);
+                Console.WriteLine($"Parsed: {d}");
+                Console.WriteLine($"ToString(): {d.ToString()}");
+                var obj = new TestXml { Value2 = d };
+                var serializer = new System.Xml.Serialization.XmlSerializer(typeof(TestXml));
+                using var writer = new System.IO.StringWriter();
+                serializer.Serialize(writer, obj);
+                Console.WriteLine(writer.ToString());
             }
         }
+    }
+
+    [System.Xml.Serialization.XmlRoot("Test")]
+    public class TestXml
+    {
+        public decimal? Value2 { get; set; }
     }
 }
