@@ -424,7 +424,8 @@ public class EcfGeneratorService : IEcfGeneratorService
                     Ncf = dto.Ncf,
                     SequenceExpirationDate = expirationDate,
                     IndicadorNotaCredito = ecfType == 34 ? 1 : null,
-                    IndicadorMontoGravado = dto.ManualIndicadorMontoGravado ?? ((totalBase - totalExempt > 0) ? 1 : 0),
+                    IndicadorMontoGravado = dto.ManualIndicadorMontoGravado ?? (ecfType == 31 ? ((totalBase - totalExempt > 0) ? 1 : 0) : null),
+
                     IncomeType = dto.IncomeType ?? ((ecfType is 31 or 32 or 33 or 34 or 44 or 45 or 46) ? "01" : null),
                     PaymentType = dto.PaymentType ?? ((ecfType is 31 or 32 or 33 or 34 or 41 or 44 or 45 or 46 or 47) ? 1 : null),
                     FechaLimitePago = dto.PaymentDeadline?.ToDrTime().ToString(DateFormat),
