@@ -69,8 +69,9 @@ public class EcfXmlSubDescuento
     [XmlElement("TipoSubDescuento")]
     public string TipoSubDescuento { get; set; } = "$"; // "$" for amount, "%" for percentage
 
-    [XmlElement("ValorSubDescuento")]
-    public decimal ValorSubDescuento { get; set; }
+    [XmlElement("SubDescuentoPorcentaje")]
+    public decimal? SubDescuentoPorcentaje { get; set; }
+    public bool ShouldSerializeSubDescuentoPorcentaje() => SubDescuentoPorcentaje.HasValue;
 
     [XmlElement("MontoSubDescuento")]
     public decimal MontoSubDescuento { get; set; }

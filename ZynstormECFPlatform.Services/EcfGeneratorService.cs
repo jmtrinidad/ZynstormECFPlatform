@@ -269,7 +269,6 @@ public class EcfGeneratorService : IEcfGeneratorService
                         new EcfXmlSubDescuento
                         {
                             TipoSubDescuento = "$",
-                            ValorSubDescuento = itemDiscountTotal,
                             MontoSubDescuento = itemDiscountTotal
                         }
                     }
