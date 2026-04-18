@@ -178,7 +178,12 @@ public class CertificationService : ICertificationService
                 excelPath = "c:\\Projects\\ZynstormECFPlatform\\133009889-16042026193727.xlsx";
             }
             var rows = MiniExcel.Query(excelPath, useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
-            var row = rows.First(r => (r["CasoPrueba"]?.ToString() ?? "") == test.CaseNumber);
+            // Use specific row for Type 31 to ensure matching reference for subsequent tests
+            var row = (test.EcfType == "31")
+                ? rows.First(r => r["ENCF"]?.ToString() == "E310000000034" || r["ENCF"]?.ToString() == "133009889E310000000034")
+                : rows.First(r => (r["CasoPrueba"]?.ToString() ?? "") == test.CaseNumber);
+            // Synchronize the test ENCF so the filename matches the XML content
+            test.ENcf = row["ENCF"]?.ToString();
 
             var requestDto = MapRowToRequest(row, test.Step);
 
@@ -289,17 +294,17 @@ public class CertificationService : ICertificationService
 
     // ── Helper: parse DD-MM-YYYY dates (DGII format) ──────────────────────────
     // IMPORTANT: Excel dates are already in Dominican Republic local time.
-    // Mark them as DateTimeKind.Local so ToDrTime() doesn't subtract 4 hours.
+    // Use DateTimeKind.Unspecified to avoid unwanted conversions in EcfGenerator.
     private static DateTime? ParseDgiiDate(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw) || raw == "#e") return null;
         if (DateTime.TryParseExact(raw, "dd-MM-yyyy",
             System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None, out var dt))
-            return DateTime.SpecifyKind(dt, DateTimeKind.Local);
+            return DateTime.SpecifyKind(dt, DateTimeKind.Unspecified);
         if (DateTime.TryParse(raw, System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None, out dt))
-            return DateTime.SpecifyKind(dt, DateTimeKind.Local);
+            return DateTime.SpecifyKind(dt, DateTimeKind.Unspecified);
         return null;
     }
 
@@ -469,6 +474,22 @@ public class CertificationService : ICertificationService
                 ManualMontoISRRetenido = GetDec(row, $"MontoISRRetenido[{i}]")
 
             };
+
+            // Extract SubRecargos (up to 5 per item) from Excel
+            for (int k = 1; k <= 5; k++)
+            {
+                var subTipo = GetStr(row, $"TipoSubRecargo[{i}][{k}]");
+                var subMonto = GetDec(row, $"MontosubRecargo[{i}][{k}]");
+                if (subTipo != null || subMonto != null)
+                {
+                    item.ManualSubRecargos.Add(new EcfSubRecargoDto
+                    {
+                        TipoSubRecargo = subTipo ?? "$",
+                        MontoSubRecargo = subMonto ?? 0,
+                        SubRecargoPorcentaje = GetDec(row, $"SubRecargoPorcentaje[{i}][{k}]")
+                    });
+                }
+            }
 
             dto.Items.Add(item);
         }

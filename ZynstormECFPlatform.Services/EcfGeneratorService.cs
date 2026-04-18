@@ -208,8 +208,8 @@ public class EcfGeneratorService : IEcfGeneratorService
     private static EcfXmlRoot MapToXmlRoot(EcfInvoiceRequestDto dto)
     {
         var ecfType = NcfHelper.ExtractEcfType(dto.Ncf);
-        var issueDate = dto.IssueDate.ToDrTime().ToString(DateFormat);
-        var expirationDate = (dto.SequenceExpirationDate ?? dto.IssueDate.AddYears(1)).ToDrTime().ToString(DateFormat);
+        var issueDate = dto.IssueDate.ToString(DateFormat);
+        var expirationDate = (dto.SequenceExpirationDate ?? dto.IssueDate.AddYears(1)).ToString(DateFormat);
         var signatureDateTime = DateTime.UtcNow.ToDrTime().ToString(DateTimeFormat);
 
         // ── Items + running totals ─────────────────────────────────────────────
@@ -303,6 +303,20 @@ public class EcfGeneratorService : IEcfGeneratorService
                 };
             }
 
+            EcfXmlTablaSubRecargo? tablaSubRecargo = null;
+            if (item.ManualSubRecargos.Count > 0)
+            {
+                tablaSubRecargo = new EcfXmlTablaSubRecargo
+                {
+                    SubRecargos = item.ManualSubRecargos.Select(s => new EcfXmlSubRecargo
+                    {
+                        TipoSubRecargo = s.TipoSubRecargo,
+                        SubRecargoPorcentaje = s.SubRecargoPorcentaje,
+                        MontoSubRecargo = s.MontoSubRecargo
+                    }).ToList()
+                };
+            }
+
             xmlItems.Add(new EcfXmlItem
             {
                 EcfType = ecfType,
@@ -318,6 +332,7 @@ public class EcfGeneratorService : IEcfGeneratorService
                 DescuentoMonto = itemDiscountTotal > 0 ? itemDiscountTotal : null,
                 TablaSubDescuento = tablaSubDescuento,
                 RecargoMonto = surchargeAmount > 0 ? surchargeAmount : null,
+                TablaSubRecargo = tablaSubRecargo,
                 TablaImpuestoAdicional = tablaImpuesto,
                 MontoItem = item.ManualMontoItem ?? (taxableAmount + itbisAmount + iscItemTotal + surchargeAmount),
 
@@ -431,13 +446,13 @@ public class EcfGeneratorService : IEcfGeneratorService
                     Ncf = dto.Ncf,
                     SequenceExpirationDate = expirationDate,
                     IndicadorNotaCredito = dto.ManualIndicadorNotaCredito ?? (ecfType == 34 ? 1 : null),
-                    IndicadorMontoGravado = dto.ManualIndicadorMontoGravado ?? (ecfType == 31 ? ((totalBase - totalExempt > 0) ? 1 : 0) : null),
+                    IndicadorMontoGravado = dto.ManualIndicadorMontoGravado ?? (ecfType == 31 && taxableGravado > 0 ? 1 : null),
 
                     IncomeType = dto.IncomeType ?? ((ecfType is 31 or 32 or 33 or 44 or 45 or 46) ? "01" : null),
 
 
                     PaymentType = dto.PaymentType ?? ((ecfType is 31 or 32 or 33 or 34 or 41 or 44 or 45 or 46 or 47) ? 1 : null),
-                    FechaLimitePago = dto.PaymentDeadline?.ToDrTime().ToString(DateFormat),
+                    FechaLimitePago = dto.PaymentDeadline?.ToString(DateFormat),
                     TerminoPago = dto.PaymentTerms
 
                 },
@@ -473,8 +488,8 @@ public class EcfGeneratorService : IEcfGeneratorService
                     TelefonoAdicional = dto.CustomerTelephone,
                     MunicipioComprador = dto.CustomerMunicipality,
                     ProvinciaComprador = dto.CustomerProvince,
-                    FechaEntrega = dto.DeliveryDate?.ToDrTime().ToString(DateFormat),
-                    FechaOrdenCompra = dto.OrderDate?.ToDrTime().ToString(DateFormat),
+                    FechaEntrega = dto.DeliveryDate?.ToString(DateFormat),
+                    FechaOrdenCompra = dto.OrderDate?.ToString(DateFormat),
                     NumeroOrdenCompra = dto.OrderNumber,
                     CodigoInternoComprador = dto.BuyerInternalCode
                 },
@@ -490,7 +505,7 @@ public class EcfGeneratorService : IEcfGeneratorService
                 {
                     NCFModificado = dto.ReferenceNcf,
                     RNCOtroContribuyente = dto.ReferenceCustomerRnc,
-                    FechaNCFModificado = (dto.ReferenceIssueDate ?? DateTime.UtcNow).ToDrTime().ToString(DateFormat),
+                    FechaNCFModificado = (dto.ReferenceIssueDate ?? DateTime.UtcNow).ToString(DateFormat),
                     CodigoModificacion = dto.ReferenceReasonCode ?? 1,
                     RazonModificacion = dto.ReferenceReasonDescription
                 } : null,

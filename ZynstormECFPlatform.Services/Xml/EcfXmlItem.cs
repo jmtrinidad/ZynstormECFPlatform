@@ -62,11 +62,15 @@ public class EcfXmlItem
     public decimal? RecargoMonto { get; set; }
     public bool ShouldSerializeRecargoMonto() => RecargoMonto.HasValue && RecargoMonto > 0;
 
-    [XmlElement("TablaImpuestoAdicional", Order = 13)]
+    [XmlElement("TablaSubRecargo", Order = 13)]
+    public EcfXmlTablaSubRecargo? TablaSubRecargo { get; set; }
+    public bool ShouldSerializeTablaSubRecargo() => TablaSubRecargo != null && TablaSubRecargo.SubRecargos.Count > 0;
+
+    [XmlElement("TablaImpuestoAdicional", Order = 14)]
     public EcfXmlTablaImpuestoAdicionalItem? TablaImpuestoAdicional { get; set; }
     public bool ShouldSerializeTablaImpuestoAdicional() => TablaImpuestoAdicional != null && EcfType != 41 && EcfType != 43;
 
-    [XmlElement("MontoItem", Order = 14)]
+    [XmlElement("MontoItem", Order = 15)]
     public decimal MontoItem { get; set; }
 
 }
@@ -88,6 +92,25 @@ public class EcfXmlSubDescuento
 
     [XmlElement("MontoSubDescuento")]
     public decimal MontoSubDescuento { get; set; }
+}
+
+public class EcfXmlTablaSubRecargo
+{
+    [XmlElement("SubRecargo")]
+    public List<EcfXmlSubRecargo> SubRecargos { get; set; } = new();
+}
+
+public class EcfXmlSubRecargo
+{
+    [XmlElement("TipoSubRecargo")]
+    public string TipoSubRecargo { get; set; } = "$"; // "$" or "%"
+
+    [XmlElement("SubRecargoPorcentaje")]
+    public decimal? SubRecargoPorcentaje { get; set; }
+    public bool ShouldSerializeSubRecargoPorcentaje() => SubRecargoPorcentaje.HasValue;
+
+    [XmlElement("MontoSubRecargo")]
+    public decimal MontoSubRecargo { get; set; }
 }
 
 public class EcfXmlItemRetencion

@@ -278,4 +278,13 @@ public class EcfItemRequestDto
     public decimal? ManualMontoITBISRetenido { get; set; }
 
     public decimal? ManualMontoISRRetenido { get; set; }
+
+    public List<EcfSubRecargoDto> ManualSubRecargos { get; set; } = new();
+}
+
+public class EcfSubRecargoDto
+{
+    public string TipoSubRecargo { get; set; } = "$"; // "$" or "%"
+    public decimal? SubRecargoPorcentaje { get; set; }
+    public decimal MontoSubRecargo { get; set; }
 }
