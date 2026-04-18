@@ -53,6 +53,7 @@ public class EcfGeneratorService : IEcfGeneratorService
     public string GenerateUnsignedXml(EcfInvoiceRequestDto dto)
     {
         var root = MapToXmlRoot(dto);
+        var ecfType = NcfHelper.ExtractEcfType(dto.Ncf);
 
         var settings = new XmlWriterSettings
         {
@@ -61,14 +62,40 @@ public class EcfGeneratorService : IEcfGeneratorService
             OmitXmlDeclaration = false
         };
 
-        using var stringWriter = new Utf8StringWriter();
-        using (var xmlWriter = XmlWriter.Create(stringWriter, settings))
+        string xml;
+        using (var stringWriter = new Utf8StringWriter())
         {
-            _serializer.Serialize(xmlWriter, root, _noNamespaces);
+            using (var xmlWriter = XmlWriter.Create(stringWriter, settings))
+            {
+                _serializer.Serialize(xmlWriter, root, _noNamespaces);
+            }
+            xml = stringWriter.ToString();
         }
 
-        return stringWriter.ToString();
+        // ── NUCLEAR OPTION: Post-processing to ensure XSD compliance ────────
+        // For type 44 (and others not in the allowed list), forcefully remove any <Retencion> block.
+        // This is a safety measure against any serialization quirks.
+        if (ecfType is not (41 or 47))
+        {
+            // Regex to remove <Retencion>...</Retencion> (including nested tags and content)
+            xml = System.Text.RegularExpressions.Regex.Replace(
+                xml, 
+                @"<Retencion\b[^>]*>.*?</Retencion>", 
+                string.Empty, 
+                System.Text.RegularExpressions.RegexOptions.Singleline);
+        }
+
+
+        // Add a diagnostic comment to verify the active version of the service
+        var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmm");
+        if (xml.Contains("<ECF>"))
+        {
+            xml = xml.Replace("<ECF>", $"<!-- Generator_Fix_V4_{timestamp} --><ECF>");
+        }
+
+        return xml;
     }
+
 
     private class Utf8StringWriter : StringWriter
     {
@@ -291,13 +318,14 @@ public class EcfGeneratorService : IEcfGeneratorService
                 TablaImpuestoAdicional = tablaImpuesto,
                 MontoItem = item.ManualMontoItem ?? (taxableAmount + itbisAmount + iscItemTotal),
 
-                // ── Retentions handling (For Purchase 41, Gastos Menores 43 and International Payment 47)
-                Retencion = (ecfType == 41 || ecfType == 43 || ecfType == 47) ? new EcfXmlItemRetencion
-                {
-                    Indicador = 1, // Retención
-                    MontoITBISRetenido = (ecfType == 41 || ecfType == 43) ? itbisRetenido : null,
-                    MontoISRRetenido = item.ManualMontoISRRetenido ?? (item.IsrRetentionAmount ?? 0)
-                } : null
+            // ── Retentions handling (ONLY for Purchase 41 and Exportation 47)
+            Retencion = (ecfType is 41 or 47) ? new EcfXmlItemRetencion
+            {
+                Indicador = 1, // Retención
+                MontoITBISRetenido = (ecfType is 41) ? itbisRetenido : null,
+                MontoISRRetenido = item.ManualMontoISRRetenido ?? (item.IsrRetentionAmount ?? 0)
+            } : null
+
             });
 
             totalBase += baseAmount;
@@ -397,10 +425,11 @@ public class EcfGeneratorService : IEcfGeneratorService
                     SequenceExpirationDate = expirationDate,
                     IndicadorNotaCredito = ecfType == 34 ? 1 : null,
                     IndicadorMontoGravado = dto.ManualIndicadorMontoGravado ?? ((totalBase - totalExempt > 0) ? 1 : 0),
-                    IncomeType = dto.IncomeType,
-                    PaymentType = dto.PaymentType,
+                    IncomeType = dto.IncomeType ?? ((ecfType is 31 or 32 or 33 or 34 or 44 or 45 or 46) ? "01" : null),
+                    PaymentType = dto.PaymentType ?? ((ecfType is 31 or 32 or 33 or 34 or 41 or 44 or 45 or 46 or 47) ? 1 : null),
                     FechaLimitePago = dto.PaymentDeadline?.ToDrTime().ToString(DateFormat),
                     TerminoPago = dto.PaymentTerms
+
                 },
                 Emisor = new EcfXmlEmisor
                 {

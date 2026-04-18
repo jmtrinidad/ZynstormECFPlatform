@@ -108,17 +108,18 @@ public class EcfXmlTotales
 
     [XmlElement("TotalITBISRetenido", Order = 21)]
     public decimal? TotalITBISRetenido { get; set; }
-    public bool ShouldSerializeTotalITBISRetenido() => TotalITBISRetenido.HasValue && EcfType != 32;
+    public bool ShouldSerializeTotalITBISRetenido() => TotalITBISRetenido.HasValue && EcfType != 32 && EcfType != 43;
 
     [XmlElement("TotalISRRetencion", Order = 22)]
     public decimal? TotalISRRetencion { get; set; }
-    public bool ShouldSerializeTotalISRRetencion() => TotalISRRetencion.HasValue && EcfType != 32;
+    public bool ShouldSerializeTotalISRRetencion() => TotalISRRetencion.HasValue && EcfType != 32 && EcfType != 43;
 
     [XmlElement("TotalITBISPercepcion", Order = 23)]
     public decimal? TotalITBISPercepcion { get; set; }
-    public bool ShouldSerializeTotalITBISPercepcion() => TotalITBISPercepcion.HasValue && EcfType != 32;
+    public bool ShouldSerializeTotalITBISPercepcion() => TotalITBISPercepcion.HasValue && EcfType != 32 && EcfType != 43;
 
     [XmlElement("TotalISRPercepcion", Order = 24)]
     public decimal? TotalISRPercepcion { get; set; }
-    public bool ShouldSerializeTotalISRPercepcion() => TotalISRPercepcion.HasValue && EcfType != 32;
+    public bool ShouldSerializeTotalISRPercepcion() => TotalISRPercepcion.HasValue && EcfType != 32 && EcfType != 43;
+
 }

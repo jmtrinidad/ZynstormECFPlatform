@@ -11,50 +11,58 @@ public class EcfXmlItem
     [XmlIgnore]
     public int EcfType { get; set; }
 
-    [XmlElement("NumeroLinea")]
+    [XmlElement("NumeroLinea", Order = 1)]
     public int NumeroLinea { get; set; }
 
-    [XmlElement("IndicadorFacturacion")]
+    [XmlElement("IndicadorFacturacion", Order = 2)]
     public int IndicadorFacturacion { get; set; }
 
-    [XmlElement("Retencion")]
-    public EcfXmlItemRetencion? Retencion { get; set; }
-    public bool ShouldSerializeRetencion() => Retencion != null && (EcfType == 41 || EcfType == 43 || EcfType == 47 || EcfType <= 34);
+    private EcfXmlItemRetencion? _retencion;
+
+    [XmlElement("Retencion", Order = 3)]
+    public EcfXmlItemRetencion? Retencion
+    {
+        get => (EcfType is 41 or 47) ? _retencion : null;
+        set => _retencion = value;
+    }
 
 
-    [XmlElement("NombreItem")]
+    public bool ShouldSerializeRetencion() => Retencion != null;
+
+
+    [XmlElement("NombreItem", Order = 4)]
     public string Name { get; set; } = null!;
 
-    [XmlElement("IndicadorBienoServicio")]
+    [XmlElement("IndicadorBienoServicio", Order = 5)]
     public int ItemType { get; set; }
 
-    [XmlElement("DescripcionItem")]
+    [XmlElement("DescripcionItem", Order = 6)]
     public string? DescripcionItem { get; set; }
     public bool ShouldSerializeDescripcionItem() => DescripcionItem != null;
 
-
-    [XmlElement("CantidadItem")]
+    [XmlElement("CantidadItem", Order = 7)]
     public decimal CantidadItem { get; set; }
 
+    [XmlElement("UnidadMedida", Order = 8)]
     public int? UnidadMedida { get; set; }
     public bool ShouldSerializeUnidadMedida() => UnidadMedida.HasValue;
 
-    [XmlElement("PrecioUnitarioItem")]
+    [XmlElement("PrecioUnitarioItem", Order = 9)]
     public decimal PrecioUnitarioItem { get; set; }
 
-    [XmlElement("DescuentoMonto")]
+    [XmlElement("DescuentoMonto", Order = 10)]
     public decimal? DescuentoMonto { get; set; }
     public bool ShouldSerializeDescuentoMonto() => DescuentoMonto.HasValue && DescuentoMonto > 0;
 
-    [XmlElement("TablaSubDescuento")]
+    [XmlElement("TablaSubDescuento", Order = 11)]
     public EcfXmlTablaSubDescuento? TablaSubDescuento { get; set; }
     public bool ShouldSerializeTablaSubDescuento() => TablaSubDescuento != null && TablaSubDescuento.SubDescuentos.Count > 0;
 
-    [XmlElement("TablaImpuestoAdicional")]
+    [XmlElement("TablaImpuestoAdicional", Order = 12)]
     public EcfXmlTablaImpuestoAdicionalItem? TablaImpuestoAdicional { get; set; }
     public bool ShouldSerializeTablaImpuestoAdicional() => TablaImpuestoAdicional != null && EcfType != 41 && EcfType != 43;
 
-    [XmlElement("MontoItem")]
+    [XmlElement("MontoItem", Order = 13)]
     public decimal MontoItem { get; set; }
 }
 

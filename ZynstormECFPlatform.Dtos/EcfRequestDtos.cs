@@ -106,7 +106,8 @@ public class EcfInvoiceRequestDto
     // ── Payment ────────────────────────────────────────────────────────────────
 
     /// <summary>1: Contado, 2: Crédito, 3: Gratuito.</summary>
-    public int PaymentType { get; set; } = 1;
+    public int? PaymentType { get; set; }
+
 
     /// <summary>Credit payment deadline date (required when PaymentType = 2).</summary>
     public DateTime? PaymentDeadline { get; set; }
@@ -115,7 +116,8 @@ public class EcfInvoiceRequestDto
     public string? PaymentTerms { get; set; }
 
     /// <summary>Income type code "01"-"06" per DGII catalog. Defaults to "01" (operational).</summary>
-    public string IncomeType { get; set; } = "01";
+    public string? IncomeType { get; set; }
+
 
     // ── Items ──────────────────────────────────────────────────────────────────
 

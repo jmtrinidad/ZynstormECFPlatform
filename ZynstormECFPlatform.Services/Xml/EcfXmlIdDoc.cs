@@ -51,14 +51,18 @@ public class EcfXmlIdDoc
 
     // ── TipoIngresos — present in 31, 32, 33, 34, 44, 45, 46. NOT in 41, 43, 47 ─────────
     [XmlElement("TipoIngresos", Order = 8)]
-    public string IncomeType { get; set; } = "01";
+    public string? IncomeType { get; set; }
     public bool ShouldSerializeIncomeType() =>
-        EcfType == 31 || EcfType == 32 || EcfType == 33 || EcfType == 34 ||
-        EcfType == 44 || EcfType == 45 || EcfType == 46;
+        !string.IsNullOrEmpty(IncomeType) &&
+        (EcfType == 31 || EcfType == 32 || EcfType == 33 || EcfType == 34 ||
+         EcfType == 44 || EcfType == 45 || EcfType == 46);
+
 
     // ── Payment ───────────────────────────────────────────────────────────────────────────
     [XmlElement("TipoPago", Order = 9)]
-    public int PaymentType { get; set; }
+    public int? PaymentType { get; set; }
+    public bool ShouldSerializePaymentType() => PaymentType.HasValue;
+
 
     [XmlElement("FechaLimitePago", Order = 10)]
     public string? FechaLimitePago { get; set; }

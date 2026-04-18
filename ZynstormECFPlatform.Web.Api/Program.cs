@@ -14,6 +14,7 @@ using ZynstormECFPlatform.Services.Extensions;
 using ZynstormECFPlatform.Web.Api.Converters;
 using Hangfire;
 using Hangfire.PostgreSql;
+using ZynstormECFPlatform.Data;
 
 // Program.cs
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -187,7 +188,7 @@ static async Task SeedData(WebApplication app)
 {
     using var scope = app.Services.CreateScope();
 
-    var db = scope.ServiceProvider.GetRequiredService<IStorageContext>();
+    var db = scope.ServiceProvider.GetRequiredService<StorageContext>();
     db.Database.Migrate();
 
     //var service = scope.ServiceProvider.GetService<SeedDb>();

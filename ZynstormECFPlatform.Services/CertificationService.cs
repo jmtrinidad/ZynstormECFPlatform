@@ -351,9 +351,10 @@ public class CertificationService : ICertificationService
             OrderNumber           = GetStr(row, "NumeroOrdenCompra"),
 
             // ── Payment ────────────────────────────────────────────────────
-            PaymentType = int.TryParse(GetStr(row, "TipoPago"), out int p) ? p : 1,
+            PaymentType = int.TryParse(GetStr(row, "TipoPago"), out int p) ? p : null,
             PaymentDeadline = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaLimitePago"))),
-            IncomeType  = GetStr(row, "TipoIngresos") ?? "01",
+            IncomeType  = GetStr(row, "TipoIngresos"),
+
 
             // ── Manual Overrides for Certification (Raw Excel Data) ────────
             ManualMontoGravadoTotal = GetDec(row, "MontoGravadoTotal"),
