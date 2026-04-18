@@ -336,9 +336,12 @@ public class CertificationService : ICertificationService
 
             // ── Buyer ──────────────────────────────────────────────────────
             CustomerRnc          = GetStr(row, "RNCComprador")           ?? "",
+            CustomerForeignId    = GetStr(row, "IdentificadorExtranjero"),
             CustomerName         = GetStr(row, "RazonSocialComprador")   ?? "",
+            CustomerCountry      = GetStr(row, "PaisComprador"),
             CustomerAddress      = GetStr(row, "DireccionComprador"),
             CustomerContact      = GetStr(row, "ContactoComprador"),
+
             CustomerEmail        = GetStr(row, "CorreoComprador"),
             CustomerMunicipality = GetStr(row, "MunicipioComprador"),
             CustomerProvince     = GetStr(row, "ProvinciaComprador"),
