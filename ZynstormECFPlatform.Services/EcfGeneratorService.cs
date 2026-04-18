@@ -215,9 +215,8 @@ public class EcfGeneratorService : IEcfGeneratorService
         // ── Items + running totals ─────────────────────────────────────────────
 
         var xmlItems = new List<EcfXmlItem>();
-        decimal totalBase = 0, totalItemDiscounts = 0, totalItbis = 0, totalExempt = 0;
-        decimal taxableG1 = 0, taxableG2 = 0, taxableG3 = 0;
-        decimal itbisG1 = 0, itbisG2 = 0, itbisG3 = 0;
+        decimal totalBase = 0, totalItemDiscounts = 0, totalItbis = 0, totalExempt = 0, totalNoFacturable = 0;
+        decimal taxableG1 = 0, taxableG2 = 0, taxableG3 = 0, itbisG1 = 0, itbisG2 = 0, itbisG3 = 0;
 
         // ISC accumulator: key = TipoImpuesto code, value = accumulated amounts
         var iscAccumulator = new Dictionary<string, EcfXmlImpuestoAdicional>(StringComparer.Ordinal);
@@ -284,7 +283,9 @@ public class EcfGeneratorService : IEcfGeneratorService
             // ISC total per item to include in MontoItem
             var iscItemTotal = item.IscSpecificAmount + item.IscAdvaloremAmount + item.OtherAdditionalTaxAmount;
 
+            var surchargeAmount = item.ManualRecargoMonto ?? 0;
             var itemDiscountTotal = item.ManualDescuentoMonto ?? (discountAmount > 0 ? discountAmount : 0);
+
             EcfXmlTablaSubDescuento? tablaSubDescuento = null;
 
             if (itemDiscountTotal > 0)
@@ -311,12 +312,15 @@ public class EcfGeneratorService : IEcfGeneratorService
                 ItemType = item.ItemType,
                 DescripcionItem = item.Description,
                 CantidadItem = item.Quantity,
-                UnidadMedida = item.UnitOfMeasure ?? 43, // 43 = Unidad
+                UnidadMedida = item.UnitOfMeasure, // Remove hardcoded 43
+
                 PrecioUnitarioItem = item.UnitPrice,
                 DescuentoMonto = itemDiscountTotal > 0 ? itemDiscountTotal : null,
                 TablaSubDescuento = tablaSubDescuento,
+                RecargoMonto = surchargeAmount > 0 ? surchargeAmount : null,
                 TablaImpuestoAdicional = tablaImpuesto,
-                MontoItem = item.ManualMontoItem ?? (taxableAmount + itbisAmount + iscItemTotal),
+                MontoItem = item.ManualMontoItem ?? (taxableAmount + itbisAmount + iscItemTotal + surchargeAmount),
+
 
             // ── Retentions handling (ONLY for Purchase 41 and Exportation 47)
             Retencion = (ecfType is 41 or 47) ? new EcfXmlItemRetencion
@@ -328,20 +332,23 @@ public class EcfGeneratorService : IEcfGeneratorService
 
             });
 
-            totalBase += baseAmount;
             totalItemDiscounts += discountAmount;
             totalItbis += itbisAmount;
 
+
             switch (billingIndicator)
             {
+                case 1:
+                case 2:
+                case 3:
+                    totalBase += baseAmount; break;
                 case 4:  // Exento
-                case 0:  // No facturable
                     totalExempt += taxableAmount; break;
-                case 3:  // ITBIS 0% (Gravado 0%)
-                    taxableG3 += taxableAmount; break;
-                case 1: taxableG1 += taxableAmount; itbisG1 += itbisAmount; break;
-                case 2: taxableG2 += taxableAmount; itbisG2 += itbisAmount; break;
+                case 0:  // No facturable
+                    totalNoFacturable += taxableAmount; break;
             }
+
+
         }
 
         // ── ISC Totales ────────────────────────────────────────────────────────
@@ -409,7 +416,7 @@ public class EcfGeneratorService : IEcfGeneratorService
 
             TotalITBISRetenido = dto.ManualTotalITBISRetenido,
             TotalISRRetencion = dto.ManualTotalISRRetencion,
-
+            MontoNoFacturable = dto.ManualMontoNoFacturable ?? (totalNoFacturable > 0 ? totalNoFacturable : null),
             MontoTotal = dto.ManualMontoTotal ?? finalTotal
         };
 
@@ -423,10 +430,12 @@ public class EcfGeneratorService : IEcfGeneratorService
                     EcfType = ecfType,
                     Ncf = dto.Ncf,
                     SequenceExpirationDate = expirationDate,
-                    IndicadorNotaCredito = ecfType == 34 ? 1 : null,
+                    IndicadorNotaCredito = dto.ManualIndicadorNotaCredito ?? (ecfType == 34 ? 1 : null),
                     IndicadorMontoGravado = dto.ManualIndicadorMontoGravado ?? (ecfType == 31 ? ((totalBase - totalExempt > 0) ? 1 : 0) : null),
 
-                    IncomeType = dto.IncomeType ?? ((ecfType is 31 or 32 or 33 or 34 or 44 or 45 or 46) ? "01" : null),
+                    IncomeType = dto.IncomeType ?? ((ecfType is 31 or 32 or 33 or 44 or 45 or 46) ? "01" : null),
+
+
                     PaymentType = dto.PaymentType ?? ((ecfType is 31 or 32 or 33 or 34 or 41 or 44 or 45 or 46 or 47) ? 1 : null),
                     FechaLimitePago = dto.PaymentDeadline?.ToDrTime().ToString(DateFormat),
                     TerminoPago = dto.PaymentTerms

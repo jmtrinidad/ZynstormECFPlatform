@@ -58,12 +58,17 @@ public class EcfXmlItem
     public EcfXmlTablaSubDescuento? TablaSubDescuento { get; set; }
     public bool ShouldSerializeTablaSubDescuento() => TablaSubDescuento != null && TablaSubDescuento.SubDescuentos.Count > 0;
 
-    [XmlElement("TablaImpuestoAdicional", Order = 12)]
+    [XmlElement("RecargoMonto", Order = 12)]
+    public decimal? RecargoMonto { get; set; }
+    public bool ShouldSerializeRecargoMonto() => RecargoMonto.HasValue && RecargoMonto > 0;
+
+    [XmlElement("TablaImpuestoAdicional", Order = 13)]
     public EcfXmlTablaImpuestoAdicionalItem? TablaImpuestoAdicional { get; set; }
     public bool ShouldSerializeTablaImpuestoAdicional() => TablaImpuestoAdicional != null && EcfType != 41 && EcfType != 43;
 
-    [XmlElement("MontoItem", Order = 13)]
+    [XmlElement("MontoItem", Order = 14)]
     public decimal MontoItem { get; set; }
+
 }
 
 public class EcfXmlTablaSubDescuento

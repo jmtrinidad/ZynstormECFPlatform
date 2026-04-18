@@ -373,6 +373,9 @@ public class CertificationService : ICertificationService
             ManualTotalITBISRetenido = GetDec(row, "TotalITBISRetenido"),
             ManualTotalISRRetencion  = GetDec(row, "TotalISRRetencion"),
             ManualMontoGravadoI1     = GetDec(row, "MontoGravadoI1"),
+            ManualIndicadorNotaCredito = int.TryParse(GetStr(row, "IndicadorNotaCredito"), out int inc) ? inc : null,
+            ManualMontoNoFacturable = GetDec(row, "MontoNoFacturable"),
+
             ManualMontoGravadoI2     = GetDec(row, "MontoGravadoI2"),
             ManualMontoGravadoI3     = GetDec(row, "MontoGravadoI3"),
 
@@ -380,6 +383,8 @@ public class CertificationService : ICertificationService
             ReferenceNcf         = GetStr(row, "NCFModificado"),
             ReferenceCustomerRnc = GetStr(row, "RNCOtroContribuyente"),
             ReferenceReasonCode  = int.TryParse(GetStr(row, "CodigoModificacion"), out int rc) ? rc : null,
+            ReferenceReasonDescription = GetStr(row, "RazonModificacion"),
+
 
             Items = new List<EcfItemRequestDto>()
         };
@@ -459,8 +464,10 @@ public class CertificationService : ICertificationService
                 BillingIndicator = indicadorFact,  // Pass exact Excel indicator (4=exento, 0=no facturable)
                 ManualMontoItem  = GetDec(row, $"MontoItem[{i}]"),
                 ManualDescuentoMonto = GetDec(row, $"DescuentoMonto[{i}]"),
+                ManualRecargoMonto   = GetDec(row, $"RecargoMonto[{i}]"),
                 ManualMontoITBISRetenido = GetDec(row, $"MontoITBISRetenido[{i}]"),
                 ManualMontoISRRetenido = GetDec(row, $"MontoISRRetenido[{i}]")
+
             };
 
             dto.Items.Add(item);

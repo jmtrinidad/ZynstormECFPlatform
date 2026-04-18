@@ -193,7 +193,10 @@ public class EcfInvoiceRequestDto
     public decimal? ManualMontoGravadoI1 { get; set; }
     public decimal? ManualMontoGravadoI2 { get; set; }
     public decimal? ManualMontoGravadoI3 { get; set; }
+    public int? ManualIndicadorNotaCredito { get; set; }
+    public decimal? ManualMontoNoFacturable { get; set; }
 }
+
 
 
 public class EcfItemRequestDto
@@ -271,6 +274,8 @@ public class EcfItemRequestDto
     // ── Manual Overrides for Certification ──────────────────────────────────
     public decimal? ManualMontoItem { get; set; }
     public decimal? ManualDescuentoMonto { get; set; }
+    public decimal? ManualRecargoMonto { get; set; }
     public decimal? ManualMontoITBISRetenido { get; set; }
+
     public decimal? ManualMontoISRRetenido { get; set; }
 }
