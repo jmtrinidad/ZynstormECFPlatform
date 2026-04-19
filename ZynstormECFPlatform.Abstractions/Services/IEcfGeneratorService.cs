@@ -10,7 +10,7 @@ public interface IEcfGeneratorService
     /// </summary>
     /// <param name="dto">Invoice data including issuer, buyer, items and totals.</param>
     /// <returns>Unsigned XML string ready for digital signature.</returns>
-    string GenerateUnsignedXml(EcfInvoiceRequestDto dto);
+    string GenerateUnsignedXml(EcfInvoiceRequestDto dto, bool isSummary = false);
 
     /// <summary>
     /// Validates the generated XML string against the DGII XSD schema that matches

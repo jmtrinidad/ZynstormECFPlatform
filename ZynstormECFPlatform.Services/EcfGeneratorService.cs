@@ -51,22 +51,22 @@ public class EcfGeneratorService : IEcfGeneratorService
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// <inheritdoc />
-    public string GenerateUnsignedXml(EcfInvoiceRequestDto dto)
+    public string GenerateUnsignedXml(EcfInvoiceRequestDto dto, bool isSummary = false)
     {
         // ── Step 1: Determine if this is an RFCE Summary ─────────────────────────
-        // In this architecture, we treat Type 32 < 250k as RFCE summary by default
-        // based on the NcfHelper providing the TipoeCF.
         var ecfType = NcfHelper.ExtractEcfType(dto.Ncf);
-        bool isRfceSummary = (ecfType == 32 && (dto.ManualMontoTotal ?? 0) < 250000);
         
-        // However, Step 4 is the SAME document but individual.
-        // We need a way to force ECF or RFCE. We'll use a hack or check another property.
-        // For now, let's look at if items are provided. RFCE summary has NO items in XSD.
-        // Also, the caller (CertificationService) can indicate it. 
-        // We'll check a custom field or just the context.
+        // Use the explicit flag if provided, otherwise fallback to the default rule for Type 32 < 250k
+        bool isRfceSummary = isSummary || (ecfType == 32 && (dto.ManualMontoTotal ?? 0) < 250000 && dto.Ncf.Length == 13);
         
-        // REFINED: We'll check if the ENCF starts with 'E' and is 13 chars.
-        // The user's RFCE sheet rows have ENCF like 'E320000000014'.
+        // SPECIAL CASE: For Step 4 (Individual Performance), we MUST use the ECF root
+        // even if it is a Type 32 < 250k. The portal explicitly requests an "eCF" for these tests.
+        if (ecfType == 32 && !isSummary && dto.ManualMontoTotal < 250000)
+        {
+            isRfceSummary = false;
+        }
+
+        // CLEANUP: Buyer cleanup removed to ensure Excel data is included.
         
         var settings = new XmlWriterSettings
         {
@@ -80,16 +80,16 @@ public class EcfGeneratorService : IEcfGeneratorService
         {
             using (var xmlWriter = XmlWriter.Create(stringWriter, settings))
             {
-                // REFINED: If items are present, it MUST be an individual document (ECF), 
-                // because RFCE summary (XSD) does not allow items.
-                if (isRfceSummary && (dto.Items == null || dto.Items.Count == 0))
+                // REFINED: Individual vs Summary selection
+                if (isRfceSummary)
                 {
-                    // This is a summary (Step 3) - No items provided
+                    // This is a summary (Step 3 or real B2C workflow)
                     var rfceRoot = MapToRfceXmlRoot(dto);
                     _rfceSerializer.Serialize(xmlWriter, rfceRoot, _noNamespaces);
                 }
                 else
                 {
+                    // This is an individual invoice (Step 4 or B2B workflow)
                     var root = MapToXmlRoot(dto);
                     _serializer.Serialize(xmlWriter, root, _noNamespaces);
                 }
@@ -236,7 +236,8 @@ public class EcfGeneratorService : IEcfGeneratorService
         var ecfType = NcfHelper.ExtractEcfType(dto.Ncf);
         var issueDate = dto.IssueDate.ToString(DateFormat);
         var expirationDate = (dto.SequenceExpirationDate ?? dto.IssueDate.AddYears(1)).ToString(DateFormat);
-        var signatureDateTime = DateTime.UtcNow.ToDrTime().ToString(DateTimeFormat);
+        var signatureDate = dto.SignatureDateOverride ?? DateTime.UtcNow.ToDrTime();
+        var signatureDateTime = signatureDate.ToString(DateTimeFormat);
 
         // ── Items + running totals ─────────────────────────────────────────────
 
@@ -597,11 +598,19 @@ public class EcfGeneratorService : IEcfGeneratorService
                     MontoNoFacturable = dto.ManualMontoNoFacturable,
                     MontoPeriodo = dto.ManualMontoPeriodo
                 },
-                CodigoSeguridadeCF = "C8Y6N2" // Placeholder — in real life this comes from the original invoice hash
+                CodigoSeguridadeCF = dto.SecurityCodeOverride ?? GenerateRandomCode(6)
             }
         };
 
         return root;
+    }
+
+    private static string GenerateRandomCode(int length)
+    {
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        var random = new Random();
+        return new string(Enumerable.Repeat(chars, length)
+            .Select(s => s[random.Next(s.Length)]).ToArray());
     }
 
     /// <summary>

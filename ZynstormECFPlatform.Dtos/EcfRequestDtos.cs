@@ -24,6 +24,18 @@ public class EcfInvoiceRequestDto
     [Required]
     public DateTime IssueDate { get; set; }
 
+    /// <summary>
+    /// SECURITY: First 6 chars of individual signature. 
+    /// For RFCE (Summary) only. If null, a random one is generated.
+    /// </summary>
+    public string? SecurityCodeOverride { get; set; }
+
+    /// <summary>
+    /// Optional override for the signature timestamp (FechaHoraFirma).
+    /// Used in certification to ensure determinism between pre-calc and real run.
+    /// </summary>
+    public DateTime? SignatureDateOverride { get; set; }
+
     /// <summary>Last valid date for the NCF sequence.</summary>
     public DateTime? SequenceExpirationDate { get; set; }
 

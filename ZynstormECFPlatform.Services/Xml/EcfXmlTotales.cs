@@ -112,7 +112,7 @@ public class EcfXmlTotales
 
     [XmlElement("TotalISRRetencion", Order = 22)]
     public decimal? TotalISRRetencion { get; set; }
-    public bool ShouldSerializeTotalISRRetencion() => TotalISRRetencion.HasValue && EcfType != 32 && EcfType != 43;
+    public bool ShouldSerializeTotalISRRetencion() => TotalISRRetencion.HasValue && TotalISRRetencion > 0 && EcfType != 32 && EcfType != 43;
 
     [XmlElement("TotalITBISPercepcion", Order = 23)]
     public decimal? TotalITBISPercepcion { get; set; }

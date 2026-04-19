@@ -30,10 +30,15 @@ public class DgiiTransmissionService : IDgiiTransmissionService
 
         if (environment == DgiiEnvironment.CerteCF)
         {
-            if (isSummary) 
+            bool isB2CSummaryChannel = isSummary || (ecfType == 32 && totalAmount < 250000);
+
+            if (isB2CSummaryChannel) 
             {
                 baseUrl = _configuration["DgiiUrls:CerteCF:RecepcionFC"] 
                     ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:RecepcionFC no fue encontrada.");
+                
+                // ── UNIFIED: Both Summary and Individual use the /ecf endpoint in RecepcionFC ──
+                // DGII differentiates them by the XML root element (<RFCE> vs <ECF>)
                 endpointUrl = $"{baseUrl}/api/recepcion/ecf";
             }
             else

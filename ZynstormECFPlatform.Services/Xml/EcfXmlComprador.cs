@@ -13,16 +13,15 @@ public class EcfXmlComprador
 
     [XmlElement("RNCComprador")]
     public string? RncComprador { get; set; }
-
-    public bool ShouldSerializeRncComprador() => !string.IsNullOrEmpty(RncComprador) && EcfType != 47;
-
+    public bool ShouldSerializeRncComprador() => !string.IsNullOrWhiteSpace(RncComprador) && EcfType != 47;
 
     [XmlElement("IdentificadorExtranjero")]
     public string? IdentificadorExtranjero { get; set; }
-    public bool ShouldSerializeIdentificadorExtranjero() => !string.IsNullOrEmpty(IdentificadorExtranjero);
+    public bool ShouldSerializeIdentificadorExtranjero() => !string.IsNullOrWhiteSpace(IdentificadorExtranjero);
 
     [XmlElement("RazonSocialComprador")]
-    public string RazonSocial { get; set; } = null!;
+    public string? RazonSocial { get; set; }
+    public bool ShouldSerializeRazonSocial() => !string.IsNullOrWhiteSpace(RazonSocial);
 
     [XmlElement("ContactoComprador")]
     public string? ContactoComprador { get; set; }

@@ -57,8 +57,6 @@ public class CertificationService : ICertificationService
 
     public async Task<List<CertificationTestDto>> GetTestsAsync()
     {
-        if (_cachedTests != null) return _cachedTests;
-
         string excelPath = Path.Combine(AppContext.BaseDirectory, "133009889-16042026193727.xlsx");
         if (!File.Exists(excelPath))
         {
@@ -68,7 +66,10 @@ public class CertificationService : ICertificationService
         if (!File.Exists(excelPath))
             throw new FileNotFoundException("El archivo de excel de certificación no fue encontrado.");
 
-        var rows = MiniExcel.Query(excelPath, useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
+        var rows = MiniExcel.Query(excelPath, useHeaderRow: true)
+            .Cast<IDictionary<string, object>>()
+            .Where(r => !string.IsNullOrWhiteSpace(GetStr(r, "TipoeCF")))
+            .ToList();
 
         // ── 1. Identify all referenced NCFs first to handle dependencies ──
         var referencedNcfs = rows
@@ -76,70 +77,66 @@ public class CertificationService : ICertificationService
             .Where(n => !string.IsNullOrEmpty(n))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // ── 1.5 Calculate Global Date Offset if not already done ──────────
-        // DISABLED: Raw Excel dates used as requested by USER
-        _dateOffset = TimeSpan.Zero;
-
-        // ── 2. Identify primary expiration dates by type ──────────────────
-        _typeExpirationDates = new Dictionary<string, DateTime>();
-        foreach (var r in rows)
-        {
-            var type = r.ContainsKey("TipoeCF") ? r["TipoeCF"]?.ToString() ?? "" : "";
-            var date = ParseDgiiDate(GetStr(r, "FechaVencimientoSecuencia"));
-            if (!string.IsNullOrEmpty(type) && date.HasValue && !_typeExpirationDates.ContainsKey(type))
-            {
-                _typeExpirationDates[type] = date.Value;
-            }
-        }
-
-        // ── 3. Load ECF (Standard) Sheet ──────────────────────────────────
-        var ecfRows = rows; // Already loaded
-
         // ── 4. Load RFCE (Summary) Sheet ──────────────────────────────────
         var rfceRows = MiniExcel.Query(excelPath, sheetName: "RFCE", useHeaderRow: true)
             .Cast<IDictionary<string, object>>()
-            .OrderBy(r => GetStr(r, "ENCF")?.Substring(Math.Max(0, (GetStr(r, "ENCF")?.Length ?? 0) - 2)))
+            .Where(r => !string.IsNullOrWhiteSpace(GetStr(r, "ENCF")))
+            .OrderBy(r =>
+            {
+                var s = GetStr(r, "ENCF") ?? "00";
+                return s.Substring(Math.Max(0, s.Length - 2));
+            })
             .ToList();
 
         var tests = new List<CertificationTestDto>();
         int index = 0;
 
-        // ── 5. Process Standard Documents (Step 1 & 2) ─────────────────────
-        foreach (var row in ecfRows)
-        {
-            var ecfTypeStr = row.ContainsKey("TipoeCF") ? row["TipoeCF"]?.ToString() ?? "" : "";
-            if (string.IsNullOrEmpty(ecfTypeStr)) continue;
-            if (ecfTypeStr == "32" && (GetDec(row, "MontoTotal") ?? 0) < 250000) continue; // Skip B2C in ECF sheet
+        // ── 5. Block 1: Standard Documents ──────────────────
+        var standardRows = rows
+            .Where(r => GetStr(r, "TipoeCF") != "32" || (GetDec(r, "MontoTotal") ?? 0) >= 250000)
+            .Select(r => new
+            {
+                Row = r,
+                Step = DetermineStep(new CertificationTestDto
+                {
+                    EcfType = GetStr(r, "TipoeCF"),
+                    ENcf = GetStr(r, "ENCF"),
+                    TotalAmount = GetDec(r, "MontoTotal") ?? 0
+                }, referencedNcfs)
+            })
+            .OrderBy(x => x.Step)
+            .ThenBy(x => GetStr(x.Row, "ENCF") ?? "")
+            .ToList();
 
+        foreach (var item in standardRows)
+        {
+            var row = item.Row;
+            var ecfTypeStr = GetStr(row, "TipoeCF");
             var encf = GetStr(row, "ENCF") ?? "";
+            var testCase = GetStr(row, "CasoPrueba") ?? "";
             var test = new CertificationTestDto
             {
                 Index = index++,
-                CaseNumber = row.ContainsKey("CasoPrueba") ? row["CasoPrueba"]?.ToString() ?? "" : "",
+                CaseNumber = testCase,
                 EcfType = ecfTypeStr,
                 ENcf = encf,
                 TotalAmount = GetDec(row, "MontoTotal") ?? 0,
-                Description = $"Caso: {row["CasoPrueba"]}"
+                Description = $"Caso: {testCase}",
+                Step = 1 // Placeholder
             };
-
             test.Step = DetermineStep(test, referencedNcfs);
-            if (test.Step is 1 or 2)
-            {
-                tests.Add(test);
-            }
+            tests.Add(test);
         }
 
-        // ── 6. Process RFCE Documents (Step 3 & 4) ─────────────────────────
-        // The user expects specific Index UI for these (9, 10, 11, 12...).
-        // We ensure we start from the correct index or just follow the sequence.
+        // ── 6. Block 2: RFCE Summaries (4 in total) ───────────────────────
+        // Step 3 (Summary) from RFCE sheet
         foreach (var row in rfceRows)
         {
             var encf = GetStr(row, "ENCF") ?? "";
-            var testCase = row.ContainsKey("CasoPrueba") ? row["CasoPrueba"]?.ToString() ?? "" : "";
+            var testCase = GetStr(row, "CasoPrueba") ?? "";
             var totalAmount = GetDec(row, "MontoTotal") ?? 0;
 
-            // Step 3 (Summary)
-            var step3 = new CertificationTestDto
+            tests.Add(new CertificationTestDto
             {
                 Index = index++,
                 CaseNumber = testCase,
@@ -148,21 +145,32 @@ public class CertificationService : ICertificationService
                 TotalAmount = totalAmount,
                 Description = $"Resumen Consumo: {testCase}",
                 Step = 3
-            };
-            tests.Add(step3);
+            });
+        }
 
-            // Step 4 (Individual)
-            var step4 = new CertificationTestDto
+        // ── 7. Block 3: B2C Performance Tests (4 in total) ────────────────
+        // Individual consumption < 250k from ECF sheet (Paso 4)
+        var performanceRows = rows
+            .Where(r => GetStr(r, "TipoeCF") == "32" && (GetDec(r, "MontoTotal") ?? 0) < 250000)
+            .OrderBy(r => GetStr(r, "ENCF"))
+            .ToList();
+
+        foreach (var row in performanceRows)
+        {
+            var encf = GetStr(row, "ENCF") ?? "";
+            var testCase = GetStr(row, "CasoPrueba") ?? "";
+            var totalAmount = GetDec(row, "MontoTotal") ?? 0;
+
+            tests.Add(new CertificationTestDto
             {
                 Index = index++,
                 CaseNumber = testCase,
                 EcfType = "32",
                 ENcf = encf,
                 TotalAmount = totalAmount,
-                Description = $"{encf} (Individual)",
+                Description = $"{encf} (S4 Performance)",
                 Step = 4
-            };
-            tests.Add(step4);
+            });
         }
 
         _cachedTests = tests;
@@ -263,7 +271,39 @@ public class CertificationService : ICertificationService
             var certPass = Encoding.UTF8.GetString(passwordBytes);
 
             // ── 3. Generate & sign XML ─────────────────────────────────────────
-            string unsignedXml = _generatorService.GenerateUnsignedXml(requestDto);
+            if (test.Step == 3)
+            {
+                // To pass Step 4 later, this Summary (Step 3) MUST use the real signature code.
+                // We'll pre-calculate it by signing the individual version of this NCF first.
+                try
+                {
+                    var ecfRows = MiniExcel.Query(excelPath, sheetName: "ECF", useHeaderRow: true)
+                        .Cast<IDictionary<string, object>>().ToList();
+                    var individualRow = ecfRows.FirstOrDefault(r => GetStr(r, "ENCF") == test.ENcf);
+                    if (individualRow != null)
+                    {
+                        var individualDto = MapRowToRequest(individualRow, 4); // Step 4 logic
+                        string individualUnsigned = _generatorService.GenerateUnsignedXml(individualDto, false);
+                        string individualSigned = _signerService.SignXml(individualUnsigned, certBase64, certPass);
+
+                        // Extract first 6 characters of <SignatureValue>, ignoring whitespaces
+                        string tag = "<SignatureValue>";
+                        var start = individualSigned.IndexOf(tag);
+                        if (start != -1)
+                        {
+                            var content = individualSigned.Substring(start + tag.Length);
+                            var realCode = content.TrimStart().Substring(0, 6);
+                            requestDto.SecurityCodeOverride = realCode;
+                            
+                            // Store debug info in a temporary property or just use the trace if we can
+                            requestDto.IssuerWebSite = $"[DEBUG-PRECALC] RNC={individualDto.IssuerRnc}, NCF={individualDto.Ncf}, Date={individualDto.IssueDate:yyyy-MM-dd}, Total={individualDto.ManualMontoTotal}";
+                        }
+                    }
+                }
+                catch { /* Fallback to random if individual row not found */ }
+            }
+
+            string unsignedXml = _generatorService.GenerateUnsignedXml(requestDto, test.Step == 3);
             string signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
 
             // ── DEBUG: Save the exact XML being sent for inspection ───────────
@@ -272,6 +312,7 @@ public class CertificationService : ICertificationService
             // ── 4. Verify XML Schema (XSD) BEFORE transmitting ────────────────
             var validationErrors = _generatorService.ValidateXmlAgainstSchema(signedXml, int.Parse(test.EcfType));
 
+            //return new DgiiTransmissionResult { };
             if (validationErrors.Any(e => e.StartsWith("[ERROR]")))
             {
                 var errorMsg = "Error de esquema (XSD): " + string.Join(" | ", validationErrors);
@@ -300,6 +341,27 @@ public class CertificationService : ICertificationService
                 test.Status = TestStatus.Passed;
                 test.TrackId = result.TrackId;
 
+                // TRACE: Log the calculated code for verification
+                if (test.Step == 3 && !string.IsNullOrEmpty(requestDto.SecurityCodeOverride))
+                {
+                    result.Mensaje += $"\n[TRACE] Summary Sync Code: {requestDto.SecurityCodeOverride}";
+                    // Sample of individual XML content used for pre-calc (if stored, but let's just log DTO fields)
+                    result.Mensaje += $"\n[TRACE] Pre-calc DTO: RNC={requestDto.IssuerRnc}, NCF={requestDto.Ncf}, Date={requestDto.IssueDate:yyyy-MM-dd}, Total={requestDto.ManualMontoTotal}";
+                }
+                else if (test.Step == 4)
+                {
+                    // Extract the first 6 chars of the actual signature we just sent
+                    string tag = "<SignatureValue>";
+                    var start = signedXml.IndexOf(tag);
+                    if (start != -1)
+                    {
+                        var sig6 = signedXml.Substring(start+tag.Length).TrimStart().Substring(0, 6);
+                        result.Mensaje += $"\n[TRACE] Individual Signature Prefix: {sig6}";
+                        result.Mensaje += $"\n[TRACE] Real DTO: RNC={requestDto.IssuerRnc}, NCF={requestDto.Ncf}, Date={requestDto.IssueDate:yyyy-MM-dd}, Total={requestDto.ManualMontoTotal}";
+                        result.Mensaje += $"\n[TRACE] Individual Unsigned XML Start: {unsignedXml.Substring(0, Math.Min(100, unsignedXml.Length)).Replace("\n","").Replace("\r","")}";
+                    }
+                }
+
                 // ── 7. Enqueue background status tracking job ──────────────────
                 BackgroundJob.Enqueue<Jobs.EcfTrackingJob>(j => j.Execute(
                     result.TrackId,
@@ -324,12 +386,22 @@ public class CertificationService : ICertificationService
         }
     }
 
-    // ── Helper: read a string from the row, returning null if empty or "#e" ──────
+    // ── Helper: read a string from the row, returning null if empty or common garbage (#e, #n/a) ──
     private static string? GetStr(IDictionary<string, object> row, string key)
     {
         if (!row.ContainsKey(key)) return null;
         var val = row[key]?.ToString();
-        return string.IsNullOrWhiteSpace(val) || val == "#e" ? null : val.Trim();
+        if (string.IsNullOrWhiteSpace(val)) return null;
+
+        var clean = val.Trim();
+        var lowered = clean.ToLowerInvariant();
+
+        // Clean only actual Excel/DGII non-data placeholders.
+        // Do NOT clean "0" because it might be a valid monetary or indicator value.
+        if (lowered == "#e" || lowered == "#n/a")
+            return null;
+
+        return clean;
     }
 
     private static decimal? GetDec(IDictionary<string, object> row, string key)
@@ -383,6 +455,7 @@ public class CertificationService : ICertificationService
             IssuerActivityCode = GetStr(row, "ActividadEconomica"),// null if "#e" or empty
             IssuerMunicipality = GetStr(row, "Municipio"),
             IssuerProvince = GetStr(row, "Provincia"),
+            IssuerPhone = GetStr(row, "TelefonoEmisor[1]"),
             IssuerEmail = GetStr(row, "CorreoEmisor"),
             IssuerWebSite = GetStr(row, "WebSite"),
             IssuerSellerCode = GetStr(row, "CodigoVendedor"),
@@ -394,6 +467,7 @@ public class CertificationService : ICertificationService
             CustomerCountry = GetStr(row, "PaisComprador"),
             CustomerAddress = GetStr(row, "DireccionComprador"),
             CustomerContact = GetStr(row, "ContactoComprador"),
+            CustomerTelephone = GetStr(row, "TelefonoAdicional"),
 
             CustomerEmail = GetStr(row, "CorreoComprador"),
             CustomerMunicipality = GetStr(row, "MunicipioComprador"),
@@ -442,6 +516,9 @@ public class CertificationService : ICertificationService
 
         // ── Dates ──────────────────────────────────────────────────────────
         dto.IssueDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaEmision")) ?? DateTime.Now);
+        
+        // Ensure deterministic signature time for certification to match Step 3 and Step 4
+        dto.SignatureDateOverride = dto.IssueDate.Date.AddHours(12);
 
         var expDate = ParseDgiiDate(GetStr(row, "FechaVencimientoSecuencia"));
         string typeStr = GetStr(row, "TipoeCF") ?? "";

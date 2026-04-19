@@ -53,7 +53,7 @@ public class EcfXmlIdDoc
     [XmlElement("TipoIngresos", Order = 8)]
     public string? IncomeType { get; set; }
     public bool ShouldSerializeIncomeType() =>
-        !string.IsNullOrEmpty(IncomeType) &&
+        !string.IsNullOrWhiteSpace(IncomeType) &&
         (EcfType == 31 || EcfType == 32 || EcfType == 33 || EcfType == 34 ||
          EcfType == 44 || EcfType == 45 || EcfType == 46);
 
@@ -66,11 +66,11 @@ public class EcfXmlIdDoc
 
     [XmlElement("FechaLimitePago", Order = 10)]
     public string? FechaLimitePago { get; set; }
-    public bool ShouldSerializeFechaLimitePago() => PaymentType == 2 && !string.IsNullOrEmpty(FechaLimitePago);
+    public bool ShouldSerializeFechaLimitePago() => PaymentType == 2 && !string.IsNullOrWhiteSpace(FechaLimitePago);
 
     [XmlElement("TerminoPago", Order = 11)]
     public string? TerminoPago { get; set; }
-    public bool ShouldSerializeTerminoPago() => !string.IsNullOrEmpty(TerminoPago);
+    public bool ShouldSerializeTerminoPago() => !string.IsNullOrWhiteSpace(TerminoPago);
 
     [XmlElement("TotalPaginas", Order = 12)]
     public int? TotalPaginas { get; set; }
