@@ -47,30 +47,38 @@ public class EcfXmlItem
     public int? UnidadMedida { get; set; }
     public bool ShouldSerializeUnidadMedida() => UnidadMedida.HasValue;
 
-    [XmlElement("PrecioUnitarioItem", Order = 9)]
+    [XmlElement("FechaElaboracion", Order = 9)]
+    public string? FechaElaboracion { get; set; }
+    public bool ShouldSerializeFechaElaboracion() => !string.IsNullOrEmpty(FechaElaboracion);
+
+    [XmlElement("FechaVencimientoItem", Order = 10)]
+    public string? FechaVencimientoItem { get; set; }
+    public bool ShouldSerializeFechaVencimientoItem() => !string.IsNullOrEmpty(FechaVencimientoItem);
+
+    [XmlElement("PrecioUnitarioItem", Order = 11)]
     public decimal PrecioUnitarioItem { get; set; }
 
-    [XmlElement("DescuentoMonto", Order = 10)]
+    [XmlElement("DescuentoMonto", Order = 12)]
     public decimal? DescuentoMonto { get; set; }
     public bool ShouldSerializeDescuentoMonto() => DescuentoMonto.HasValue && DescuentoMonto > 0;
 
-    [XmlElement("TablaSubDescuento", Order = 11)]
+    [XmlElement("TablaSubDescuento", Order = 13)]
     public EcfXmlTablaSubDescuento? TablaSubDescuento { get; set; }
     public bool ShouldSerializeTablaSubDescuento() => TablaSubDescuento != null && TablaSubDescuento.SubDescuentos.Count > 0;
 
-    [XmlElement("RecargoMonto", Order = 12)]
+    [XmlElement("RecargoMonto", Order = 14)]
     public decimal? RecargoMonto { get; set; }
     public bool ShouldSerializeRecargoMonto() => RecargoMonto.HasValue && RecargoMonto > 0;
 
-    [XmlElement("TablaSubRecargo", Order = 13)]
+    [XmlElement("TablaSubRecargo", Order = 15)]
     public EcfXmlTablaSubRecargo? TablaSubRecargo { get; set; }
     public bool ShouldSerializeTablaSubRecargo() => TablaSubRecargo != null && TablaSubRecargo.SubRecargos.Count > 0;
 
-    [XmlElement("TablaImpuestoAdicional", Order = 14)]
+    [XmlElement("TablaImpuestoAdicional", Order = 16)]
     public EcfXmlTablaImpuestoAdicionalItem? TablaImpuestoAdicional { get; set; }
     public bool ShouldSerializeTablaImpuestoAdicional() => TablaImpuestoAdicional != null && EcfType != 41 && EcfType != 43;
 
-    [XmlElement("MontoItem", Order = 15)]
+    [XmlElement("MontoItem", Order = 17)]
     public decimal MontoItem { get; set; }
 
 }

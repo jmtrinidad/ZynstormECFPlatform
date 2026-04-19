@@ -29,6 +29,7 @@ public class CertificationService : ICertificationService
 
     // In-memory store for certification state
     private static List<CertificationTestDto>? _cachedTests;
+
     private static Dictionary<string, DateTime>? _typeExpirationDates;
     private static TimeSpan? _dateOffset;
 
@@ -91,13 +92,24 @@ public class CertificationService : ICertificationService
             }
         }
 
-        var tests = new List<CertificationTestDto>();
+        // ── 3. Load ECF (Standard) Sheet ──────────────────────────────────
+        var ecfRows = rows; // Already loaded
 
+        // ── 4. Load RFCE (Summary) Sheet ──────────────────────────────────
+        var rfceRows = MiniExcel.Query(excelPath, sheetName: "RFCE", useHeaderRow: true)
+            .Cast<IDictionary<string, object>>()
+            .OrderBy(r => GetStr(r, "ENCF")?.Substring(Math.Max(0, (GetStr(r, "ENCF")?.Length ?? 0) - 2)))
+            .ToList();
+
+        var tests = new List<CertificationTestDto>();
         int index = 0;
-        foreach (var row in rows)
+
+        // ── 5. Process Standard Documents (Step 1 & 2) ─────────────────────
+        foreach (var row in ecfRows)
         {
             var ecfTypeStr = row.ContainsKey("TipoeCF") ? row["TipoeCF"]?.ToString() ?? "" : "";
             if (string.IsNullOrEmpty(ecfTypeStr)) continue;
+            if (ecfTypeStr == "32" && (GetDec(row, "MontoTotal") ?? 0) < 250000) continue; // Skip B2C in ECF sheet
 
             var encf = GetStr(row, "ENCF") ?? "";
             var test = new CertificationTestDto
@@ -106,32 +118,51 @@ public class CertificationService : ICertificationService
                 CaseNumber = row.ContainsKey("CasoPrueba") ? row["CasoPrueba"]?.ToString() ?? "" : "",
                 EcfType = ecfTypeStr,
                 ENcf = encf,
-                TotalAmount = row.ContainsKey("MontoTotal") ? Convert.ToDecimal(row["MontoTotal"] ?? 0) : 0,
+                TotalAmount = GetDec(row, "MontoTotal") ?? 0,
                 Description = $"Caso: {row["CasoPrueba"]}"
             };
 
             test.Step = DetermineStep(test, referencedNcfs);
-            
-            if (test.Step > 0)
+            if (test.Step is 1 or 2)
             {
                 tests.Add(test);
-                
-                // Special: If it's Step 3 (Summary), we also need the SAME case as Step 4 (Individual)
-                if (test.Step == 3)
-                {
-                    var step4Test = new CertificationTestDto
-                    {
-                        Index = index++,
-                        CaseNumber = test.CaseNumber,
-                        EcfType = test.EcfType,
-                        ENcf = test.ENcf, 
-                        TotalAmount = test.TotalAmount,
-                        Description = $"Caso (Individual): {test.CaseNumber}",
-                        Step = 4
-                    };
-                    tests.Add(step4Test);
-                }
             }
+        }
+
+        // ── 6. Process RFCE Documents (Step 3 & 4) ─────────────────────────
+        // The user expects specific Index UI for these (9, 10, 11, 12...).
+        // We ensure we start from the correct index or just follow the sequence.
+        foreach (var row in rfceRows)
+        {
+            var encf = GetStr(row, "ENCF") ?? "";
+            var testCase = row.ContainsKey("CasoPrueba") ? row["CasoPrueba"]?.ToString() ?? "" : "";
+            var totalAmount = GetDec(row, "MontoTotal") ?? 0;
+
+            // Step 3 (Summary)
+            var step3 = new CertificationTestDto
+            {
+                Index = index++,
+                CaseNumber = testCase,
+                EcfType = "32",
+                ENcf = encf,
+                TotalAmount = totalAmount,
+                Description = $"Resumen Consumo: {testCase}",
+                Step = 3
+            };
+            tests.Add(step3);
+
+            // Step 4 (Individual)
+            var step4 = new CertificationTestDto
+            {
+                Index = index++,
+                CaseNumber = testCase,
+                EcfType = "32",
+                ENcf = encf,
+                TotalAmount = totalAmount,
+                Description = $"{encf} (Individual)",
+                Step = 4
+            };
+            tests.Add(step4);
         }
 
         _cachedTests = tests;
@@ -141,7 +172,7 @@ public class CertificationService : ICertificationService
     private int DetermineStep(CertificationTestDto test, HashSet<string> referencedNcfs)
     {
         if (!int.TryParse(test.EcfType, out int type)) return 0;
-        
+
         // Promotion: If this document is referenced by another, it MUST be Step 1 (Individual)
         // so the DGII system has it recorded before the reference document is sent.
         if (referencedNcfs.Contains(test.ENcf?.Trim()))
@@ -165,11 +196,11 @@ public class CertificationService : ICertificationService
     public async Task<DgiiTransmissionResult> RunTestAsync(int index)
     {
         var allTests = await GetTestsAsync();
-        var test = allTests.FirstOrDefault(t => t.Index == index) 
+        var test = allTests.FirstOrDefault(t => t.Index == index)
             ?? throw new ArgumentException("Test no encontrado.");
 
         test.Status = TestStatus.Running;
-        
+
         try
         {
             string excelPath = Path.Combine(AppContext.BaseDirectory, "133009889-16042026193727.xlsx");
@@ -177,13 +208,29 @@ public class CertificationService : ICertificationService
             {
                 excelPath = "c:\\Projects\\ZynstormECFPlatform\\133009889-16042026193727.xlsx";
             }
-            var rows = MiniExcel.Query(excelPath, useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
-            // Use specific row for Type 31 to ensure matching reference for subsequent tests
-            var row = (test.EcfType == "31")
-                ? rows.First(r => r["ENCF"]?.ToString() == "E310000000034" || r["ENCF"]?.ToString() == "133009889E310000000034")
-                : rows.First(r => (r["CasoPrueba"]?.ToString() ?? "") == test.CaseNumber);
+
+            // ── Select correct sheet based on step ────────────────────────
+            string sheetName = (test.Step == 3) ? "RFCE" : "ECF";
+            var rows = MiniExcel.Query(excelPath, sheetName: sheetName, useHeaderRow: true)
+                .Cast<IDictionary<string, object>>().ToList();
+
+            // ── Find exact row ───────────────────────────────────────────
+            // For Step 3 (Summary), we find by CaseNumber in RFCE sheet.
+            // For Step 4 (Individual) and Step 1/2, we find by CaseNumber or ENCF in ECF sheet.
+            IDictionary<string, object> row;
+            if (test.Step == 3)
+            {
+                row = rows.First(r => GetStr(r, "ENCF") == test.ENcf);
+            }
+            else
+            {
+                // Find by ENCF or CaseNumber in ECF sheet
+                row = rows.FirstOrDefault(r => GetStr(r, "ENCF") == test.ENcf)
+                      ?? rows.First(r => GetStr(r, "CasoPrueba") == test.CaseNumber);
+            }
+
             // Synchronize the test ENCF so the filename matches the XML content
-            test.ENcf = row["ENCF"]?.ToString();
+            test.ENcf = GetStr(row, "ENCF");
 
             var requestDto = MapRowToRequest(row, test.Step);
 
@@ -207,23 +254,24 @@ public class CertificationService : ICertificationService
                 ?? throw new InvalidOperationException($"El cliente RNC '{issuerRnc}' no tiene un certificado digital registrado.");
 
             var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
-            var passwordBytes   = _encryptedService.DecryptWithSecret(certificate.Password,    decryptedSecretKey);
+            var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
 
             if (certificateBytes.Length == 0 || passwordBytes.Length == 0)
                 throw new InvalidOperationException("No se pudo desencriptar el certificado del cliente.");
 
             var certBase64 = Convert.ToBase64String(certificateBytes);
-            var certPass   = Encoding.UTF8.GetString(passwordBytes);
+            var certPass = Encoding.UTF8.GetString(passwordBytes);
 
             // ── 3. Generate & sign XML ─────────────────────────────────────────
             string unsignedXml = _generatorService.GenerateUnsignedXml(requestDto);
-            string signedXml   = _signerService.SignXml(unsignedXml, certBase64, certPass);
-            
+            string signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
+
             // ── DEBUG: Save the exact XML being sent for inspection ───────────
             try { File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "temp_last_request.xml"), signedXml); } catch { }
 
             // ── 4. Verify XML Schema (XSD) BEFORE transmitting ────────────────
             var validationErrors = _generatorService.ValidateXmlAgainstSchema(signedXml, int.Parse(test.EcfType));
+
             if (validationErrors.Any(e => e.StartsWith("[ERROR]")))
             {
                 var errorMsg = "Error de esquema (XSD): " + string.Join(" | ", validationErrors);
@@ -238,12 +286,12 @@ public class CertificationService : ICertificationService
             // ── 6. Transmit ────────────────────────────────────────────────────
             bool isSummary = (test.Step == 3);
             var result = await _transmissionService.SendEcfAsync(
-                DgiiEnvironment.CerteCF, 
-                token, 
-                signedXml, 
-                int.Parse(test.EcfType), 
-                test.TotalAmount, 
-                issuerRnc, 
+                DgiiEnvironment.CerteCF,
+                token,
+                signedXml,
+                int.Parse(test.EcfType),
+                test.TotalAmount,
+                issuerRnc,
                 test.ENcf,
                 isSummary);
 
@@ -254,10 +302,10 @@ public class CertificationService : ICertificationService
 
                 // ── 7. Enqueue background status tracking job ──────────────────
                 BackgroundJob.Enqueue<Jobs.EcfTrackingJob>(j => j.Execute(
-                    result.TrackId, 
-                    DgiiEnvironment.CerteCF, 
-                    issuerRnc, 
-                    certBase64, 
+                    result.TrackId,
+                    DgiiEnvironment.CerteCF,
+                    issuerRnc,
+                    certBase64,
                     certPass));
             }
             else
@@ -327,69 +375,67 @@ public class CertificationService : ICertificationService
             Ncf = GetStr(row, "ENCF") ?? "",
 
             // ── Issuer ─────────────────────────────────────────────────────
-            IssuerRnc            = GetStr(row, "RNCEmisor")          ?? "",
-            IssuerName           = GetStr(row, "RazonSocialEmisor")  ?? "",
-            IssuerAddress        = GetStr(row, "DireccionEmisor")     ?? "",
+            IssuerRnc = GetStr(row, "RNCEmisor") ?? "",
+            IssuerName = GetStr(row, "RazonSocialEmisor") ?? "",
+            IssuerAddress = GetStr(row, "DireccionEmisor") ?? "",
             IssuerCommercialName = GetStr(row, "NombreComercial"),
-            IssuerBranchCode     = GetStr(row, "Sucursal"),          // null if "#e" or empty
-            IssuerActivityCode   = GetStr(row, "ActividadEconomica"),// null if "#e" or empty
-            IssuerMunicipality   = GetStr(row, "Municipio"),
-            IssuerProvince       = GetStr(row, "Provincia"),
-            IssuerEmail          = GetStr(row, "CorreoEmisor"),
-            IssuerWebSite        = GetStr(row, "WebSite"),
-            IssuerSellerCode     = GetStr(row, "CodigoVendedor"),
+            IssuerBranchCode = GetStr(row, "Sucursal"),          // null if "#e" or empty
+            IssuerActivityCode = GetStr(row, "ActividadEconomica"),// null if "#e" or empty
+            IssuerMunicipality = GetStr(row, "Municipio"),
+            IssuerProvince = GetStr(row, "Provincia"),
+            IssuerEmail = GetStr(row, "CorreoEmisor"),
+            IssuerWebSite = GetStr(row, "WebSite"),
+            IssuerSellerCode = GetStr(row, "CodigoVendedor"),
 
             // ── Buyer ──────────────────────────────────────────────────────
-            CustomerRnc          = GetStr(row, "RNCComprador")           ?? "",
-            CustomerForeignId    = GetStr(row, "IdentificadorExtranjero"),
-            CustomerName         = GetStr(row, "RazonSocialComprador")   ?? "",
-            CustomerCountry      = GetStr(row, "PaisComprador"),
-            CustomerAddress      = GetStr(row, "DireccionComprador"),
-            CustomerContact      = GetStr(row, "ContactoComprador"),
+            CustomerRnc = GetStr(row, "RNCComprador") ?? "",
+            CustomerForeignId = GetStr(row, "IdentificadorExtranjero"),
+            CustomerName = GetStr(row, "RazonSocialComprador") ?? "",
+            CustomerCountry = GetStr(row, "PaisComprador"),
+            CustomerAddress = GetStr(row, "DireccionComprador"),
+            CustomerContact = GetStr(row, "ContactoComprador"),
 
-            CustomerEmail        = GetStr(row, "CorreoComprador"),
+            CustomerEmail = GetStr(row, "CorreoComprador"),
             CustomerMunicipality = GetStr(row, "MunicipioComprador"),
-            CustomerProvince     = GetStr(row, "ProvinciaComprador"),
-            BuyerInternalCode    = GetStr(row, "CodigoInternoComprador"),
+            CustomerProvince = GetStr(row, "ProvinciaComprador"),
+            BuyerInternalCode = GetStr(row, "CodigoInternoComprador"),
 
             // ── Commercial fields ──────────────────────────────────────────
             InternalInvoiceNumber = GetStr(row, "NumeroFacturaInterna"),
-            InternalOrderNumber   = GetStr(row, "NumeroPedidoInterno"),
-            SalesZone             = GetStr(row, "ZonaVenta"),
-            OrderNumber           = GetStr(row, "NumeroOrdenCompra"),
+            InternalOrderNumber = GetStr(row, "NumeroPedidoInterno"),
+            SalesZone = GetStr(row, "ZonaVenta"),
+            OrderNumber = GetStr(row, "NumeroOrdenCompra"),
 
             // ── Payment ────────────────────────────────────────────────────
             PaymentType = int.TryParse(GetStr(row, "TipoPago"), out int p) ? p : null,
             PaymentDeadline = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaLimitePago"))),
-            IncomeType  = GetStr(row, "TipoIngresos"),
-
+            IncomeType = GetStr(row, "TipoIngresos"),
 
             // ── Manual Overrides for Certification (Raw Excel Data) ────────
             ManualMontoGravadoTotal = GetDec(row, "MontoGravadoTotal"),
-            ManualMontoExento       = GetDec(row, "MontoExento"),
-            ManualMontoTotal        = GetDec(row, "MontoTotal"),
-            ManualTotalITBIS        = GetDec(row, "TotalITBIS"),
-            ManualTotalITBIS1       = GetDec(row, "TotalITBIS1"),
-            ManualTotalITBIS2       = GetDec(row, "TotalITBIS2"),
-            ManualTotalITBIS3       = GetDec(row, "TotalITBIS3"),
-            ManualMontoPeriodo      = GetDec(row, "MontoPeriodo"),
-            ManualValorPagar        = GetDec(row, "ValorPagar"),
+            ManualMontoExento = GetDec(row, "MontoExento"),
+            ManualMontoTotal = GetDec(row, "MontoTotal"),
+            ManualTotalITBIS = GetDec(row, "TotalITBIS"),
+            ManualTotalITBIS1 = GetDec(row, "TotalITBIS1"),
+            ManualTotalITBIS2 = GetDec(row, "TotalITBIS2"),
+            ManualTotalITBIS3 = GetDec(row, "TotalITBIS3"),
+            ManualMontoPeriodo = GetDec(row, "MontoPeriodo"),
+            ManualValorPagar = GetDec(row, "ValorPagar"),
             ManualIndicadorMontoGravado = int.TryParse(GetStr(row, "IndicadorMontoGravado"), out int img) ? img : null,
             ManualTotalITBISRetenido = GetDec(row, "TotalITBISRetenido"),
-            ManualTotalISRRetencion  = GetDec(row, "TotalISRRetencion"),
-            ManualMontoGravadoI1     = GetDec(row, "MontoGravadoI1"),
+            ManualTotalISRRetencion = GetDec(row, "TotalISRRetencion"),
+            ManualMontoGravadoI1 = GetDec(row, "MontoGravadoI1"),
             ManualIndicadorNotaCredito = int.TryParse(GetStr(row, "IndicadorNotaCredito"), out int inc) ? inc : null,
             ManualMontoNoFacturable = GetDec(row, "MontoNoFacturable"),
 
-            ManualMontoGravadoI2     = GetDec(row, "MontoGravadoI2"),
-            ManualMontoGravadoI3     = GetDec(row, "MontoGravadoI3"),
+            ManualMontoGravadoI2 = GetDec(row, "MontoGravadoI2"),
+            ManualMontoGravadoI3 = GetDec(row, "MontoGravadoI3"),
 
             // ── Reference (NC/ND types 33/34) ──────────────────────────────
-            ReferenceNcf         = GetStr(row, "NCFModificado"),
+            ReferenceNcf = GetStr(row, "NCFModificado"),
             ReferenceCustomerRnc = GetStr(row, "RNCOtroContribuyente"),
-            ReferenceReasonCode  = int.TryParse(GetStr(row, "CodigoModificacion"), out int rc) ? rc : null,
+            ReferenceReasonCode = int.TryParse(GetStr(row, "CodigoModificacion"), out int rc) ? rc : null,
             ReferenceReasonDescription = GetStr(row, "RazonModificacion"),
-
 
             Items = new List<EcfItemRequestDto>()
         };
@@ -405,9 +451,9 @@ public class CertificationService : ICertificationService
         }
         dto.SequenceExpirationDate = ApplyDateOffset(expDate);
 
-        dto.DeliveryDate           = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaEntrega")));
-        dto.OrderDate              = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaOrdenCompra")));
-        dto.ReferenceIssueDate     = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaNCFModificado")));
+        dto.DeliveryDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaEntrega")));
+        dto.OrderDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaOrdenCompra")));
+        dto.ReferenceIssueDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaNCFModificado")));
 
         // ── MontoNoFacturable (type 33 exento) ────────────────────────────
         var montoNoFacturableStr = GetStr(row, "MontoNoFacturable");
@@ -429,7 +475,7 @@ public class CertificationService : ICertificationService
             var nombre = GetStr(row, nombreKey);
             if (nombre == null) continue;
 
-            var indicadorStr  = GetStr(row, $"IndicadorFacturacion[{i}]");
+            var indicadorStr = GetStr(row, $"IndicadorFacturacion[{i}]");
             var indicadorFact = int.TryParse(indicadorStr, out int indF) ? indF : 1;
 
             // Map IndicadorFacturacion → TaxPercentage
@@ -437,16 +483,16 @@ public class CertificationService : ICertificationService
             {
                 1 => 18m,
                 2 => 16m,
-                3 =>  0m,
-                4 =>  0m, // exento — no ITBIS
-                0 =>  0m, // no facturable — no ITBIS
+                3 => 0m,
+                4 => 0m, // exento — no ITBIS
+                0 => 0m, // no facturable — no ITBIS
                 _ => 18m
             };
 
-            var cantStr  = GetStr(row, $"CantidadItem[{i}]");
+            var cantStr = GetStr(row, $"CantidadItem[{i}]");
             var precioStr = GetStr(row, $"PrecioUnitarioItem[{i}]");
             var bienServStr = GetStr(row, $"IndicadorBienoServicio[{i}]");
-            var unidadStr   = GetStr(row, $"UnidadMedida[{i}]");
+            var unidadStr = GetStr(row, $"UnidadMedida[{i}]");
 
             decimal cantidad = decimal.TryParse(cantStr,
                 System.Globalization.NumberStyles.Any,
@@ -454,25 +500,26 @@ public class CertificationService : ICertificationService
             decimal precio = decimal.TryParse(precioStr,
                 System.Globalization.NumberStyles.Any,
                 System.Globalization.CultureInfo.InvariantCulture, out decimal pr) ? pr : 0;
-            int itemType  = int.TryParse(bienServStr, out int bs) ? bs : 1;
+            int itemType = int.TryParse(bienServStr, out int bs) ? bs : 1;
             int? unitOfMeasure = int.TryParse(unidadStr, out int um) ? um : null;
 
             var item = new EcfItemRequestDto
             {
-                Name             = nombre,
-                Description      = GetStr(row, $"DescripcionItem[{i}]"),
-                Quantity         = cantidad,
-                UnitPrice        = precio,
-                ItemType         = itemType,
-                UnitOfMeasure    = unitOfMeasure,
-                TaxPercentage    = taxPct,
+                Name = nombre,
+                Description = GetStr(row, $"DescripcionItem[{i}]"),
+                Quantity = cantidad,
+                UnitPrice = precio,
+                ItemType = itemType,
+                UnitOfMeasure = unitOfMeasure,
+                TaxPercentage = taxPct,
                 BillingIndicator = indicadorFact,  // Pass exact Excel indicator (4=exento, 0=no facturable)
-                ManualMontoItem  = GetDec(row, $"MontoItem[{i}]"),
+                ManualMontoItem = GetDec(row, $"MontoItem[{i}]"),
                 ManualDescuentoMonto = GetDec(row, $"DescuentoMonto[{i}]"),
-                ManualRecargoMonto   = GetDec(row, $"RecargoMonto[{i}]"),
+                ManualRecargoMonto = GetDec(row, $"RecargoMonto[{i}]"),
                 ManualMontoITBISRetenido = GetDec(row, $"MontoITBISRetenido[{i}]"),
-                ManualMontoISRRetenido = GetDec(row, $"MontoISRRetenido[{i}]")
-
+                ManualMontoISRRetenido = GetDec(row, $"MontoISRRetenido[{i}]"),
+                FechaElaboracion = GetStr(row, $"FechaElaboracion[{i}]"),
+                FechaVencimientoItem = GetStr(row, $"FechaVencimientoItem[{i}]")
             };
 
             // Extract SubRecargos (up to 5 per item) from Excel

@@ -77,18 +77,40 @@ public class DgiiTransmissionService : IDgiiTransmissionService
 
         try
         {
-            var result = JsonSerializer.Deserialize<DgiiTransmissionResult>(responseString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var result = JsonSerializer.Deserialize<DgiiTransmissionResult>(responseString, options);
+            
             if (result != null)
             {
-                if (!response.IsSuccessStatusCode && string.IsNullOrEmpty(result.Error))
+                // Mapping success based on RFCE fields if present
+                if (result.Estado != null || result.Codigo.HasValue)
+                {
+                    bool isRfceSuccess = result.Estado == "Aceptado" || result.Codigo == 1 || result.Codigo == 0;
+                    
+                    if (!isRfceSuccess)
+                    {
+                        if (string.IsNullOrEmpty(result.Error))
+                        {
+                            var msgs = result.Mensajes?.Select(m => $"{m.Codigo}: {m.Valor}") ?? Enumerable.Empty<string>();
+                            result.Error = $"DGII {result.Estado}: {string.Join(" | ", msgs)}";
+                        }
+                    }
+                }
+                else if (!response.IsSuccessStatusCode && string.IsNullOrEmpty(result.Error))
                 {
                     result.Error = response.ReasonPhrase ?? "HTTP Error";
                 }
+                
                 return result;
             }
         }
-        catch
+        catch (JsonException)
         {
+            // If it's not JSON, might be a raw TrackId or an error message
+            if (response.IsSuccessStatusCode && responseString.Length > 5 && responseString.Length < 50 && !responseString.Contains('<'))
+            {
+                return new DgiiTransmissionResult { TrackId = responseString.Trim('"') };
+            }
         }
 
         return new DgiiTransmissionResult 

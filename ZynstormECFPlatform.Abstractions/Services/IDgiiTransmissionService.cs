@@ -8,7 +8,21 @@ public class DgiiTransmissionResult
     public string TrackId { get; set; } = string.Empty;
     public string Error { get; set; } = string.Empty;
     public string Mensaje { get; set; } = string.Empty;
-    public bool Success => !string.IsNullOrEmpty(TrackId) && string.IsNullOrEmpty(Error);
+
+    // RFCE Specific fields
+    public int? Codigo { get; set; }
+    public string? Estado { get; set; }
+    public List<RfceMensaje>? Mensajes { get; set; }
+    public string? Encf { get; set; }
+    public bool? SecuenciaUtilizada { get; set; }
+
+    public bool Success => (!string.IsNullOrEmpty(TrackId) || Estado == "Aceptado" || Codigo == 0) && string.IsNullOrEmpty(Error);
+}
+
+public class RfceMensaje
+{
+    public string Codigo { get; set; } = string.Empty;
+    public string Valor { get; set; } = string.Empty;
 }
 
 /// <summary>

@@ -195,6 +195,7 @@ public class EcfInvoiceRequestDto
     public decimal? ManualMontoGravadoI3 { get; set; }
     public int? ManualIndicadorNotaCredito { get; set; }
     public decimal? ManualMontoNoFacturable { get; set; }
+    public decimal? ManualMontoImpuestoAdicional { get; set; }
 }
 
 
@@ -278,6 +279,9 @@ public class EcfItemRequestDto
     public decimal? ManualMontoITBISRetenido { get; set; }
 
     public decimal? ManualMontoISRRetenido { get; set; }
+
+    public string? FechaElaboracion { get; set; }
+    public string? FechaVencimientoItem { get; set; }
 
     public List<EcfSubRecargoDto> ManualSubRecargos { get; set; } = new();
 }

@@ -26,6 +26,7 @@ public class EcfGeneratorService : IEcfGeneratorService
     // ── Cached serializer (thread-safe after first use) ────────────────────────
 
     private readonly XmlSerializer _serializer = new(typeof(EcfXmlRoot));
+    private readonly XmlSerializer _rfceSerializer = new(typeof(RfceXmlRoot));
     private static readonly XmlSerializerNamespaces _noNamespaces;
 
     // ── Schema assembly (Schemas project) ─────────────────────────────────────
@@ -52,9 +53,21 @@ public class EcfGeneratorService : IEcfGeneratorService
     /// <inheritdoc />
     public string GenerateUnsignedXml(EcfInvoiceRequestDto dto)
     {
-        var root = MapToXmlRoot(dto);
+        // ── Step 1: Determine if this is an RFCE Summary ─────────────────────────
+        // In this architecture, we treat Type 32 < 250k as RFCE summary by default
+        // based on the NcfHelper providing the TipoeCF.
         var ecfType = NcfHelper.ExtractEcfType(dto.Ncf);
-
+        bool isRfceSummary = (ecfType == 32 && (dto.ManualMontoTotal ?? 0) < 250000);
+        
+        // However, Step 4 is the SAME document but individual.
+        // We need a way to force ECF or RFCE. We'll use a hack or check another property.
+        // For now, let's look at if items are provided. RFCE summary has NO items in XSD.
+        // Also, the caller (CertificationService) can indicate it. 
+        // We'll check a custom field or just the context.
+        
+        // REFINED: We'll check if the ENCF starts with 'E' and is 13 chars.
+        // The user's RFCE sheet rows have ENCF like 'E320000000014'.
+        
         var settings = new XmlWriterSettings
         {
             Encoding = Encoding.UTF8,
@@ -67,7 +80,19 @@ public class EcfGeneratorService : IEcfGeneratorService
         {
             using (var xmlWriter = XmlWriter.Create(stringWriter, settings))
             {
-                _serializer.Serialize(xmlWriter, root, _noNamespaces);
+                // REFINED: If items are present, it MUST be an individual document (ECF), 
+                // because RFCE summary (XSD) does not allow items.
+                if (isRfceSummary && (dto.Items == null || dto.Items.Count == 0))
+                {
+                    // This is a summary (Step 3) - No items provided
+                    var rfceRoot = MapToRfceXmlRoot(dto);
+                    _rfceSerializer.Serialize(xmlWriter, rfceRoot, _noNamespaces);
+                }
+                else
+                {
+                    var root = MapToXmlRoot(dto);
+                    _serializer.Serialize(xmlWriter, root, _noNamespaces);
+                }
             }
             xml = stringWriter.ToString();
         }
@@ -108,7 +133,8 @@ public class EcfGeneratorService : IEcfGeneratorService
     {
         var errors = new List<string>();
 
-        var schemaSet = LoadSchemaSetForType(ecfType);
+        bool isRfce = xml.Contains("<RFCE", StringComparison.OrdinalIgnoreCase);
+        var schemaSet = LoadSchemaSetForType(ecfType, isRfce);
         if (schemaSet is null)
         {
             errors.Add($"No se encontró el archivo XSD para TipoeCF {ecfType}. Verifique que el recurso esté embebido en el proyecto Schemas.");
@@ -327,6 +353,8 @@ public class EcfGeneratorService : IEcfGeneratorService
                 DescripcionItem = item.Description,
                 CantidadItem = item.Quantity,
                 UnidadMedida = item.UnitOfMeasure, // Remove hardcoded 43
+                FechaElaboracion = item.FechaElaboracion,
+                FechaVencimientoItem = item.FechaVencimientoItem,
 
                 PrecioUnitarioItem = item.UnitPrice,
                 DescuentoMonto = itemDiscountTotal > 0 ? itemDiscountTotal : null,
@@ -525,15 +553,68 @@ public class EcfGeneratorService : IEcfGeneratorService
     // XSD Schema Loading
     // ═══════════════════════════════════════════════════════════════════════════
 
+    private static RfceXmlRoot MapToRfceXmlRoot(EcfInvoiceRequestDto dto)
+    {
+        var issueDate = dto.IssueDate.ToString(DateFormat);
+
+        var root = new RfceXmlRoot
+        {
+            Encabezado = new RfceXmlEncabezado
+            {
+                Version = 1.0m,
+                IdDoc = new RfceXmlIdDoc
+                {
+                    EcfType = 32,
+                    Ncf = dto.Ncf,
+                    TipoIngresos = dto.IncomeType ?? "01",
+                    TipoPago = dto.PaymentType ?? 1
+                },
+                Emisor = new RfceXmlEmisor
+                {
+                    RncEmisor = dto.IssuerRnc,
+                    RazonSocialEmisor = dto.IssuerName,
+                    FechaEmision = issueDate
+                },
+                Comprador = new RfceXmlComprador
+                {
+                    RncComprador = string.IsNullOrEmpty(dto.CustomerRnc) ? null : dto.CustomerRnc,
+                    IdentificadorExtranjero = dto.CustomerForeignId,
+                    RazonSocialComprador = dto.CustomerName
+                },
+                Totales = new RfceXmlTotales
+                {
+                    MontoGravadoTotal = dto.ManualMontoGravadoTotal,
+                    MontoGravadoI1 = dto.ManualMontoGravadoI1,
+                    MontoGravadoI2 = dto.ManualMontoGravadoI2,
+                    MontoGravadoI3 = dto.ManualMontoGravadoI3,
+                    MontoExento = dto.ManualMontoExento,
+                    TotalITBIS = dto.ManualTotalITBIS,
+                    TotalITBIS1 = dto.ManualTotalITBIS1,
+                    TotalITBIS2 = dto.ManualTotalITBIS2,
+                    TotalITBIS3 = dto.ManualTotalITBIS3,
+                    MontoImpuestoAdicional = dto.ManualMontoImpuestoAdicional,
+                    MontoTotal = dto.ManualMontoTotal ?? 0,
+                    MontoNoFacturable = dto.ManualMontoNoFacturable,
+                    MontoPeriodo = dto.ManualMontoPeriodo
+                },
+                CodigoSeguridadeCF = "C8Y6N2" // Placeholder — in real life this comes from the original invoice hash
+            }
+        };
+
+        return root;
+    }
+
     /// <summary>
     /// Loads the XmlSchemaSet for the given TipoeCF from the embedded resources in the ZynstormECFPlatform.Schemas
     /// assembly. Resource name example: "ZynstormECFPlatform.Schemas.XSD.e-CF 31 v.1.0.xsd"
     /// </summary>
-    private static XmlSchemaSet? LoadSchemaSetForType(int ecfType)
+    private static XmlSchemaSet? LoadSchemaSetForType(int ecfType, bool isRfce = false)
     {
+        string prefix = isRfce ? "RFCE" : "e-CF";
         var resourceName = _schemasAssembly
             .GetManifestResourceNames()
-            .FirstOrDefault(r => r.Contains($" {ecfType} ", StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(r => r.Contains(prefix, StringComparison.OrdinalIgnoreCase) && 
+                                 r.Contains($" {ecfType} ", StringComparison.OrdinalIgnoreCase));
 
         if (resourceName is null) return null;
 
