@@ -62,12 +62,18 @@ public class DgiiTransmissionService : IDgiiTransmissionService
         using var request = new HttpRequestMessage(HttpMethod.Post, endpointUrl);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         
+        // CerteCF always uses multipart/form-data in this implementation to match portal behavior.
         if (environment == DgiiEnvironment.CerteCF)
         {
-            // CerteCF requires multipart/form-data for transmission too
             string fileName = $"{rncEmisor}{eNcf}.xml";
             var multipartContent = new MultipartFormDataContent();
-            var xmlFileContent = new StringContent(signedXml, Encoding.UTF8, "text/xml");
+            
+            // Use UTF-8 WITHOUT BOM to avoid "001 Archivo no válido"
+            var utf8WithoutBom = new System.Text.UTF8Encoding(false);
+            var xmlBytes = utf8WithoutBom.GetBytes(signedXml);
+            var xmlFileContent = new ByteArrayContent(xmlBytes);
+            xmlFileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/xml");
+            
             multipartContent.Add(xmlFileContent, "xml", fileName);
             request.Content = multipartContent;
         }

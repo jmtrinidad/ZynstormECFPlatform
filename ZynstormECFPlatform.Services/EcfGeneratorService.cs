@@ -111,13 +111,6 @@ public class EcfGeneratorService : IEcfGeneratorService
         }
 
 
-        // Add a diagnostic comment to verify the active version of the service
-        var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmm");
-        if (xml.Contains("<ECF>"))
-        {
-            xml = xml.Replace("<ECF>", $"<!-- Generator_Fix_V4_{timestamp} --><ECF>");
-        }
-
         return xml;
     }
 

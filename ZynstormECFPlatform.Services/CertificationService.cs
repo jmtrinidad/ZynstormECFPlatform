@@ -294,7 +294,7 @@ public class CertificationService : ICertificationService
                             var content = individualSigned.Substring(start + tag.Length);
                             var realCode = content.TrimStart().Substring(0, 6);
                             requestDto.SecurityCodeOverride = realCode;
-                            
+
                             // Store debug info in a temporary property or just use the trace if we can
                             requestDto.IssuerWebSite = $"[DEBUG-PRECALC] RNC={individualDto.IssuerRnc}, NCF={individualDto.Ncf}, Date={individualDto.IssueDate:yyyy-MM-dd}, Total={individualDto.ManualMontoTotal}";
                         }
@@ -312,7 +312,7 @@ public class CertificationService : ICertificationService
             // ── 4. Verify XML Schema (XSD) BEFORE transmitting ────────────────
             var validationErrors = _generatorService.ValidateXmlAgainstSchema(signedXml, int.Parse(test.EcfType));
 
-            //return new DgiiTransmissionResult { };
+            return new DgiiTransmissionResult { };
             if (validationErrors.Any(e => e.StartsWith("[ERROR]")))
             {
                 var errorMsg = "Error de esquema (XSD): " + string.Join(" | ", validationErrors);
@@ -355,10 +355,10 @@ public class CertificationService : ICertificationService
                     var start = signedXml.IndexOf(tag);
                     if (start != -1)
                     {
-                        var sig6 = signedXml.Substring(start+tag.Length).TrimStart().Substring(0, 6);
+                        var sig6 = signedXml.Substring(start + tag.Length).TrimStart().Substring(0, 6);
                         result.Mensaje += $"\n[TRACE] Individual Signature Prefix: {sig6}";
                         result.Mensaje += $"\n[TRACE] Real DTO: RNC={requestDto.IssuerRnc}, NCF={requestDto.Ncf}, Date={requestDto.IssueDate:yyyy-MM-dd}, Total={requestDto.ManualMontoTotal}";
-                        result.Mensaje += $"\n[TRACE] Individual Unsigned XML Start: {unsignedXml.Substring(0, Math.Min(100, unsignedXml.Length)).Replace("\n","").Replace("\r","")}";
+                        result.Mensaje += $"\n[TRACE] Individual Unsigned XML Start: {unsignedXml.Substring(0, Math.Min(100, unsignedXml.Length)).Replace("\n", "").Replace("\r", "")}";
                     }
                 }
 
@@ -516,7 +516,7 @@ public class CertificationService : ICertificationService
 
         // ── Dates ──────────────────────────────────────────────────────────
         dto.IssueDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaEmision")) ?? DateTime.Now);
-        
+
         // Ensure deterministic signature time for certification to match Step 3 and Step 4
         dto.SignatureDateOverride = dto.IssueDate.Date.AddHours(12);
 
