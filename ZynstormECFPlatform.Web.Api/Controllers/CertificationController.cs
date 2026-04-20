@@ -88,8 +88,11 @@ public class CertificationController : ControllerBase
     {
         var status = await _certificationService.GetJobStatusAsync(jobId);
 
-        if (status.Status != "Completed" || string.IsNullOrEmpty(status.DownloadUrl))
-            return BadRequest("El archivo aún no está listo o el proceso falló.");
+        if (status.HighestCompletedStep < 3)
+            return BadRequest("La descarga solo está permitida una vez que el Paso 3 (Resúmenes B2C) haya sido completado exitosamente.");
+
+        if (string.IsNullOrEmpty(status.DownloadUrl))
+            return BadRequest("El archivo aún no ha sido generado.");
 
         var bytes = await System.IO.File.ReadAllBytesAsync(status.DownloadUrl);
         return File(bytes, "application/zip", $"cert_step4_{jobId}.zip");

@@ -86,8 +86,8 @@ public class CertificationService : ICertificationService
             var ecfTypeStr = GetStr(row, "TipoeCF");
             if (string.IsNullOrWhiteSpace(ecfTypeStr)) continue;
 
-            var encf = CleanNcf(GetStr(row, "ENCF") ?? GetStr(row, "CasoPrueba") ?? "") ?? "";
-            var testCase = GetStr(row, "CasoPrueba") ?? "";
+            var encf = CleanNcf(GetStr(row, "ENCF") ?? GetStr(row, "CasoPrueba") ?? GetStr(row, "Caso Prueba") ?? GetStr(row, "Caso de Prueba") ?? "") ?? "";
+            var testCase = GetStr(row, "CasoPrueba") ?? GetStr(row, "Caso Prueba") ?? GetStr(row, "Caso de Prueba") ?? GetStr(row, "Escenario") ?? GetStr(row, "Descripcion") ?? GetStr(row, "Descripción") ?? "";
             // Try to get index from Excel (Indice, Índice, Index), fallback to sequence
             string idxStr = GetStr(row, "Indice") ?? GetStr(row, "Índice") ?? GetStr(row, "Index") ?? index.ToString();
             if (!int.TryParse(idxStr, out int idxValue)) idxValue = index;
@@ -113,21 +113,47 @@ public class CertificationService : ICertificationService
 
     private int DetermineStep(CertificationTestDto test, HashSet<string> referencedNcfs)
     {
-        if (!int.TryParse(test.EcfType, out int type)) return 0;
+        int finalStep = 0;
+        if (!int.TryParse(test.EcfType, out int type)) {
+             Console.WriteLine($"[STEP-DEBUG] Case {test.Description} - Unknown type, assigned Step 0");
+             return 0;
+        }
 
-        if (referencedNcfs.Contains(test.ENcf?.Trim()))
-            return 1;
+        // 1. Explicit Keywords (Step 4 / Manual / Simulation)
+        string desc = test.Description ?? "";
+        bool isStep4 = desc.Contains("Paso 4", StringComparison.OrdinalIgnoreCase) || 
+                       desc.Contains("Etapa 4", StringComparison.OrdinalIgnoreCase) || 
+                       desc.Contains("Paso IV", StringComparison.OrdinalIgnoreCase) ||
+                       desc.Contains("Etapa IV", StringComparison.OrdinalIgnoreCase) ||
+                       desc.Contains("Simulacion", StringComparison.OrdinalIgnoreCase) || 
+                       desc.Contains("Simulación", StringComparison.OrdinalIgnoreCase) ||
+                       desc.Contains("Escenario 24", StringComparison.OrdinalIgnoreCase) ||
+                       desc.Contains("Escenario 25", StringComparison.OrdinalIgnoreCase) ||
+                       desc.Contains("Manual", StringComparison.OrdinalIgnoreCase) ||
+                       desc.Contains("Especial", StringComparison.OrdinalIgnoreCase);
 
-        if (type == 31 || type == 41 || (type >= 43 && type <= 47) || (type == 32 && test.TotalAmount >= 250000))
-            return 1;
+        if (isStep4)
+        {
+            finalStep = 4;
+        }
+        else if (referencedNcfs.Contains(test.ENcf?.Trim()))
+            finalStep = 1;
+        else if (type == 31 || type == 41 || (type >= 43 && type <= 47) || (type == 32 && test.TotalAmount >= 250000))
+            finalStep = 1;
+        else if (type == 33 || type == 34)
+            finalStep = 2;
+        else if (type == 32 && test.TotalAmount < 250000)
+            finalStep = 3;
 
-        if (type == 33 || type == 34)
-            return 2;
+        // 5. Fallback: Last cases are usually Step 4 if not otherwise identified
+        if (finalStep == 0) 
+        {
+            // Explicitly handle indices 25-28 as Step 4 if they weren't caught by keywords
+            if (test.Index >= 25) finalStep = 4;
+        }
 
-        if (type == 32 && test.TotalAmount < 250000)
-            return 3;
-
-        return 0;
+        Console.WriteLine($"[STEP-DEBUG] Case {test.Index} ({test.ENcf}) - Type {type} - Assigned Step {finalStep} (Desc: {test.Description})");
+        return finalStep;
     }
 
     private IDictionary<string, object>? FindRowForTest(List<IDictionary<string, object>> allRows, CertificationTestDto test)
@@ -607,6 +633,7 @@ public class CertificationService : ICertificationService
             var tests = await GetTestsFromExcelAsync(tempFilePath);
             status.TotalSteps = tests.Count;
             status.CurrentStep = 0;
+            Console.WriteLine($"[INFO] Automation started for Job {jobId}. Total tests: {tests.Count}, Step 4 identified: {tests.Count(t => t.Step == 4)}");
 
             var step4Xmls = new Dictionary<string, string>();
 
@@ -624,6 +651,9 @@ public class CertificationService : ICertificationService
                 {
                     var genResult = await GenerateSignedXmlForTestAsync(test, client, tempFilePath);
                     step4Xmls[$"cert_test_{test.Index}_{test.ENcf}.xml"] = genResult;
+                    
+                    if (test.Step > status.HighestCompletedStep)
+                        status.HighestCompletedStep = test.Step;
 
                     status.CompletedSteps.Add(new CertificationStepResultDto
                     {
@@ -648,11 +678,16 @@ public class CertificationService : ICertificationService
                         Message = result.Success ? "Paso exitoso" : result.Error
                     });
 
-                    if (!result.Success)
+                    if (result.Success)
+                    {
+                        if (test.Step > status.HighestCompletedStep)
+                            status.HighestCompletedStep = test.Step;
+                    }
+                    else
                     {
                         status.Status = "Failed";
                         status.ErrorMessage = $"Error en Index {test.Index} (NCF: {test.ENcf}): {result.Error}";
-                        return;
+                        break;
                     }
                 }
             }
@@ -758,7 +793,7 @@ public class CertificationService : ICertificationService
 
         if (finalStatus.Estado == "Aceptado" || (test.Step == 3 && finalStatus.Estado == "Generado"))
         {
-            return new DgiiTransmissionResult { TrackId = sendResult.TrackId };
+            return new DgiiTransmissionResult { TrackId = sendResult.TrackId, SignedXml = signedXml };
         }
 
         return new DgiiTransmissionResult

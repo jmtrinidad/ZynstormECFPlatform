@@ -13,6 +13,7 @@ public class CertificationJobStatusDto
     public string ErrorMessage { get; set; } = string.Empty;
     public string DgiiResponse { get; set; } = string.Empty;
     public List<CertificationStepResultDto> CompletedSteps { get; set; } = new();
+    public int HighestCompletedStep { get; set; }
     public string DownloadUrl { get; set; } = string.Empty;
 }
 

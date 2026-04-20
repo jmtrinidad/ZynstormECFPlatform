@@ -15,6 +15,7 @@ public class DgiiTransmissionResult
     public List<RfceMensaje>? Mensajes { get; set; }
     public string? Encf { get; set; }
     public bool? SecuenciaUtilizada { get; set; }
+    public string? SignedXml { get; set; }
 
     public bool Success => (!string.IsNullOrEmpty(TrackId) || Estado == "Aceptado" || Codigo == 0) && string.IsNullOrEmpty(Error);
 }
