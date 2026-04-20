@@ -152,6 +152,7 @@ public class DgiiTransmissionService : IDgiiTransmissionService
         string url;
         if (environment == DgiiEnvironment.CerteCF)
         {
+            // CerteCF standard for consulting by trackId using the /Estado endpoint
             url = $"{baseUrl}/api/Consultas/Estado?TrackId={trackId}";
         }
         else
@@ -168,9 +169,15 @@ public class DgiiTransmissionService : IDgiiTransmissionService
         if (response.IsSuccessStatusCode)
         {
             var result = JsonSerializer.Deserialize<DgiiStatusResponse>(responseString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return result ?? new DgiiStatusResponse { Estado = "ParseError", TrackId = trackId };
+            return result ?? new DgiiStatusResponse { Estado = "ParseError", TrackId = trackId, Error = "Error deserializing DGII response" };
         }
 
-        return new DgiiStatusResponse { Estado = "Error", TrackId = trackId };
+        return new DgiiStatusResponse 
+        { 
+            Estado = "Error", 
+            TrackId = trackId, 
+            Error = $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}",
+            Mensaje = responseString 
+        };
     }
 }

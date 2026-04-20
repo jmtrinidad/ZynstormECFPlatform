@@ -15,4 +15,9 @@ public interface IXmlSignatureService
     /// <param name="certificatePassword">The password for the certificate.</param>
     /// <returns>The signed XML string.</returns>
     string SignXml(string unsignedXml, string certificateBase64, string certificatePassword);
+
+    /// <summary>
+    /// Extracts the value of the SignatureValue element from a signed XML.
+    /// </summary>
+    string GetSignatureValue(string signedXml);
 }

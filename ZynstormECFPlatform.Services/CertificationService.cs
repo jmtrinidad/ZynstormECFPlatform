@@ -13,6 +13,9 @@ using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
 
+using System.IO.Compression;
+using ZynstormECFPlatform.Core.Entities;
+
 namespace ZynstormECFPlatform.Services;
 
 public class CertificationService : ICertificationService
@@ -32,6 +35,9 @@ public class CertificationService : ICertificationService
 
     private static Dictionary<string, DateTime>? _typeExpirationDates;
     private static TimeSpan? _dateOffset;
+
+    // Track job status in memory (simplified for now)
+    private static readonly Dictionary<string, CertificationJobStatusDto> _jobStatuses = new();
 
     public CertificationService(
         IConfiguration configuration,
@@ -58,119 +64,47 @@ public class CertificationService : ICertificationService
     public async Task<List<CertificationTestDto>> GetTestsAsync()
     {
         string excelPath = Path.Combine(AppContext.BaseDirectory, "133009889-16042026193727.xlsx");
-        if (!File.Exists(excelPath))
-        {
-            excelPath = "c:\\Projects\\ZynstormECFPlatform\\133009889-16042026193727.xlsx";
-        }
+        return await GetTestsFromExcelAsync(excelPath);
+    }
 
-        if (!File.Exists(excelPath))
-            throw new FileNotFoundException("El archivo de excel de certificación no fue encontrado.");
+    private async Task<List<CertificationTestDto>> GetTestsFromExcelAsync(string excelPath)
+    {
+        if (!File.Exists(excelPath)) return new List<CertificationTestDto>();
 
-        var rows = MiniExcel.Query(excelPath, useHeaderRow: true)
-            .Cast<IDictionary<string, object>>()
-            .Where(r => !string.IsNullOrWhiteSpace(GetStr(r, "TipoeCF")))
-            .ToList();
+        var rows = (await MiniExcel.QueryAsync(excelPath, useHeaderRow: true)).Cast<IDictionary<string, object>>().ToList();
+        var tests = new List<CertificationTestDto>();
 
         // ── 1. Identify all referenced NCFs first to handle dependencies ──
         var referencedNcfs = rows
-            .Select(r => GetStr(r, "NCFModificado"))
+            .Select(r => CleanNcf(GetStr(r, "NCFModificado")))
             .Where(n => !string.IsNullOrEmpty(n))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // ── 4. Load RFCE (Summary) Sheet ──────────────────────────────────
-        var rfceRows = MiniExcel.Query(excelPath, sheetName: "RFCE", useHeaderRow: true)
-            .Cast<IDictionary<string, object>>()
-            .Where(r => !string.IsNullOrWhiteSpace(GetStr(r, "ENCF")))
-            .OrderBy(r =>
-            {
-                var s = GetStr(r, "ENCF") ?? "00";
-                return s.Substring(Math.Max(0, s.Length - 2));
-            })
-            .ToList();
-
-        var tests = new List<CertificationTestDto>();
         int index = 0;
-
-        // ── 5. Block 1: Standard Documents ──────────────────
-        var standardRows = rows
-            .Where(r => GetStr(r, "TipoeCF") != "32" || (GetDec(r, "MontoTotal") ?? 0) >= 250000)
-            .Select(r => new
-            {
-                Row = r,
-                Step = DetermineStep(new CertificationTestDto
-                {
-                    EcfType = GetStr(r, "TipoeCF"),
-                    ENcf = GetStr(r, "ENCF"),
-                    TotalAmount = GetDec(r, "MontoTotal") ?? 0
-                }, referencedNcfs)
-            })
-            .OrderBy(x => x.Step)
-            .ThenBy(x => GetStr(x.Row, "ENCF") ?? "")
-            .ToList();
-
-        foreach (var item in standardRows)
+        foreach (var row in rows)
         {
-            var row = item.Row;
             var ecfTypeStr = GetStr(row, "TipoeCF");
-            var encf = GetStr(row, "ENCF") ?? "";
+            if (string.IsNullOrWhiteSpace(ecfTypeStr)) continue;
+
+            var encf = CleanNcf(GetStr(row, "ENCF") ?? GetStr(row, "CasoPrueba") ?? "") ?? "";
             var testCase = GetStr(row, "CasoPrueba") ?? "";
+            // Try to get index from Excel (Indice, Índice, Index), fallback to sequence
+            string idxStr = GetStr(row, "Indice") ?? GetStr(row, "Índice") ?? GetStr(row, "Index") ?? index.ToString();
+            if (!int.TryParse(idxStr, out int idxValue)) idxValue = index;
+
             var test = new CertificationTestDto
             {
-                Index = index++,
+                Index = idxValue,
                 CaseNumber = testCase,
                 EcfType = ecfTypeStr,
                 ENcf = encf,
                 TotalAmount = GetDec(row, "MontoTotal") ?? 0,
                 Description = $"Caso: {testCase}",
-                Step = 1 // Placeholder
+                Step = 1
             };
+            index++;
             test.Step = DetermineStep(test, referencedNcfs);
             tests.Add(test);
-        }
-
-        // ── 6. Block 2: RFCE Summaries (4 in total) ───────────────────────
-        // Step 3 (Summary) from RFCE sheet
-        foreach (var row in rfceRows)
-        {
-            var encf = GetStr(row, "ENCF") ?? "";
-            var testCase = GetStr(row, "CasoPrueba") ?? "";
-            var totalAmount = GetDec(row, "MontoTotal") ?? 0;
-
-            tests.Add(new CertificationTestDto
-            {
-                Index = index++,
-                CaseNumber = testCase,
-                EcfType = "32",
-                ENcf = encf,
-                TotalAmount = totalAmount,
-                Description = $"Resumen Consumo: {testCase}",
-                Step = 3
-            });
-        }
-
-        // ── 7. Block 3: B2C Performance Tests (4 in total) ────────────────
-        // Individual consumption < 250k from ECF sheet (Paso 4)
-        var performanceRows = rows
-            .Where(r => GetStr(r, "TipoeCF") == "32" && (GetDec(r, "MontoTotal") ?? 0) < 250000)
-            .OrderBy(r => GetStr(r, "ENCF"))
-            .ToList();
-
-        foreach (var row in performanceRows)
-        {
-            var encf = GetStr(row, "ENCF") ?? "";
-            var testCase = GetStr(row, "CasoPrueba") ?? "";
-            var totalAmount = GetDec(row, "MontoTotal") ?? 0;
-
-            tests.Add(new CertificationTestDto
-            {
-                Index = index++,
-                CaseNumber = testCase,
-                EcfType = "32",
-                ENcf = encf,
-                TotalAmount = totalAmount,
-                Description = $"{encf} (S4 Performance)",
-                Step = 4
-            });
         }
 
         _cachedTests = tests;
@@ -181,27 +115,33 @@ public class CertificationService : ICertificationService
     {
         if (!int.TryParse(test.EcfType, out int type)) return 0;
 
-        // Promotion: If this document is referenced by another, it MUST be Step 1 (Individual)
-        // so the DGII system has it recorded before the reference document is sent.
         if (referencedNcfs.Contains(test.ENcf?.Trim()))
             return 1;
 
-        // Group 1: 31, 41, 43, 44, 45, 46, 47, and 32 with amount >= 250,000
         if (type == 31 || type == 41 || (type >= 43 && type <= 47) || (type == 32 && test.TotalAmount >= 250000))
             return 1;
 
-        // Group 2: 33, 34 (References)
         if (type == 33 || type == 34)
             return 2;
 
-        // Group 3: 32 with amount < 250,000 (Summary)
         if (type == 32 && test.TotalAmount < 250000)
             return 3;
 
         return 0;
     }
 
-    public async Task<DgiiTransmissionResult> RunTestAsync(int index)
+    private IDictionary<string, object>? FindRowForTest(List<IDictionary<string, object>> allRows, CertificationTestDto test)
+    {
+        return allRows.FirstOrDefault(r =>
+        {
+            string rowIdx = GetStr(r, "Indice") ?? GetStr(r, "Índice") ?? GetStr(r, "Index");
+            string rowNcf = CleanNcf(GetStr(r, "ENCF") ?? GetStr(r, "CasoPrueba") ?? "");
+
+            return rowIdx == test.Index.ToString() || rowNcf == test.ENcf;
+        });
+    }
+
+    public async Task<DgiiTransmissionResult> RunTestAsync(int index, string webRootPath)
     {
         var allTests = await GetTestsAsync();
         var test = allTests.FirstOrDefault(t => t.Index == index)
@@ -212,19 +152,11 @@ public class CertificationService : ICertificationService
         try
         {
             string excelPath = Path.Combine(AppContext.BaseDirectory, "133009889-16042026193727.xlsx");
-            if (!File.Exists(excelPath))
-            {
-                excelPath = "c:\\Projects\\ZynstormECFPlatform\\133009889-16042026193727.xlsx";
-            }
 
-            // ── Select correct sheet based on step ────────────────────────
             string sheetName = (test.Step == 3) ? "RFCE" : "ECF";
             var rows = MiniExcel.Query(excelPath, sheetName: sheetName, useHeaderRow: true)
                 .Cast<IDictionary<string, object>>().ToList();
 
-            // ── Find exact row ───────────────────────────────────────────
-            // For Step 3 (Summary), we find by CaseNumber in RFCE sheet.
-            // For Step 4 (Individual) and Step 1/2, we find by CaseNumber or ENCF in ECF sheet.
             IDictionary<string, object> row;
             if (test.Step == 3)
             {
@@ -232,22 +164,18 @@ public class CertificationService : ICertificationService
             }
             else
             {
-                // Find by ENCF or CaseNumber in ECF sheet
                 row = rows.FirstOrDefault(r => GetStr(r, "ENCF") == test.ENcf)
                       ?? rows.First(r => GetStr(r, "CasoPrueba") == test.CaseNumber);
             }
 
-            // Synchronize the test ENCF so the filename matches the XML content
             test.ENcf = GetStr(row, "ENCF");
 
             var requestDto = MapRowToRequest(row, test.Step);
 
-            // ── 1. Resolve issuer RNC from DTO or config ───────────────────────
             string issuerRnc = requestDto.IssuerRnc;
             if (string.IsNullOrEmpty(issuerRnc))
                 issuerRnc = _configuration["Certification:IssuerRnc"] ?? "133009889";
 
-            // ── 2. Load certificate from database by issuer RNC ────────────────
             var client = await _clientService.GetByAsync(x => x.Rnc == issuerRnc)
                 ?? throw new InvalidOperationException($"No se encontró ningún cliente registrado con el RNC '{issuerRnc}'.");
 
@@ -270,11 +198,8 @@ public class CertificationService : ICertificationService
             var certBase64 = Convert.ToBase64String(certificateBytes);
             var certPass = Encoding.UTF8.GetString(passwordBytes);
 
-            // ── 3. Generate & sign XML ─────────────────────────────────────────
             if (test.Step == 3)
             {
-                // To pass Step 4 later, this Summary (Step 3) MUST use the real signature code.
-                // We'll pre-calculate it by signing the individual version of this NCF first.
                 try
                 {
                     var ecfRows = MiniExcel.Query(excelPath, sheetName: "ECF", useHeaderRow: true)
@@ -282,11 +207,10 @@ public class CertificationService : ICertificationService
                     var individualRow = ecfRows.FirstOrDefault(r => GetStr(r, "ENCF") == test.ENcf);
                     if (individualRow != null)
                     {
-                        var individualDto = MapRowToRequest(individualRow, 4); // Step 4 logic
+                        var individualDto = MapRowToRequest(individualRow, 4);
                         string individualUnsigned = _generatorService.GenerateUnsignedXml(individualDto, false);
                         string individualSigned = _signerService.SignXml(individualUnsigned, certBase64, certPass);
 
-                        // Extract first 6 characters of <SignatureValue>, ignoring whitespaces
                         string tag = "<SignatureValue>";
                         var start = individualSigned.IndexOf(tag);
                         if (start != -1)
@@ -294,25 +218,27 @@ public class CertificationService : ICertificationService
                             var content = individualSigned.Substring(start + tag.Length);
                             var realCode = content.TrimStart().Substring(0, 6);
                             requestDto.SecurityCodeOverride = realCode;
-
-                            // Store debug info in a temporary property or just use the trace if we can
                             requestDto.IssuerWebSite = $"[DEBUG-PRECALC] RNC={individualDto.IssuerRnc}, NCF={individualDto.Ncf}, Date={individualDto.IssueDate:yyyy-MM-dd}, Total={individualDto.ManualMontoTotal}";
                         }
                     }
                 }
-                catch { /* Fallback to random if individual row not found */ }
+                catch { }
             }
 
             string unsignedXml = _generatorService.GenerateUnsignedXml(requestDto, test.Step == 3);
             string signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
 
-            // ── DEBUG: Save the exact XML being sent for inspection ───────────
-            try { File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "temp_last_request.xml"), signedXml); } catch { }
+            try
+            {
+                string scratchFolder = Path.Combine(webRootPath, "certification_files");
+                if (!Directory.Exists(scratchFolder)) Directory.CreateDirectory(scratchFolder);
+                string exportPath = Path.Combine(scratchFolder, $"cert_test_{test.Index}.xml");
+                File.WriteAllText(exportPath, signedXml);
+            }
+            catch { }
 
-            // ── 4. Verify XML Schema (XSD) BEFORE transmitting ────────────────
             var validationErrors = _generatorService.ValidateXmlAgainstSchema(signedXml, int.Parse(test.EcfType));
 
-            return new DgiiTransmissionResult { };
             if (validationErrors.Any(e => e.StartsWith("[ERROR]")))
             {
                 var errorMsg = "Error de esquema (XSD): " + string.Join(" | ", validationErrors);
@@ -321,10 +247,8 @@ public class CertificationService : ICertificationService
                 return new DgiiTransmissionResult { Error = errorMsg };
             }
 
-            // ── 5. Authenticate with DGII ──────────────────────────────────────
             string token = await _authService.GetTokenAsync(issuerRnc, DgiiEnvironment.CerteCF, certBase64, certPass);
 
-            // ── 6. Transmit ────────────────────────────────────────────────────
             bool isSummary = (test.Step == 3);
             var result = await _transmissionService.SendEcfAsync(
                 DgiiEnvironment.CerteCF,
@@ -341,28 +265,6 @@ public class CertificationService : ICertificationService
                 test.Status = TestStatus.Passed;
                 test.TrackId = result.TrackId;
 
-                // TRACE: Log the calculated code for verification
-                if (test.Step == 3 && !string.IsNullOrEmpty(requestDto.SecurityCodeOverride))
-                {
-                    result.Mensaje += $"\n[TRACE] Summary Sync Code: {requestDto.SecurityCodeOverride}";
-                    // Sample of individual XML content used for pre-calc (if stored, but let's just log DTO fields)
-                    result.Mensaje += $"\n[TRACE] Pre-calc DTO: RNC={requestDto.IssuerRnc}, NCF={requestDto.Ncf}, Date={requestDto.IssueDate:yyyy-MM-dd}, Total={requestDto.ManualMontoTotal}";
-                }
-                else if (test.Step == 4)
-                {
-                    // Extract the first 6 chars of the actual signature we just sent
-                    string tag = "<SignatureValue>";
-                    var start = signedXml.IndexOf(tag);
-                    if (start != -1)
-                    {
-                        var sig6 = signedXml.Substring(start + tag.Length).TrimStart().Substring(0, 6);
-                        result.Mensaje += $"\n[TRACE] Individual Signature Prefix: {sig6}";
-                        result.Mensaje += $"\n[TRACE] Real DTO: RNC={requestDto.IssuerRnc}, NCF={requestDto.Ncf}, Date={requestDto.IssueDate:yyyy-MM-dd}, Total={requestDto.ManualMontoTotal}";
-                        result.Mensaje += $"\n[TRACE] Individual Unsigned XML Start: {unsignedXml.Substring(0, Math.Min(100, unsignedXml.Length)).Replace("\n", "").Replace("\r", "")}";
-                    }
-                }
-
-                // ── 7. Enqueue background status tracking job ──────────────────
                 BackgroundJob.Enqueue<Jobs.EcfTrackingJob>(j => j.Execute(
                     result.TrackId,
                     DgiiEnvironment.CerteCF,
@@ -386,18 +288,25 @@ public class CertificationService : ICertificationService
         }
     }
 
-    // ── Helper: read a string from the row, returning null if empty or common garbage (#e, #n/a) ──
+    private static string? CleanNcf(string? raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return raw;
+        // Find the first letter (NCF start) and return everything from there
+        var match = System.Text.RegularExpressions.Regex.Match(raw, @"[A-Za-z].*");
+        return match.Success ? match.Value : raw;
+    }
+
     private static string? GetStr(IDictionary<string, object> row, string key)
     {
-        if (!row.ContainsKey(key)) return null;
-        var val = row[key]?.ToString();
+        if (row == null || string.IsNullOrEmpty(key)) return null;
+        if (!row.TryGetValue(key, out var valObj) || valObj == null) return null;
+
+        var val = valObj.ToString();
         if (string.IsNullOrWhiteSpace(val)) return null;
 
         var clean = val.Trim();
         var lowered = clean.ToLowerInvariant();
 
-        // Clean only actual Excel/DGII non-data placeholders.
-        // Do NOT clean "0" because it might be a valid monetary or indicator value.
         if (lowered == "#e" || lowered == "#n/a")
             return null;
 
@@ -412,9 +321,6 @@ public class CertificationService : ICertificationService
         return null;
     }
 
-    // ── Helper: parse DD-MM-YYYY dates (DGII format) ──────────────────────────
-    // IMPORTANT: Excel dates are already in Dominican Republic local time.
-    // Use DateTimeKind.Unspecified to avoid unwanted conversions in EcfGenerator.
     private static DateTime? ParseDgiiDate(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw) || raw == "#e") return null;
@@ -443,24 +349,19 @@ public class CertificationService : ICertificationService
     {
         var dto = new EcfInvoiceRequestDto
         {
-            // ── Identification ─────────────────────────────────────────────
-            Ncf = GetStr(row, "ENCF") ?? "",
-
-            // ── Issuer ─────────────────────────────────────────────────────
+            Ncf = CleanNcf(GetStr(row, "ENCF") ?? GetStr(row, "CasoPrueba") ?? "") ?? "",
             IssuerRnc = GetStr(row, "RNCEmisor") ?? "",
             IssuerName = GetStr(row, "RazonSocialEmisor") ?? "",
             IssuerAddress = GetStr(row, "DireccionEmisor") ?? "",
             IssuerCommercialName = GetStr(row, "NombreComercial"),
-            IssuerBranchCode = GetStr(row, "Sucursal"),          // null if "#e" or empty
-            IssuerActivityCode = GetStr(row, "ActividadEconomica"),// null if "#e" or empty
+            IssuerBranchCode = GetStr(row, "Sucursal"),
+            IssuerActivityCode = GetStr(row, "ActividadEconomica"),
             IssuerMunicipality = GetStr(row, "Municipio"),
             IssuerProvince = GetStr(row, "Provincia"),
             IssuerPhone = GetStr(row, "TelefonoEmisor[1]"),
             IssuerEmail = GetStr(row, "CorreoEmisor"),
             IssuerWebSite = GetStr(row, "WebSite"),
             IssuerSellerCode = GetStr(row, "CodigoVendedor"),
-
-            // ── Buyer ──────────────────────────────────────────────────────
             CustomerRnc = GetStr(row, "RNCComprador") ?? "",
             CustomerForeignId = GetStr(row, "IdentificadorExtranjero"),
             CustomerName = GetStr(row, "RazonSocialComprador") ?? "",
@@ -468,24 +369,17 @@ public class CertificationService : ICertificationService
             CustomerAddress = GetStr(row, "DireccionComprador"),
             CustomerContact = GetStr(row, "ContactoComprador"),
             CustomerTelephone = GetStr(row, "TelefonoAdicional"),
-
             CustomerEmail = GetStr(row, "CorreoComprador"),
             CustomerMunicipality = GetStr(row, "MunicipioComprador"),
             CustomerProvince = GetStr(row, "ProvinciaComprador"),
             BuyerInternalCode = GetStr(row, "CodigoInternoComprador"),
-
-            // ── Commercial fields ──────────────────────────────────────────
             InternalInvoiceNumber = GetStr(row, "NumeroFacturaInterna"),
             InternalOrderNumber = GetStr(row, "NumeroPedidoInterno"),
             SalesZone = GetStr(row, "ZonaVenta"),
             OrderNumber = GetStr(row, "NumeroOrdenCompra"),
-
-            // ── Payment ────────────────────────────────────────────────────
             PaymentType = int.TryParse(GetStr(row, "TipoPago"), out int p) ? p : null,
             PaymentDeadline = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaLimitePago"))),
             IncomeType = GetStr(row, "TipoIngresos"),
-
-            // ── Manual Overrides for Certification (Raw Excel Data) ────────
             ManualMontoGravadoTotal = GetDec(row, "MontoGravadoTotal"),
             ManualMontoExento = GetDec(row, "MontoExento"),
             ManualMontoTotal = GetDec(row, "MontoTotal"),
@@ -501,23 +395,16 @@ public class CertificationService : ICertificationService
             ManualMontoGravadoI1 = GetDec(row, "MontoGravadoI1"),
             ManualIndicadorNotaCredito = int.TryParse(GetStr(row, "IndicadorNotaCredito"), out int inc) ? inc : null,
             ManualMontoNoFacturable = GetDec(row, "MontoNoFacturable"),
-
             ManualMontoGravadoI2 = GetDec(row, "MontoGravadoI2"),
             ManualMontoGravadoI3 = GetDec(row, "MontoGravadoI3"),
-
-            // ── Reference (NC/ND types 33/34) ──────────────────────────────
-            ReferenceNcf = GetStr(row, "NCFModificado"),
+            ReferenceNcf = CleanNcf(GetStr(row, "NCFModificado")),
             ReferenceCustomerRnc = GetStr(row, "RNCOtroContribuyente"),
             ReferenceReasonCode = int.TryParse(GetStr(row, "CodigoModificacion"), out int rc) ? rc : null,
             ReferenceReasonDescription = GetStr(row, "RazonModificacion"),
-
             Items = new List<EcfItemRequestDto>()
         };
 
-        // ── Dates ──────────────────────────────────────────────────────────
         dto.IssueDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaEmision")) ?? DateTime.Now);
-
-        // Ensure deterministic signature time for certification to match Step 3 and Step 4
         dto.SignatureDateOverride = dto.IssueDate.Date.AddHours(12);
 
         var expDate = ParseDgiiDate(GetStr(row, "FechaVencimientoSecuencia"));
@@ -532,20 +419,12 @@ public class CertificationService : ICertificationService
         dto.OrderDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaOrdenCompra")));
         dto.ReferenceIssueDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaNCFModificado")));
 
-        // ── MontoNoFacturable (type 33 exento) ────────────────────────────
         var montoNoFacturableStr = GetStr(row, "MontoNoFacturable");
         if (decimal.TryParse(montoNoFacturableStr,
             System.Globalization.NumberStyles.Any,
             System.Globalization.CultureInfo.InvariantCulture, out decimal mnf) && mnf > 0)
             dto.MontoNoFacturable = mnf;
 
-        // ── Items ──────────────────────────────────────────────────────────
-        // IndicadorFacturacion from Excel:
-        //   1 = Gravado ITBIS 18%
-        //   2 = Gravado ITBIS 16%
-        //   3 = Gravado ITBIS 0%
-        //   4 = Exento
-        //   0 = No facturable (informativo)
         for (int i = 1; i <= 50; i++)
         {
             var nombreKey = $"NombreItem[{i}]";
@@ -555,14 +434,13 @@ public class CertificationService : ICertificationService
             var indicadorStr = GetStr(row, $"IndicadorFacturacion[{i}]");
             var indicadorFact = int.TryParse(indicadorStr, out int indF) ? indF : 1;
 
-            // Map IndicadorFacturacion → TaxPercentage
             decimal taxPct = indicadorFact switch
             {
                 1 => 18m,
                 2 => 16m,
                 3 => 0m,
-                4 => 0m, // exento — no ITBIS
-                0 => 0m, // no facturable — no ITBIS
+                4 => 0m,
+                0 => 0m,
                 _ => 18m
             };
 
@@ -589,7 +467,7 @@ public class CertificationService : ICertificationService
                 ItemType = itemType,
                 UnitOfMeasure = unitOfMeasure,
                 TaxPercentage = taxPct,
-                BillingIndicator = indicadorFact,  // Pass exact Excel indicator (4=exento, 0=no facturable)
+                BillingIndicator = indicadorFact,
                 ManualMontoItem = GetDec(row, $"MontoItem[{i}]"),
                 ManualDescuentoMonto = GetDec(row, $"DescuentoMonto[{i}]"),
                 ManualRecargoMonto = GetDec(row, $"RecargoMonto[{i}]"),
@@ -599,7 +477,6 @@ public class CertificationService : ICertificationService
                 FechaVencimientoItem = GetStr(row, $"FechaVencimientoItem[{i}]")
             };
 
-            // Extract SubRecargos (up to 5 per item) from Excel
             for (int k = 1; k <= 5; k++)
             {
                 var subTipo = GetStr(row, $"TipoSubRecargo[{i}][{k}]");
@@ -624,6 +501,29 @@ public class CertificationService : ICertificationService
     public async Task<CertificationSummaryDto> GetSummaryAsync()
     {
         var tests = await GetTestsAsync();
+        
+        // Find latest job to enrich clinical data
+        var latestJob = _jobStatuses.Values
+            .OrderByDescending(j => j.JobId) // GUID-based but GUIDs are random, better use a timestamp if we had one.
+            .FirstOrDefault();
+
+        if (latestJob != null)
+        {
+            foreach (var test in tests)
+            {
+                var matchingStep = latestJob.CompletedSteps.FirstOrDefault(s => s.Index == test.Index);
+                if (matchingStep != null)
+                {
+                    test.Status = matchingStep.Status == "Aceptado" ? TestStatus.Passed : 
+                                  matchingStep.Status == "Rechazado" ? TestStatus.Failed : 
+                                  TestStatus.Pending;
+                    // We can't easily change the DTO in place if it doesn't have these fields, 
+                    // but we can put the TrackID in the TestCase or similar if needed.
+                    // For now, at least the Status will be correct.
+                }
+            }
+        }
+
         return new CertificationSummaryDto
         {
             TotalTests = tests.Count,
@@ -632,4 +532,264 @@ public class CertificationService : ICertificationService
             Tests = tests
         };
     }
+
+    #region Automation & Hangfire
+
+    public async Task<string> EnqueueCertificationJobAsync(byte[] excelBytes, string fileName, string webRootPath)
+    {
+        string scratchFolder = Path.Combine(webRootPath, "certification_files");
+        if (!Directory.Exists(scratchFolder)) Directory.CreateDirectory(scratchFolder);
+
+        string jobId = Guid.NewGuid().ToString("N").Substring(0, 8);
+        string tempPath = Path.Combine(scratchFolder, $"suite_{jobId}.xlsx");
+        await File.WriteAllBytesAsync(tempPath, excelBytes);
+
+        _jobStatuses[jobId] = new CertificationJobStatusDto { JobId = jobId, Status = "Pending" };
+
+        BackgroundJob.Enqueue<ICertificationService>(x => x.ProcessAutomationJobAsync(tempPath, jobId, webRootPath));
+
+        return jobId;
+    }
+
+    public async Task<CertificationJobStatusDto> GetJobStatusAsync(string jobId)
+    {
+        if (_jobStatuses.TryGetValue(jobId, out var status))
+        {
+            return await Task.FromResult(status);
+        }
+        return await Task.FromResult(new CertificationJobStatusDto { JobId = jobId, Status = "NotFound" });
+    }
+
+    public async Task<List<CertificationStepResultDto>> GetJobLogsAsync(string jobId)
+    {
+        if (_jobStatuses.TryGetValue(jobId, out var status))
+        {
+            return await Task.FromResult(status.CompletedSteps);
+        }
+        return await Task.FromResult(new List<CertificationStepResultDto>());
+    }
+
+    [AutomaticRetry(Attempts = 0)]
+    public async Task ProcessAutomationJobAsync(string tempFilePath, string jobId, string webRootPath)
+    {
+        if (!_jobStatuses.ContainsKey(jobId))
+        {
+            _jobStatuses[jobId] = new CertificationJobStatusDto { JobId = jobId, Status = "Processing" };
+        }
+        
+        var status = _jobStatuses[jobId];
+        status.Status = "Processing";
+
+        try
+        {
+            var allRows = (await MiniExcel.QueryAsync(tempFilePath, useHeaderRow: true)).Cast<IDictionary<string, object>>().ToList();
+            if (allRows.Count < 2) throw new Exception("Excel file is empty or missing data row.");
+
+            var firstRow = allRows[0];
+            string? rncEmisor = GetStr(firstRow, "RNCEmisor");
+
+            if (string.IsNullOrEmpty(rncEmisor))
+            {
+                // Fallback: Extract from CasoPrueba (e.g. 133009889E330000000001 -> 133009889)
+                var casoPrueba = GetStr(firstRow, "CasoPrueba") ?? GetStr(firstRow, "ENCF");
+                if (!string.IsNullOrEmpty(casoPrueba))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(casoPrueba, @"^\d+");
+                    if (match.Success) rncEmisor = match.Value;
+                }
+            }
+
+            if (string.IsNullOrEmpty(rncEmisor)) throw new Exception("Could not find RNCEmisor or extract it from CasoPrueba in the excel.");
+
+            var client = await _clientService.GetByAsync(c => c.Rnc == rncEmisor);
+            if (client == null) throw new Exception($"Client with RNC {rncEmisor} not found in the database. Certification cannot proceed without certificate.");
+
+            var tests = await GetTestsFromExcelAsync(tempFilePath);
+            status.TotalSteps = tests.Count;
+            status.CurrentStep = 0;
+
+            var step4Xmls = new Dictionary<string, string>();
+
+            foreach (var test in tests.OrderBy(t => t.Step).ThenBy(t => t.Index))
+            {
+                status.CurrentStep++;
+                status.CurrentNcf = test.ENcf;
+                
+                if (test.Index <= 5)
+                {
+                    Console.WriteLine($"[MONITORING] Sending Test Index {test.Index} - NCF: {test.ENcf} - Step: {test.Step}");
+                }
+
+                if (test.Step == 4)
+                {
+                    var genResult = await GenerateSignedXmlForTestAsync(test, client, tempFilePath);
+                    step4Xmls[$"cert_test_{test.Index}_{test.ENcf}.xml"] = genResult;
+
+                    status.CompletedSteps.Add(new CertificationStepResultDto
+                    {
+                        Index = test.Index,
+                        Ncf = test.ENcf,
+                        Step = "4",
+                        Status = "Generated",
+                        Message = "Ready for manual upload."
+                    });
+                }
+                else
+                {
+                    var result = await RunTestInternalAsync(test, client, allRows);
+
+                    status.CompletedSteps.Add(new CertificationStepResultDto
+                    {
+                        Index = test.Index,
+                        Ncf = test.ENcf,
+                        Step = test.Step.ToString(),
+                        TrackId = result.TrackId,
+                        Status = result.Success ? "Aceptado" : "Rechazado",
+                        Message = result.Success ? "Paso exitoso" : result.Error
+                    });
+
+                    if (!result.Success)
+                    {
+                        status.Status = "Failed";
+                        status.ErrorMessage = $"Error en Index {test.Index} (NCF: {test.ENcf}): {result.Error}";
+                        return;
+                    }
+                }
+            }
+
+            if (step4Xmls.Any())
+            {
+                string zipPath = Path.Combine(Path.GetDirectoryName(tempFilePath)!, $"cert_step4_results_{jobId}.zip");
+                using (var zipStream = new FileStream(zipPath, FileMode.Create))
+                using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create, true))
+                {
+                    foreach (var entry in step4Xmls)
+                    {
+                        var zipEntry = archive.CreateEntry(entry.Key, CompressionLevel.Optimal);
+                        using (var entryStream = zipEntry.Open())
+                        using (var writer = new StreamWriter(entryStream))
+                        {
+                            writer.Write(entry.Value);
+                        }
+                    }
+                }
+                status.DownloadUrl = zipPath;
+            }
+
+            status.Status = "Completed";
+        }
+        catch (Exception ex)
+        {
+            status.Status = "Failed";
+            status.ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task<string> GenerateSignedXmlForTestAsync(CertificationTestDto test, Client client, string excelPath)
+    {
+        var allRows = (await MiniExcel.QueryAsync(excelPath, useHeaderRow: true)).Cast<IDictionary<string, object>>().ToList();
+        var row = FindRowForTest(allRows, test);
+
+        if (row == null) throw new Exception($"Data row for index {test.Index} / NCF {test.ENcf} not found.");
+
+        var requestDto = MapRowToRequest(row, test.Step);
+        string unsignedXml = _generatorService.GenerateUnsignedXml(requestDto, test.Step == 3);
+
+        var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+        if (cert == null) throw new Exception("Client has no active certificate.");
+
+        var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId);
+        if (apiKey == null) throw new Exception("Client has no api key.");
+
+        string secret = _encryptedService.DecryptString(apiKey.SecretKey);
+        string certBase64 = Convert.ToBase64String(_encryptedService.DecryptWithSecret(cert.Certificate, secret));
+        string certPass = Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(cert.Password, secret));
+
+        return _signerService.SignXml(unsignedXml, certBase64, certPass);
+    }
+
+    private async Task<DgiiTransmissionResult> RunTestInternalAsync(CertificationTestDto test, Client client, List<IDictionary<string, object>> allRows)
+    {
+        var row = FindRowForTest(allRows, test);
+        if (row == null) return new DgiiTransmissionResult { Error = $"Data for index {test.Index} / NCF {test.ENcf} not found." };
+
+        var requestDto = MapRowToRequest(row, test.Step);
+
+        if (test.Step == 3)
+        {
+            string ncfToSync = GetStr(row, "NCFModificado");
+            var individualRow = allRows.FirstOrDefault(r => GetStr(r, "ENCF") == ncfToSync);
+            if (individualRow != null)
+            {
+                var individualDto = MapRowToRequest(individualRow, 4);
+                individualDto.SignatureDateOverride = individualDto.IssueDate.Date.AddHours(12);
+                string unsignedInd = _generatorService.GenerateUnsignedXml(individualDto, false);
+
+                var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+                var secret = _encryptedService.DecryptString((await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)).SecretKey);
+                string signedInd = _signerService.SignXml(unsignedInd, Convert.ToBase64String(_encryptedService.DecryptWithSecret(cert.Certificate, secret)), Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(cert.Password, secret)));
+
+                requestDto.SecurityCodeOverride = _signerService.GetSignatureValue(signedInd).Substring(0, 6);
+            }
+        }
+
+        string unsignedXml = _generatorService.GenerateUnsignedXml(requestDto, test.Step == 3);
+        var activeCert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+        var secretKey = _encryptedService.DecryptString((await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)).SecretKey);
+        string signedXml = _signerService.SignXml(unsignedXml, Convert.ToBase64String(_encryptedService.DecryptWithSecret(activeCert.Certificate, secretKey)), Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(activeCert.Password, secretKey)));
+
+        var token = await _authService.GetTokenAsync(client.Rnc, DgiiEnvironment.CerteCF, Convert.ToBase64String(_encryptedService.DecryptWithSecret(activeCert.Certificate, secretKey)), Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(activeCert.Password, secretKey)));
+
+        var sendResult = await _transmissionService.SendEcfAsync(
+            DgiiEnvironment.CerteCF,
+            token,
+            signedXml,
+            int.Parse(test.EcfType),
+            test.TotalAmount,
+            client.Rnc,
+            test.ENcf,
+            test.Step == 3);
+
+        if (!sendResult.Success || string.IsNullOrEmpty(sendResult.TrackId))
+            return sendResult;
+
+        // Poll until Aceptado or Rechazado
+        var finalStatus = await PollDgiiStatusAsync(sendResult.TrackId, client.Rnc);
+
+        if (finalStatus.Estado == "Aceptado" || (test.Step == 3 && finalStatus.Estado == "Generado"))
+        {
+            return new DgiiTransmissionResult { TrackId = sendResult.TrackId };
+        }
+
+        return new DgiiTransmissionResult
+        {
+            Error = $"DGII Rejected: {finalStatus.Estado}. Mensajes: {string.Join(", ", finalStatus.Mensajes?.Select(m => m.Valor) ?? new[] { "Sin mensaje" })}"
+        };
+    }
+
+    private async Task<DgiiStatusResponse> PollDgiiStatusAsync(string trackId, string rnc)
+    {
+        var client = await _clientService.GetByAsync(c => c.Rnc == rnc);
+        var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+        var secret = _encryptedService.DecryptString((await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)).SecretKey);
+        var token = await _authService.GetTokenAsync(rnc, DgiiEnvironment.CerteCF, Convert.ToBase64String(_encryptedService.DecryptWithSecret(cert.Certificate, secret)), Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(cert.Password, secret)));
+
+        DgiiStatusResponse status;
+        int attempts = 0;
+        int maxAttempts = 60;
+
+        do
+        {
+            attempts++;
+            await Task.Delay(1000);
+            status = await _transmissionService.GetStatusAsync(DgiiEnvironment.CerteCF, token, trackId);
+
+            if (status.Estado == "Aceptado" || status.Estado == "Rechazado" || status.Estado == "Generado")
+                break;
+        } while (attempts < maxAttempts);
+
+        return status;
+    }
+
+    #endregion Automation & Hangfire
 }

@@ -11,11 +11,13 @@ public class DgiiStatusResponse
     public string ENcf { get; set; } = string.Empty;
     public bool SecuenciaUtilizada { get; set; }
     public string FechaRecepcion { get; set; } = string.Empty;
+    public string Error { get; set; } = string.Empty;
+    public string Mensaje { get; set; } = string.Empty;
     public List<DgiiStatusMensaje> Mensajes { get; set; } = new();
 }
 
 public class DgiiStatusMensaje
 {
-    public string Codigo { get; set; } = string.Empty;
+    public object Codigo { get; set; } = string.Empty;
     public string Valor { get; set; } = string.Empty;
 }

@@ -65,4 +65,16 @@ public class XmlSignatureService : IXmlSignatureService
         // 8. Return signed XML
         return doc.OuterXml;
     }
+
+    public string GetSignatureValue(string signedXml)
+    {
+        var doc = new XmlDocument();
+        doc.LoadXml(signedXml);
+
+        var nsmgr = new XmlNamespaceManager(doc.NameTable);
+        nsmgr.AddNamespace("ds", "http://www.w3.org/2000/09/xmldsig#");
+
+        var node = doc.SelectSingleNode("//ds:SignatureValue", nsmgr);
+        return node?.InnerText.Trim() ?? string.Empty;
+    }
 }
