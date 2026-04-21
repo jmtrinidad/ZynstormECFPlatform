@@ -98,7 +98,7 @@ public class CertificationService : ICertificationService
         {
             var ncf = CleanNcf(GetStr(rfceRow, "ENCF") ?? "");
             var ecfRow = ecfRows.FirstOrDefault(r => CleanNcf(GetStr(r, "ENCF") ?? "") == ncf) ?? rfceRow;
-            
+
             var test = MapToTest(ecfRow, targetIndex++, referencedNcfs);
             test.Step = 3;
             tests.Add(test);
@@ -142,11 +142,11 @@ public class CertificationService : ICertificationService
         string desc = test.Description ?? "";
 
         // 1. Keyword Detection (Step 4 - Simulation/Manual)
-        if (desc.Contains("Paso 4", StringComparison.OrdinalIgnoreCase) || 
-            desc.Contains("Etapa 4", StringComparison.OrdinalIgnoreCase) || 
+        if (desc.Contains("Paso 4", StringComparison.OrdinalIgnoreCase) ||
+            desc.Contains("Etapa 4", StringComparison.OrdinalIgnoreCase) ||
             desc.Contains("Paso IV", StringComparison.OrdinalIgnoreCase) ||
             desc.Contains("Etapa IV", StringComparison.OrdinalIgnoreCase) ||
-            desc.Contains("Simulacion", StringComparison.OrdinalIgnoreCase) || 
+            desc.Contains("Simulacion", StringComparison.OrdinalIgnoreCase) ||
             desc.Contains("Simulación", StringComparison.OrdinalIgnoreCase) ||
             desc.Contains("Manual", StringComparison.OrdinalIgnoreCase) ||
             desc.Contains("Especial", StringComparison.OrdinalIgnoreCase))
@@ -157,14 +157,14 @@ public class CertificationService : ICertificationService
         // 2. Referenced NCFs (Step 1 priority)
         if (referencedNcfs.Contains(test.ENcf?.Trim()))
             return 1;
-        
+
         // 3. Document Types
         if (type == 31 || type == 41 || (type >= 43 && type <= 47) || (type == 32 && test.TotalAmount >= 250000))
             return 1;
-        
+
         if (type == 33 || type == 34)
             return 2;
-        
+
         // Step 3 Summaries (Type 32 for B2C)
         if (type == 32 && test.TotalAmount < 250000)
             return 3;
@@ -464,22 +464,22 @@ public class CertificationService : ICertificationService
             "dd/MM/yyyy HH:mm:ss",
             "dd/MM/yyyy HH:mm",
             "dd/MM/yyyy",
-            "MM/dd/yyyy HH:mm:ss", 
+            "MM/dd/yyyy HH:mm:ss",
             "MM/dd/yyyy HH:mm",
             "MM/dd/yyyy",
             "yyyy-MM-dd HH:mm:ss",
             "yyyy-MM-dd HH:mm",
             "yyyy-MM-dd",
-            "M/d/yyyy h:mm:ss tt", 
-            "MM/dd/yyyy h:mm:ss tt", 
+            "M/d/yyyy h:mm:ss tt",
+            "MM/dd/yyyy h:mm:ss tt",
             "d/M/yyyy h:mm:ss tt",
-            "dd/MM/yyyy h:mm:ss tt", 
-            "yyyy-MM-dd h:mm:ss tt", 
+            "dd/MM/yyyy h:mm:ss tt",
+            "yyyy-MM-dd h:mm:ss tt",
             "dd-MM-yyyy h:mm:ss tt",
             "yyyy/MM/dd HH:mm:ss",
             "yyyy/MM/dd"
         ];
-        
+
         if (DateTime.TryParseExact(val, formats, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsedDt))
             return parsedDt;
 
@@ -624,7 +624,7 @@ public class CertificationService : ICertificationService
                 3 => 0m,
                 4 => 0m,
                 0 => 0m,
-                _ => 18m 
+                _ => 18m
             };
 
             var cantStr = GetStr(row, $"CantidadItem[{i}]");
@@ -684,7 +684,7 @@ public class CertificationService : ICertificationService
     public async Task<CertificationSummaryDto> GetSummaryAsync()
     {
         var tests = await GetTestsAsync();
-        
+
         // Find latest job to enrich clinical data
         var latestJob = _jobStatuses.Values
             .OrderByDescending(j => j.JobId) // GUID-based but GUIDs are random, better use a timestamp if we had one.
@@ -697,10 +697,10 @@ public class CertificationService : ICertificationService
                 var matchingStep = latestJob.CompletedSteps.FirstOrDefault(s => s.Index == test.Index);
                 if (matchingStep != null)
                 {
-                    test.Status = matchingStep.Status == "Aceptado" ? TestStatus.Passed : 
-                                  matchingStep.Status == "Rechazado" ? TestStatus.Failed : 
+                    test.Status = matchingStep.Status == "Aceptado" ? TestStatus.Passed :
+                                  matchingStep.Status == "Rechazado" ? TestStatus.Failed :
                                   TestStatus.Pending;
-                    // We can't easily change the DTO in place if it doesn't have these fields, 
+                    // We can't easily change the DTO in place if it doesn't have these fields,
                     // but we can put the TrackID in the TestCase or similar if needed.
                     // For now, at least the Status will be correct.
                 }
@@ -759,7 +759,7 @@ public class CertificationService : ICertificationService
         {
             _jobStatuses[jobId] = new CertificationJobStatusDto { JobId = jobId, Status = "Processing" };
         }
-        
+
         var status = _jobStatuses[jobId];
         status.Status = "Processing";
 
@@ -791,16 +791,16 @@ public class CertificationService : ICertificationService
             var tests = await GetTestsFromExcelAsync(tempFilePath);
             status.TotalSteps = tests.Count;
             status.CurrentStep = 0;
-            
+
             var jobStartTime = DateTime.Now; // Stabilize all signatures in this job
-            
+
             // Create a 'Virtual' collection that exactly mirrors the tests mapping logic
             var virtualRows = new List<IDictionary<string, object>>();
             var rfceNcfSet = rfceRows.Select(r => CleanNcf(GetStr(r, "ENCF") ?? "")).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var step1Rows = ecfRows.Where(r => !rfceNcfSet.Contains(CleanNcf(GetStr(r, "ENCF") ?? ""))).Take(21).ToList();
 
             virtualRows.AddRange(step1Rows); // 0-20
-            
+
             // For Step 3 (21-24)
             foreach (var rfceRow in rfceRows)
             {
@@ -825,7 +825,7 @@ public class CertificationService : ICertificationService
             {
                 status.CurrentStep++;
                 status.CurrentNcf = test.ENcf;
-                
+
                 Console.WriteLine($"[DEBUG-JOB] Processing Step {test.Step}, Index {test.Index}, NCF {test.ENcf}, Type {test.EcfType}");
 
                 // Stabilize transmission
@@ -835,10 +835,10 @@ public class CertificationService : ICertificationService
                     // For Step 4, we MUST use the same security code that was used in Step 3
                     string? sharedCode = null;
                     ncfSecurityCodes.TryGetValue(test.ENcf, out sharedCode);
-                    
+
                     var genResult = await GenerateSignedXmlForTestAsync(test, client, virtualRows, sharedCode, jobStartTime);
                     step4Xmls[$"cert_test_{test.Index}_{test.ENcf}.xml"] = genResult;
-                    
+
                     if (test.Step > status.HighestCompletedStep)
                         status.HighestCompletedStep = test.Step;
 
@@ -962,7 +962,7 @@ public class CertificationService : ICertificationService
 
         var requestDto = MapRowToRequest(row, test.Step, fallbackDate);
         requestDto.SignatureDateOverride = fallbackDate;
-        
+
         if (!string.IsNullOrEmpty(forcedCode))
         {
             requestDto.SecurityCodeOverride = forcedCode;
@@ -1060,7 +1060,7 @@ public class CertificationService : ICertificationService
         var results = new List<DgiiTransmissionResult>();
         using var ms = new MemoryStream(excelBytes);
         var rows = MiniExcel.Query(ms, useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
-        
+
         var processStartTime = DateTime.Now;
 
         foreach (var row in rows)
@@ -1068,8 +1068,8 @@ public class CertificationService : ICertificationService
             try
             {
                 var dto = MapRowToArecfRequest(row, processStartTime);
-                
-                // Identify the client who needs to sign. 
+
+                // Identify the client who needs to sign.
                 // We check both RNCComprador and RNCEmisor, prioritization matches the certification target.
                 var client = await _clientService.GetByAsync(x => x.Rnc == dto.RNCComprador)
                           ?? await _clientService.GetByAsync(x => x.Rnc == dto.RNCEmisor);
@@ -1083,7 +1083,7 @@ public class CertificationService : ICertificationService
                 // 1. Get Security Data
                 var activeCert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
                 var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId);
-                
+
                 if (activeCert == null || apiKey == null)
                 {
                     results.Add(new DgiiTransmissionResult { Error = $"Datos de seguridad (Certificado/API Key) incompletos para el cliente {client.Rnc}." });
@@ -1099,18 +1099,19 @@ public class CertificationService : ICertificationService
 
                 // 3. Validate against XSD (Pattern "Lo hicimos en la certificación")
                 var validationErrors = _generatorService.ValidateXmlAgainstSchema(unsignedXml, 0);
+
                 if (validationErrors.Any())
                 {
-                    results.Add(new DgiiTransmissionResult 
-                    { 
-                        Error = $"XML AEC generado para {dto.ENcf} no cumple con el XSD: {string.Join(" | ", validationErrors)}" 
+                    results.Add(new DgiiTransmissionResult
+                    {
+                        Error = $"XML AEC generado para {dto.ENcf} no cumple con el XSD: {string.Join(" | ", validationErrors)}"
                     });
                     // continue; // User might decide to continue or stop. Usually better to stop if invalid.
                 }
 
                 // 4. Authentication (Semilla -> Token)
                 var token = await _authService.GetTokenAsync(client.Rnc, DgiiEnvironment.CerteCF, certBase64, certPass);
-                
+
                 // 5. Digital Signature
                 var signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
 
@@ -1118,7 +1119,7 @@ public class CertificationService : ICertificationService
                 var transmission = await _transmissionService.SendArecfAsync(DgiiEnvironment.CerteCF, token, signedXml, client.Rnc, dto.ENcf);
                 transmission.Encf = dto.ENcf;
                 transmission.SignedXml = signedXml;
-                
+
                 results.Add(transmission);
             }
             catch (Exception ex)
@@ -1136,7 +1137,7 @@ public class CertificationService : ICertificationService
         var version = GetStr(row, "Version") ?? "1.0";
         var rncEmisor = GetStr(row, "RNCEmisor") ?? GetStr(row, "RNC Emisor") ?? (FindValueBroadly(row, "RNC", "Emisor")?.ToString() ?? "");
         var encf = (FindValueBroadly(row, "eNCF") ?? FindValueBroadly(row, "NCF") ?? "").ToString() ?? "";
-        
+
         var fechaEmisionRaw = ObjectToDateTime(FindValueBroadly(row, "Fecha", "Emision"));
         var fechaEmision = fechaEmisionRaw ?? fallbackDate;
 
@@ -1154,7 +1155,7 @@ public class CertificationService : ICertificationService
         var fechaHoraAproRaw = ObjectToDateTime(FindValueBroadly(row, "Fecha", "Hora", "Aprobacion"))
                             ?? ObjectToDateTime(FindValueBroadly(row, "Fecha", "Aprobacion"))
                             ?? ObjectToDateTime(FindValueBroadly(row, "Fecha", "Aprobacion", "Comercial"));
-        
+
         var fechaHoraApro = fechaHoraAproRaw ?? fallbackDate;
 
         return new AcecfRequestDto
