@@ -27,4 +27,9 @@ public interface IEcfGeneratorService
     /// <param name="dto">Invoice data to validate.</param>
     /// <returns>List of validation errors. Empty list means all checks passed.</returns>
     List<string> ValidateDto(EcfInvoiceRequestDto dto);
+
+    /// <summary>
+    /// Generates an unsigned XML string for Aprobación Comercial de e-CF (ACECF).
+    /// </summary>
+    string GenerateArecfXml(AcecfRequestDto dto);
 }

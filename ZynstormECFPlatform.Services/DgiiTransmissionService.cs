@@ -180,4 +180,76 @@ public class DgiiTransmissionService : IDgiiTransmissionService
             Mensaje = responseString 
         };
     }
+
+    public async Task<DgiiTransmissionResult> SendArecfAsync(DgiiEnvironment environment, string token, string signedXml, string rncEmisor, string eNcf)
+    {
+        string baseUrl = _configuration["DgiiUrls:CerteCF:AprobacionComercial"] 
+            ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:AprobacionComercial no fue encontrada.");
+        
+        string endpointUrl = $"{baseUrl}/api/AprobacionComercial";
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, endpointUrl);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        
+        string fileName = $"{rncEmisor}{eNcf}AEC.xml";
+        var multipartContent = new MultipartFormDataContent();
+        
+        var utf8WithoutBom = new System.Text.UTF8Encoding(false);
+        var xmlBytes = utf8WithoutBom.GetBytes(signedXml);
+        var xmlFileContent = new ByteArrayContent(xmlBytes);
+        xmlFileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/xml");
+        
+        multipartContent.Add(xmlFileContent, "xml", fileName);
+        request.Content = multipartContent;
+
+        var response = await _httpClient.SendAsync(request);
+        var responseString = await response.Content.ReadAsStringAsync();
+
+        try
+        {
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var aecResp = JsonSerializer.Deserialize<DgiiArecfResponse>(responseString, options);
+            
+            if (aecResp != null)
+            {
+                var result = new DgiiTransmissionResult
+                {
+                    Estado = aecResp.Estado,
+                    Mensaje = aecResp.Mensaje != null ? string.Join(" | ", aecResp.Mensaje) : responseString
+                };
+
+                if (int.TryParse(aecResp.Codigo, out var codInt))
+                {
+                    result.Codigo = codInt;
+                }
+
+                if (!response.IsSuccessStatusCode || (result.Codigo != 0 && result.Codigo != 1))
+                {
+                    result.Error = $"{result.Estado}: {result.Mensaje}";
+                }
+
+                return result;
+            }
+        }
+        catch (JsonException)
+        {
+            if (response.IsSuccessStatusCode && responseString.Length > 5 && responseString.Length < 50 && !responseString.Contains('<'))
+            {
+                return new DgiiTransmissionResult { TrackId = responseString.Trim('"') };
+            }
+        }
+
+        return new DgiiTransmissionResult 
+        { 
+            Error = !response.IsSuccessStatusCode ? $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}: {responseString}" : "Des-serialization error",
+            Mensaje = responseString
+        };
+    }
+
+    private class DgiiArecfResponse
+    {
+        public string? Codigo { get; set; }
+        public string? Estado { get; set; }
+        public List<string>? Mensaje { get; set; }
+    }
 }

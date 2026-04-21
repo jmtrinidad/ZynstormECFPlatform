@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="ACECF">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="DetalleAprobacionComercial">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="Version" type="xs:string" fixed="1.0" />
+              <xs:element name="RNCEmisor" type="xs:string" />
+              <xs:element name="eNCF" type="xs:string" />
+              <xs:element name="FechaEmision" type="xs:string" />
+              <xs:element name="MontoTotal" type="xs:decimal" />
+              <xs:element name="RNCComprador" type="xs:string" />
+              <xs:element name="Estado" type="xs:int" />
+              <xs:element name="DetalleMotivoRechazo" type="xs:string" minOccurs="0" />
+              <xs:element name="FechaHoraAprobacionComercial" type="xs:string" />
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:any processContents="skip" minOccurs="0" maxOccurs="1" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

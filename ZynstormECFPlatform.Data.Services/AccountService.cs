@@ -32,7 +32,7 @@ public class AccountService : IAccountService
             LastName = model.LastName,
             PhoneNumber = model.PhoneNumber,
             UserName = model.UserName,
-            RegisteredAt = DateTime.UtcNow,
+            RegisteredAt = DateTime.Now,
             IsActive = true
         };
 

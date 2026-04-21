@@ -104,4 +104,17 @@ public class CertificationController : ControllerBase
         var logs = await _certificationService.GetJobLogsAsync(jobId);
         return Ok(logs);
     }
+
+    [HttpPost("aprobacion-comercial")]
+    public async Task<ActionResult<List<DgiiTransmissionResult>>> ProcessAprobacionComercial([FromForm] IFormFile excelFile)
+    {
+        if (excelFile == null || excelFile.Length == 0)
+            return BadRequest("Debe proporcionar el archivo Excel 'Aprobacion comerciar.xlsx'.");
+
+        using var ms = new MemoryStream();
+        await excelFile.CopyToAsync(ms);
+        var results = await _certificationService.ProcessAprobacionComercialAsync(ms.ToArray());
+
+        return Ok(results);
+    }
 }

@@ -15,4 +15,7 @@ public interface ICertificationService
     Task ProcessAutomationJobAsync(string tempFilePath, string jobId, string webRootPath);
     Task<CertificationJobStatusDto> GetJobStatusAsync(string jobId);
     Task<List<CertificationStepResultDto>> GetJobLogsAsync(string jobId);
+
+    // AEC Processing
+    Task<List<DgiiTransmissionResult>> ProcessAprobacionComercialAsync(byte[] excelBytes);
 }

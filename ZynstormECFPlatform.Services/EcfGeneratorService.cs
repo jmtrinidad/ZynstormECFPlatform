@@ -27,6 +27,7 @@ public class EcfGeneratorService : IEcfGeneratorService
 
     private readonly XmlSerializer _serializer = new(typeof(EcfXmlRoot));
     private readonly XmlSerializer _rfceSerializer = new(typeof(RfceXmlRoot));
+    private readonly XmlSerializer _acecfSerializer = new(typeof(AcecfXmlRoot));
     private static readonly XmlSerializerNamespaces _noNamespaces;
 
     // ── Schema assembly (Schemas project) ─────────────────────────────────────
@@ -612,6 +613,26 @@ public class EcfGeneratorService : IEcfGeneratorService
     /// </summary>
     private static XmlSchemaSet? LoadSchemaSetForType(int ecfType, bool isRfce = false)
     {
+        // Special case for ACECF (Commercial Approval)
+        if (ecfType == 0 && !isRfce)
+        {
+            var arecfResource = _schemasAssembly
+                .GetManifestResourceNames()
+                .FirstOrDefault(r => r.Contains("ACECF", StringComparison.OrdinalIgnoreCase));
+            
+            if (arecfResource != null)
+            {
+                using var aecStream = _schemasAssembly.GetManifestResourceStream(arecfResource);
+                if (aecStream != null)
+                {
+                    var aecSchemaSet = new XmlSchemaSet();
+                    aecSchemaSet.Add(null, XmlReader.Create(aecStream));
+                    aecSchemaSet.Compile();
+                    return aecSchemaSet;
+                }
+            }
+        }
+
         string prefix = isRfce ? "RFCE" : "e-CF";
         var resourceName = _schemasAssembly
             .GetManifestResourceNames()
@@ -627,5 +648,39 @@ public class EcfGeneratorService : IEcfGeneratorService
         schemaSet.Add(null, XmlReader.Create(stream));
         schemaSet.Compile();
         return schemaSet;
+    }
+    public string GenerateArecfXml(AcecfRequestDto dto)
+    {
+        var model = new AcecfXmlRoot
+        {
+            Detalle = new ArecfXmlDetalle
+            {
+                Version = dto.Version ?? "1.0",
+                RNCEmisor = dto.RNCEmisor,
+                ENcf = dto.ENcf,
+                FechaEmision = dto.FechaEmision,
+                MontoTotal = dto.MontoTotal,
+                RNCComprador = dto.RNCComprador,
+                Estado = dto.Estado,
+                DetalleMotivoRechazo = dto.DetalleMotivoRechazo,
+                FechaHoraAprobacionComercial = dto.FechaHoraAprobacionComercial
+            }
+        };
+
+        var settings = new XmlWriterSettings
+        {
+            Encoding = Encoding.UTF8,
+            Indent = true,
+            OmitXmlDeclaration = false
+        };
+
+        using (var stringWriter = new Utf8StringWriter())
+        {
+            using (var xmlWriter = XmlWriter.Create(stringWriter, settings))
+            {
+                _acecfSerializer.Serialize(xmlWriter, model, _noNamespaces);
+            }
+            return stringWriter.ToString();
+        }
     }
 }

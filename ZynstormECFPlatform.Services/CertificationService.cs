@@ -338,10 +338,66 @@ public class CertificationService : ICertificationService
         return match.Success ? match.Value : raw;
     }
 
-    private static string? GetStr(IDictionary<string, object> row, string key)
+    private static object? GetVal(IDictionary<string, object> row, string key)
     {
         if (row == null || string.IsNullOrEmpty(key)) return null;
-        if (!row.TryGetValue(key, out var valObj) || valObj == null) return null;
+        if (row.TryGetValue(key, out var val) && val != null) return val;
+
+        var normalizedKey = NormalizeKey(key);
+        foreach (var k in row.Keys)
+        {
+            if (NormalizeKey(k) == normalizedKey)
+                return row[k];
+        }
+
+        return null;
+    }
+
+    private static object? FindValueBroadly(IDictionary<string, object> row, params string[] keywords)
+    {
+        if (row == null || keywords == null || keywords.Length == 0) return null;
+
+        // 1. Exact match first (normalized)
+        foreach (var kw in keywords)
+        {
+            var val = GetVal(row, kw);
+            if (val != null) return val;
+        }
+
+        // 2. Partial match (contains all keywords)
+        var normalizedKeywords = keywords.Select(k => NormalizeKey(k)).ToList();
+        foreach (var key in row.Keys)
+        {
+            var normalizedKey = NormalizeKey(key);
+            if (normalizedKeywords.All(kw => normalizedKey.Contains(kw)))
+                return row[key];
+        }
+
+        // 3. Fallback: Contains FIRST keyword at least
+        var firstKw = normalizedKeywords[0];
+        foreach (var key in row.Keys)
+        {
+            if (NormalizeKey(key).Contains(firstKw))
+                return row[key];
+        }
+
+        return null;
+    }
+
+    private static string NormalizeKey(string key)
+    {
+        if (string.IsNullOrEmpty(key)) return "";
+        // Remove spaces, dots, slashes, dashes
+        var normalized = key.Replace(" ", "").Replace(".", "").Replace("/", "").Replace("-", "").Replace("_", "").ToLowerInvariant();
+        // Remove accents
+        normalized = normalized.Replace("á", "a").Replace("é", "e").Replace("í", "i").Replace("ó", "o").Replace("ú", "u");
+        return normalized;
+    }
+
+    private static string? GetStr(IDictionary<string, object> row, string key)
+    {
+        var valObj = GetVal(row, key);
+        if (valObj == null) return null;
 
         var val = valObj.ToString();
         if (string.IsNullOrWhiteSpace(val)) return null;
@@ -357,11 +413,86 @@ public class CertificationService : ICertificationService
 
     private static decimal? GetDec(IDictionary<string, object> row, string key)
     {
-        var val = GetStr(row, key);
-        if (decimal.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal d))
-            return d;
+        var valObj = GetVal(row, key);
+        if (valObj == null) return null;
+        if (valObj is decimal d) return d;
+        if (valObj is double db) return (decimal)db;
+        if (valObj is int i) return (decimal)i;
+        if (valObj is long l) return (decimal)l;
+        if (valObj is float f) return (decimal)f;
+
+        var val = valObj.ToString();
+        if (decimal.TryParse(val, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal parsed))
+            return parsed;
         return null;
     }
+
+    private static int GetInt(IDictionary<string, object> row, string key)
+    {
+        var valObj = GetVal(row, key);
+        if (valObj == null) return 0;
+        if (valObj is int i) return i;
+        if (valObj is decimal d) return (int)d;
+        if (valObj is double db) return (int)db;
+        if (valObj is long l) return (int)l;
+
+        var val = valObj.ToString();
+        if (int.TryParse(val, out int parsed))
+            return parsed;
+        return 0;
+    }
+
+    private static DateTime? GetDateTime(IDictionary<string, object> row, string key)
+    {
+        var valObj = GetVal(row, key);
+        return ObjectToDateTime(valObj);
+    }
+
+    private static DateTime? ObjectToDateTime(object? valObj)
+    {
+        if (valObj == null) return null;
+        if (valObj is DateTime dt) return dt;
+
+        var val = valObj.ToString();
+        if (string.IsNullOrWhiteSpace(val) || val == "#e") return null;
+
+        // Exhaustive list based on DGII Excel screenshot and previous errors
+        string[] formats = [
+            "dd-MM-yyyy HH:mm:ss",
+            "dd-MM-yyyy HH:mm",
+            "dd-MM-yyyy",
+            "dd/MM/yyyy HH:mm:ss",
+            "dd/MM/yyyy HH:mm",
+            "dd/MM/yyyy",
+            "MM/dd/yyyy HH:mm:ss", 
+            "MM/dd/yyyy HH:mm",
+            "MM/dd/yyyy",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd HH:mm",
+            "yyyy-MM-dd",
+            "M/d/yyyy h:mm:ss tt", 
+            "MM/dd/yyyy h:mm:ss tt", 
+            "d/M/yyyy h:mm:ss tt",
+            "dd/MM/yyyy h:mm:ss tt", 
+            "yyyy-MM-dd h:mm:ss tt", 
+            "dd-MM-yyyy h:mm:ss tt",
+            "yyyy/MM/dd HH:mm:ss",
+            "yyyy/MM/dd"
+        ];
+        
+        if (DateTime.TryParseExact(val, formats, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsedDt))
+            return parsedDt;
+
+        if (DateTime.TryParse(val, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out parsedDt))
+            return parsedDt;
+
+        if (DateTime.TryParse(val, out parsedDt))
+            return parsedDt;
+
+        return null;
+    }
+
+    private static string CleanRnc(string? rnc) => rnc?.Trim().Replace("-", "") ?? "";
 
     private static DateTime? ParseDgiiDate(string? raw)
     {
@@ -373,6 +504,15 @@ public class CertificationService : ICertificationService
         if (DateTime.TryParse(raw, System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None, out dt))
             return DateTime.SpecifyKind(dt, DateTimeKind.Unspecified);
+        return null;
+    }
+
+    private static DateTime? ParseDgiiDateTime(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        if (DateTime.TryParse(raw, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var dt))
+            return dt;
         return null;
     }
 
@@ -912,6 +1052,127 @@ public class CertificationService : ICertificationService
     }
 
     #endregion Automation & Hangfire
+
+    #region AEC Processing
+
+    public async Task<List<DgiiTransmissionResult>> ProcessAprobacionComercialAsync(byte[] excelBytes)
+    {
+        var results = new List<DgiiTransmissionResult>();
+        using var ms = new MemoryStream(excelBytes);
+        var rows = MiniExcel.Query(ms, useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
+        
+        var processStartTime = DateTime.Now;
+
+        foreach (var row in rows)
+        {
+            try
+            {
+                var dto = MapRowToArecfRequest(row, processStartTime);
+                
+                // Identify the client who needs to sign. 
+                // We check both RNCComprador and RNCEmisor, prioritization matches the certification target.
+                var client = await _clientService.GetByAsync(x => x.Rnc == dto.RNCComprador)
+                          ?? await _clientService.GetByAsync(x => x.Rnc == dto.RNCEmisor);
+
+                if (client == null)
+                {
+                    results.Add(new DgiiTransmissionResult { Error = $"No se encontró un cliente registrado para RNC {dto.RNCComprador} o {dto.RNCEmisor}. Verifique que el cliente esté dado de alta en el sistema." });
+                    continue;
+                }
+
+                // 1. Get Security Data
+                var activeCert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+                var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId);
+                
+                if (activeCert == null || apiKey == null)
+                {
+                    results.Add(new DgiiTransmissionResult { Error = $"Datos de seguridad (Certificado/API Key) incompletos para el cliente {client.Rnc}." });
+                    continue;
+                }
+
+                var secretKey = _encryptedService.DecryptString(apiKey.SecretKey);
+                string certBase64 = Convert.ToBase64String(_encryptedService.DecryptWithSecret(activeCert.Certificate, secretKey));
+                string certPass = Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(activeCert.Password, secretKey));
+
+                // 2. Generate Unsigned XML
+                var unsignedXml = _generatorService.GenerateArecfXml(dto);
+
+                // 3. Validate against XSD (Pattern "Lo hicimos en la certificación")
+                var validationErrors = _generatorService.ValidateXmlAgainstSchema(unsignedXml, 0);
+                if (validationErrors.Any())
+                {
+                    results.Add(new DgiiTransmissionResult 
+                    { 
+                        Error = $"XML AEC generado para {dto.ENcf} no cumple con el XSD: {string.Join(" | ", validationErrors)}" 
+                    });
+                    // continue; // User might decide to continue or stop. Usually better to stop if invalid.
+                }
+
+                // 4. Authentication (Semilla -> Token)
+                var token = await _authService.GetTokenAsync(client.Rnc, DgiiEnvironment.CerteCF, certBase64, certPass);
+                
+                // 5. Digital Signature
+                var signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
+
+                // 6. Transmission
+                var transmission = await _transmissionService.SendArecfAsync(DgiiEnvironment.CerteCF, token, signedXml, client.Rnc, dto.ENcf);
+                transmission.Encf = dto.ENcf;
+                transmission.SignedXml = signedXml;
+                
+                results.Add(transmission);
+            }
+            catch (Exception ex)
+            {
+                results.Add(new DgiiTransmissionResult { Error = $"Error procesando AEC: {ex.Message}" });
+            }
+        }
+
+        return results;
+    }
+
+    private AcecfRequestDto MapRowToArecfRequest(IDictionary<string, object> row, DateTime fallbackDate)
+    {
+        // Broad Matching to ensure we catch columns with variations (Accents, Case, Connector words)
+        var version = GetStr(row, "Version") ?? "1.0";
+        var rncEmisor = GetStr(row, "RNCEmisor") ?? GetStr(row, "RNC Emisor") ?? (FindValueBroadly(row, "RNC", "Emisor")?.ToString() ?? "");
+        var encf = (FindValueBroadly(row, "eNCF") ?? FindValueBroadly(row, "NCF") ?? "").ToString() ?? "";
+        
+        var fechaEmisionRaw = ObjectToDateTime(FindValueBroadly(row, "Fecha", "Emision"));
+        var fechaEmision = fechaEmisionRaw ?? fallbackDate;
+
+        var montoTotalVal = FindValueBroadly(row, "Monto", "Total") ?? FindValueBroadly(row, "Total");
+        decimal montoTotal = 0;
+        if (montoTotalVal != null) decimal.TryParse(montoTotalVal.ToString(), out montoTotal);
+
+        var rncComprador = GetStr(row, "RNCComprador") ?? GetStr(row, "RNC Comprador") ?? (FindValueBroadly(row, "RNC", "Comprador")?.ToString() ?? "");
+        var estadoVal = FindValueBroadly(row, "Estado");
+        int estado = 1;
+        if (estadoVal != null) int.TryParse(estadoVal.ToString(), out estado);
+
+        var motivo = GetStr(row, "DetalleMotivoRechazo") ?? (FindValueBroadly(row, "Motivo")?.ToString() ?? "");
+
+        var fechaHoraAproRaw = ObjectToDateTime(FindValueBroadly(row, "Fecha", "Hora", "Aprobacion"))
+                            ?? ObjectToDateTime(FindValueBroadly(row, "Fecha", "Aprobacion"))
+                            ?? ObjectToDateTime(FindValueBroadly(row, "Fecha", "Aprobacion", "Comercial"));
+        
+        var fechaHoraApro = fechaHoraAproRaw ?? fallbackDate;
+
+        return new AcecfRequestDto
+        {
+            Version = version,
+            RNCEmisor = rncEmisor,
+            ENcf = encf,
+            FechaEmision = fechaEmision.ToString("dd-MM-yyyy"),
+            MontoTotal = montoTotal,
+            RNCComprador = rncComprador,
+            Estado = estado,
+            DetalleMotivoRechazo = motivo,
+            FechaHoraAprobacionComercial = fechaHoraApro.ToString("dd-MM-yyyy HH:mm:ss")
+        };
+    }
+
+    #endregion AEC Processing
+
     private string GenerateRandomCode(int length)
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
