@@ -15,7 +15,8 @@ public class EcfXmlItem
     public int NumeroLinea { get; set; }
 
     [XmlElement("IndicadorFacturacion", Order = 2)]
-    public int IndicadorFacturacion { get; set; }
+    public int? IndicadorFacturacion { get; set; }
+    public bool ShouldSerializeIndicadorFacturacion() => IndicadorFacturacion.HasValue;
 
     private EcfXmlItemRetencion? _retencion;
 
@@ -34,7 +35,8 @@ public class EcfXmlItem
     public string Name { get; set; } = null!;
 
     [XmlElement("IndicadorBienoServicio", Order = 5)]
-    public int ItemType { get; set; }
+    public int? ItemType { get; set; }
+    public bool ShouldSerializeItemType() => ItemType.HasValue;
 
     [XmlElement("DescripcionItem", Order = 6)]
     public string? DescripcionItem { get; set; }

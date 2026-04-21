@@ -53,8 +53,8 @@ public class EcfGeneratorService : IEcfGeneratorService
     /// <inheritdoc />
     public string GenerateUnsignedXml(EcfInvoiceRequestDto dto, bool isSummary = false)
     {
-        // ── Step 1: Determine if this is an RFCE Summary ─────────────────────────
-        var ecfType = NcfHelper.ExtractEcfType(dto.Ncf);
+        // ── Step 1: Determine the ECF Type (Priority: explicit dto.EcfType > NCF extraction) ─────────────────────────
+        var ecfType = dto.EcfType ?? NcfHelper.ExtractEcfType(dto.Ncf);
         
         // Use the explicit flag if provided, otherwise fallback to the default rule for Type 32 < 250k
         bool isRfceSummary = isSummary || (ecfType == 32 && (dto.ManualMontoTotal ?? 0) < 250000 && dto.Ncf.Length == 13);
@@ -467,13 +467,13 @@ public class EcfGeneratorService : IEcfGeneratorService
                     EcfType = ecfType,
                     Ncf = dto.Ncf,
                     SequenceExpirationDate = expirationDate,
-                    IndicadorNotaCredito = dto.ManualIndicadorNotaCredito ?? (ecfType == 34 ? 1 : null),
-                    IndicadorMontoGravado = dto.ManualIndicadorMontoGravado ?? (ecfType == 31 && taxableGravado > 0 ? 1 : null),
+                    IndicadorNotaCredito = dto.ManualIndicadorNotaCredito,
+                    IndicadorMontoGravado = dto.ManualIndicadorMontoGravado,
 
-                    IncomeType = dto.IncomeType ?? ((ecfType is 31 or 32 or 33 or 44 or 45 or 46) ? "01" : null),
+                    IncomeType = dto.IncomeType,
 
 
-                    PaymentType = dto.PaymentType ?? ((ecfType is 31 or 32 or 33 or 34 or 41 or 44 or 45 or 46 or 47) ? 1 : null),
+                    PaymentType = dto.PaymentType,
                     FechaLimitePago = dto.PaymentDeadline?.ToString(DateFormat),
                     TerminoPago = dto.PaymentTerms
 
@@ -560,8 +560,8 @@ public class EcfGeneratorService : IEcfGeneratorService
                 {
                     EcfType = 32,
                     Ncf = dto.Ncf,
-                    TipoIngresos = dto.IncomeType ?? "01",
-                    TipoPago = dto.PaymentType ?? 1
+                    TipoIngresos = dto.IncomeType,
+                    TipoPago = dto.PaymentType
                 },
                 Emisor = new RfceXmlEmisor
                 {
@@ -601,7 +601,7 @@ public class EcfGeneratorService : IEcfGeneratorService
     private static string GenerateRandomCode(int length)
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        var random = new Random();
+        var random = Random.Shared;
         return new string(Enumerable.Repeat(chars, length)
             .Select(s => s[random.Next(s.Length)]).ToArray());
     }

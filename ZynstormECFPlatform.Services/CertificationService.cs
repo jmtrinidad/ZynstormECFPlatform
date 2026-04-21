@@ -71,39 +71,44 @@ public class CertificationService : ICertificationService
     {
         if (!File.Exists(excelPath)) return new List<CertificationTestDto>();
 
-        var rows = (await MiniExcel.QueryAsync(excelPath, useHeaderRow: true)).Cast<IDictionary<string, object>>().ToList();
-        var tests = new List<CertificationTestDto>();
+        var ecfRows = MiniExcel.Query(excelPath, sheetName: "ECF", useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
+        var rfceRows = MiniExcel.Query(excelPath, sheetName: "RFCE", useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
 
-        // ── 1. Identify all referenced NCFs first to handle dependencies ──
-        var referencedNcfs = rows
+        var tests = new List<CertificationTestDto>();
+        var referencedNcfs = ecfRows
             .Select(r => CleanNcf(GetStr(r, "NCFModificado")))
             .Where(n => !string.IsNullOrEmpty(n))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        int index = 0;
-        foreach (var row in rows)
+        int targetIndex = 0;
+        var rfceNcfs = rfceRows.Select(r => CleanNcf(GetStr(r, "ENCF") ?? "")).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Filter ECF rows to exclude those and take exactly 21 for Step 1
+        var ecfRowsForStep1 = ecfRows.Where(r => !rfceNcfs.Contains(CleanNcf(GetStr(r, "ENCF") ?? ""))).Take(21).ToList();
+
+        // Block 1: ECF Rows 0-20 -> Steps 1 & 2
+        foreach (var row in ecfRowsForStep1)
         {
-            var ecfTypeStr = GetStr(row, "TipoeCF");
-            if (string.IsNullOrWhiteSpace(ecfTypeStr)) continue;
+            var test = MapToTest(row, targetIndex++, referencedNcfs);
+            tests.Add(test);
+        }
 
-            var encf = CleanNcf(GetStr(row, "ENCF") ?? GetStr(row, "CasoPrueba") ?? GetStr(row, "Caso Prueba") ?? GetStr(row, "Caso de Prueba") ?? "") ?? "";
-            var testCase = GetStr(row, "CasoPrueba") ?? GetStr(row, "Caso Prueba") ?? GetStr(row, "Caso de Prueba") ?? GetStr(row, "Escenario") ?? GetStr(row, "Descripcion") ?? GetStr(row, "Descripción") ?? "";
-            // Try to get index from Excel (Indice, Índice, Index), fallback to sequence
-            string idxStr = GetStr(row, "Indice") ?? GetStr(row, "Índice") ?? GetStr(row, "Index") ?? index.ToString();
-            if (!int.TryParse(idxStr, out int idxValue)) idxValue = index;
+        // Block 2: Step 3 -> NCFs from RFCE sheet
+        foreach (var rfceRow in rfceRows)
+        {
+            var ncf = CleanNcf(GetStr(rfceRow, "ENCF") ?? "");
+            var ecfRow = ecfRows.FirstOrDefault(r => CleanNcf(GetStr(r, "ENCF") ?? "") == ncf) ?? rfceRow;
+            
+            var test = MapToTest(ecfRow, targetIndex++, referencedNcfs);
+            test.Step = 3;
+            tests.Add(test);
+        }
 
-            var test = new CertificationTestDto
-            {
-                Index = idxValue,
-                CaseNumber = testCase,
-                EcfType = ecfTypeStr,
-                ENcf = encf,
-                TotalAmount = GetDec(row, "MontoTotal") ?? 0,
-                Description = $"Caso: {testCase}",
-                Step = 1
-            };
-            index++;
-            test.Step = DetermineStep(test, referencedNcfs);
+        // Block 3: Step 4 -> RFCE rows (mapping them as individual invoices for download)
+        foreach (var rfceRow in rfceRows)
+        {
+            var test = MapToTest(rfceRow, targetIndex++, referencedNcfs);
+            test.Step = 4;
             tests.Add(test);
         }
 
@@ -111,49 +116,60 @@ public class CertificationService : ICertificationService
         return _cachedTests;
     }
 
+    private CertificationTestDto MapToTest(IDictionary<string, object> row, int index, HashSet<string> referencedNcfs)
+    {
+        var ecfTypeStr = GetStr(row, "TipoeCF") ?? "31";
+        var encf = CleanNcf(GetStr(row, "ENCF") ?? GetStr(row, "CasoPrueba") ?? "") ?? "";
+        var testCase = GetStr(row, "CasoPrueba") ?? GetStr(row, "Caso Prueba") ?? GetStr(row, "Caso de Prueba") ?? GetStr(row, "Escenario") ?? GetStr(row, "Descripcion") ?? GetStr(row, "Descripción") ?? "";
+
+        var test = new CertificationTestDto
+        {
+            Index = index,
+            CaseNumber = testCase,
+            EcfType = ecfTypeStr,
+            ENcf = encf,
+            TotalAmount = GetDec(row, "MontoTotal") ?? 0,
+            Description = $"Caso: {testCase}",
+            Status = TestStatus.Pending
+        };
+        test.Step = DetermineStep(test, referencedNcfs);
+        return test;
+    }
+
     private int DetermineStep(CertificationTestDto test, HashSet<string> referencedNcfs)
     {
-        int finalStep = 0;
-        if (!int.TryParse(test.EcfType, out int type)) {
-             Console.WriteLine($"[STEP-DEBUG] Case {test.Description} - Unknown type, assigned Step 0");
-             return 0;
-        }
-
-        // 1. Explicit Keywords (Step 4 / Manual / Simulation)
+        if (!int.TryParse(test.EcfType, out int type)) return 0;
         string desc = test.Description ?? "";
-        bool isStep4 = desc.Contains("Paso 4", StringComparison.OrdinalIgnoreCase) || 
-                       desc.Contains("Etapa 4", StringComparison.OrdinalIgnoreCase) || 
-                       desc.Contains("Paso IV", StringComparison.OrdinalIgnoreCase) ||
-                       desc.Contains("Etapa IV", StringComparison.OrdinalIgnoreCase) ||
-                       desc.Contains("Simulacion", StringComparison.OrdinalIgnoreCase) || 
-                       desc.Contains("Simulación", StringComparison.OrdinalIgnoreCase) ||
-                       desc.Contains("Escenario 24", StringComparison.OrdinalIgnoreCase) ||
-                       desc.Contains("Escenario 25", StringComparison.OrdinalIgnoreCase) ||
-                       desc.Contains("Manual", StringComparison.OrdinalIgnoreCase) ||
-                       desc.Contains("Especial", StringComparison.OrdinalIgnoreCase);
 
-        if (isStep4)
+        // 1. Keyword Detection (Step 4 - Simulation/Manual)
+        if (desc.Contains("Paso 4", StringComparison.OrdinalIgnoreCase) || 
+            desc.Contains("Etapa 4", StringComparison.OrdinalIgnoreCase) || 
+            desc.Contains("Paso IV", StringComparison.OrdinalIgnoreCase) ||
+            desc.Contains("Etapa IV", StringComparison.OrdinalIgnoreCase) ||
+            desc.Contains("Simulacion", StringComparison.OrdinalIgnoreCase) || 
+            desc.Contains("Simulación", StringComparison.OrdinalIgnoreCase) ||
+            desc.Contains("Manual", StringComparison.OrdinalIgnoreCase) ||
+            desc.Contains("Especial", StringComparison.OrdinalIgnoreCase))
         {
-            finalStep = 4;
-        }
-        else if (referencedNcfs.Contains(test.ENcf?.Trim()))
-            finalStep = 1;
-        else if (type == 31 || type == 41 || (type >= 43 && type <= 47) || (type == 32 && test.TotalAmount >= 250000))
-            finalStep = 1;
-        else if (type == 33 || type == 34)
-            finalStep = 2;
-        else if (type == 32 && test.TotalAmount < 250000)
-            finalStep = 3;
-
-        // 5. Fallback: Last cases are usually Step 4 if not otherwise identified
-        if (finalStep == 0) 
-        {
-            // Explicitly handle indices 25-28 as Step 4 if they weren't caught by keywords
-            if (test.Index >= 25) finalStep = 4;
+            return 4;
         }
 
-        Console.WriteLine($"[STEP-DEBUG] Case {test.Index} ({test.ENcf}) - Type {type} - Assigned Step {finalStep} (Desc: {test.Description})");
-        return finalStep;
+        // 2. Referenced NCFs (Step 1 priority)
+        if (referencedNcfs.Contains(test.ENcf?.Trim()))
+            return 1;
+        
+        // 3. Document Types
+        if (type == 31 || type == 41 || (type >= 43 && type <= 47) || (type == 32 && test.TotalAmount >= 250000))
+            return 1;
+        
+        if (type == 33 || type == 34)
+            return 2;
+        
+        // Step 3 Summaries (Type 32 for B2C)
+        if (type == 32 && test.TotalAmount < 250000)
+            return 3;
+
+        return 0;
     }
 
     private IDictionary<string, object>? FindRowForTest(List<IDictionary<string, object>> allRows, CertificationTestDto test)
@@ -375,6 +391,7 @@ public class CertificationService : ICertificationService
     {
         var dto = new EcfInvoiceRequestDto
         {
+            EcfType = int.TryParse(GetStr(row, "TipoeCF"), out int t) ? t : 0,
             Ncf = CleanNcf(GetStr(row, "ENCF") ?? GetStr(row, "CasoPrueba") ?? "") ?? "",
             IssuerRnc = GetStr(row, "RNCEmisor") ?? "",
             IssuerName = GetStr(row, "RazonSocialEmisor") ?? "",
@@ -431,7 +448,7 @@ public class CertificationService : ICertificationService
         };
 
         dto.IssueDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaEmision")) ?? DateTime.Now);
-        dto.SignatureDateOverride = dto.IssueDate.Date.AddHours(12);
+        // dto.SignatureDateOverride = dto.IssueDate.Date.AddHours(12); // Removed as requested
 
         var expDate = ParseDgiiDate(GetStr(row, "FechaVencimientoSecuencia"));
         string typeStr = GetStr(row, "TipoeCF") ?? "";
@@ -458,7 +475,7 @@ public class CertificationService : ICertificationService
             if (nombre == null) continue;
 
             var indicadorStr = GetStr(row, $"IndicadorFacturacion[{i}]");
-            var indicadorFact = int.TryParse(indicadorStr, out int indF) ? indF : 1;
+            var indicadorFact = int.TryParse(indicadorStr, out int indF) ? (int?)indF : null;
 
             decimal taxPct = indicadorFact switch
             {
@@ -467,7 +484,7 @@ public class CertificationService : ICertificationService
                 3 => 0m,
                 4 => 0m,
                 0 => 0m,
-                _ => 18m
+                _ => 18m 
             };
 
             var cantStr = GetStr(row, $"CantidadItem[{i}]");
@@ -481,8 +498,8 @@ public class CertificationService : ICertificationService
             decimal precio = decimal.TryParse(precioStr,
                 System.Globalization.NumberStyles.Any,
                 System.Globalization.CultureInfo.InvariantCulture, out decimal pr) ? pr : 0;
-            int itemType = int.TryParse(bienServStr, out int bs) ? bs : 1;
-            int? unitOfMeasure = int.TryParse(unidadStr, out int um) ? um : null;
+            int? itemType = int.TryParse(bienServStr, out int bs) ? (int?)bs : null;
+            int? unitOfMeasure = int.TryParse(unidadStr, out int um) ? (int?)um : null;
 
             var item = new EcfItemRequestDto
             {
@@ -608,15 +625,16 @@ public class CertificationService : ICertificationService
 
         try
         {
-            var allRows = (await MiniExcel.QueryAsync(tempFilePath, useHeaderRow: true)).Cast<IDictionary<string, object>>().ToList();
-            if (allRows.Count < 2) throw new Exception("Excel file is empty or missing data row.");
+            var ecfRows = MiniExcel.Query(tempFilePath, sheetName: "ECF", useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
+            var rfceRows = MiniExcel.Query(tempFilePath, sheetName: "RFCE", useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
 
-            var firstRow = allRows[0];
+            if (ecfRows.Count < 1) throw new Exception("Excel file is empty or missing data row.");
+
+            var firstRow = ecfRows[0];
             string? rncEmisor = GetStr(firstRow, "RNCEmisor");
 
             if (string.IsNullOrEmpty(rncEmisor))
             {
-                // Fallback: Extract from CasoPrueba (e.g. 133009889E330000000001 -> 133009889)
                 var casoPrueba = GetStr(firstRow, "CasoPrueba") ?? GetStr(firstRow, "ENCF");
                 if (!string.IsNullOrEmpty(casoPrueba))
                 {
@@ -625,31 +643,53 @@ public class CertificationService : ICertificationService
                 }
             }
 
-            if (string.IsNullOrEmpty(rncEmisor)) throw new Exception("Could not find RNCEmisor or extract it from CasoPrueba in the excel.");
+            if (string.IsNullOrEmpty(rncEmisor)) throw new Exception("Could not find RNCEmisor in the excel.");
 
             var client = await _clientService.GetByAsync(c => c.Rnc == rncEmisor);
-            if (client == null) throw new Exception($"Client with RNC {rncEmisor} not found in the database. Certification cannot proceed without certificate.");
+            if (client == null) throw new Exception($"Client with RNC {rncEmisor} not found in the database.");
 
             var tests = await GetTestsFromExcelAsync(tempFilePath);
             status.TotalSteps = tests.Count;
             status.CurrentStep = 0;
-            Console.WriteLine($"[INFO] Automation started for Job {jobId}. Total tests: {tests.Count}, Step 4 identified: {tests.Count(t => t.Step == 4)}");
+            
+            // Create a 'Virtual' collection that exactly mirrors the tests mapping logic
+            var virtualRows = new List<IDictionary<string, object>>();
+            var rfceNcfSet = rfceRows.Select(r => CleanNcf(GetStr(r, "ENCF") ?? "")).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var step1Rows = ecfRows.Where(r => !rfceNcfSet.Contains(CleanNcf(GetStr(r, "ENCF") ?? ""))).Take(21).ToList();
+
+            virtualRows.AddRange(step1Rows); // 0-20
+            
+            // For Step 3 (21-24)
+            foreach (var rfceRow in rfceRows)
+            {
+                var ncf = CleanNcf(GetStr(rfceRow, "ENCF") ?? "");
+                var ecfRow = ecfRows.FirstOrDefault(r => CleanNcf(GetStr(r, "ENCF") ?? "") == ncf) ?? rfceRow;
+                virtualRows.Add(ecfRow);
+            }
+
+            // For Step 4 (25-28)
+            virtualRows.AddRange(rfceRows);
 
             var step4Xmls = new Dictionary<string, string>();
+            var ncfSecurityCodes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var globalUsedCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var test in tests.OrderBy(t => t.Step).ThenBy(t => t.Index))
             {
                 status.CurrentStep++;
                 status.CurrentNcf = test.ENcf;
                 
-                if (test.Index <= 5)
-                {
-                    Console.WriteLine($"[MONITORING] Sending Test Index {test.Index} - NCF: {test.ENcf} - Step: {test.Step}");
-                }
+                Console.WriteLine($"[DEBUG-JOB] Processing Step {test.Step}, Index {test.Index}, NCF {test.ENcf}, Type {test.EcfType}");
 
+                // Stabilize transmission
+                await Task.Delay(2000);
                 if (test.Step == 4)
                 {
-                    var genResult = await GenerateSignedXmlForTestAsync(test, client, tempFilePath);
+                    // For Step 4, we MUST use the same security code that was used in Step 3
+                    string? sharedCode = null;
+                    ncfSecurityCodes.TryGetValue(test.ENcf, out sharedCode);
+                    
+                    var genResult = await GenerateSignedXmlForTestAsync(test, client, virtualRows, sharedCode);
                     step4Xmls[$"cert_test_{test.Index}_{test.ENcf}.xml"] = genResult;
                     
                     if (test.Step > status.HighestCompletedStep)
@@ -660,13 +700,23 @@ public class CertificationService : ICertificationService
                         Index = test.Index,
                         Ncf = test.ENcf,
                         Step = "4",
-                        Status = "Generated",
-                        Message = "Ready for manual upload."
+                        Status = "Generado",
+                        Message = string.IsNullOrEmpty(sharedCode) ? "XML generado (aleatorio)" : $"XML generado con código sincronizado: {sharedCode}"
                     });
                 }
                 else
                 {
-                    var result = await RunTestInternalAsync(test, client, allRows);
+                    // For Steps 1, 2, 3: Generate a UNIQUE code (deduplicated against global cache)
+                    string forcedCode;
+                    int safetyIter = 0;
+                    do {
+                        forcedCode = GenerateRandomCode(6);
+                        safetyIter++;
+                    } while (globalUsedCodes.Contains(forcedCode) && safetyIter < 100);
+
+                    globalUsedCodes.Add(forcedCode);
+
+                    var result = await RunTestInternalAsync(test, client, virtualRows, forcedCode);
 
                     status.CompletedSteps.Add(new CertificationStepResultDto
                     {
@@ -675,11 +725,12 @@ public class CertificationService : ICertificationService
                         Step = test.Step.ToString(),
                         TrackId = result.TrackId,
                         Status = result.Success ? "Aceptado" : "Rechazado",
-                        Message = result.Success ? "Paso exitoso" : result.Error
+                        Message = result.Success ? $"Paso exitoso (Code: {forcedCode})" : result.Error
                     });
 
                     if (result.Success)
                     {
+                        ncfSecurityCodes[test.ENcf] = forcedCode; // Track/Overwrite code for this NCF for Step 4
                         if (test.Step > status.HighestCompletedStep)
                             status.HighestCompletedStep = test.Step;
                     }
@@ -711,7 +762,8 @@ public class CertificationService : ICertificationService
                 status.DownloadUrl = zipPath;
             }
 
-            status.Status = "Completed";
+            if (status.Status != "Failed")
+                status.Status = "Completed";
         }
         catch (Exception ex)
         {
@@ -720,14 +772,17 @@ public class CertificationService : ICertificationService
         }
     }
 
-    private async Task<string> GenerateSignedXmlForTestAsync(CertificationTestDto test, Client client, string excelPath)
+    private async Task<string> GenerateSignedXmlForTestAsync(CertificationTestDto test, Client client, List<IDictionary<string, object>> virtualRows, string? forcedCode = null)
     {
-        var allRows = (await MiniExcel.QueryAsync(excelPath, useHeaderRow: true)).Cast<IDictionary<string, object>>().ToList();
-        var row = FindRowForTest(allRows, test);
-
-        if (row == null) throw new Exception($"Data row for index {test.Index} / NCF {test.ENcf} not found.");
+        var row = test.Index < virtualRows.Count ? virtualRows[test.Index] : virtualRows.Last();
 
         var requestDto = MapRowToRequest(row, test.Step);
+        
+        if (!string.IsNullOrEmpty(forcedCode))
+        {
+            requestDto.SecurityCodeOverride = forcedCode;
+        }
+
         string unsignedXml = _generatorService.GenerateUnsignedXml(requestDto, test.Step == 3);
 
         var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
@@ -743,34 +798,18 @@ public class CertificationService : ICertificationService
         return _signerService.SignXml(unsignedXml, certBase64, certPass);
     }
 
-    private async Task<DgiiTransmissionResult> RunTestInternalAsync(CertificationTestDto test, Client client, List<IDictionary<string, object>> allRows)
+    private async Task<DgiiTransmissionResult> RunTestInternalAsync(CertificationTestDto test, Client client, List<IDictionary<string, object>> virtualRows, string? forcedCode = null)
     {
-        var row = FindRowForTest(allRows, test);
-        if (row == null) return new DgiiTransmissionResult { Error = $"Data for index {test.Index} / NCF {test.ENcf} not found." };
-
+        var row = virtualRows[test.Index];
         var requestDto = MapRowToRequest(row, test.Step);
 
-        if (test.Step == 3)
-        {
-            string ncfToSync = GetStr(row, "NCFModificado");
-            var individualRow = allRows.FirstOrDefault(r => GetStr(r, "ENCF") == ncfToSync);
-            if (individualRow != null)
-            {
-                var individualDto = MapRowToRequest(individualRow, 4);
-                individualDto.SignatureDateOverride = individualDto.IssueDate.Date.AddHours(12);
-                string unsignedInd = _generatorService.GenerateUnsignedXml(individualDto, false);
+        // ALWAYS ensure randomization/forced code to avoid 'Already used' errors
+        requestDto.SecurityCodeOverride = forcedCode;
 
-                var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
-                var secret = _encryptedService.DecryptString((await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)).SecretKey);
-                string signedInd = _signerService.SignXml(unsignedInd, Convert.ToBase64String(_encryptedService.DecryptWithSecret(cert.Certificate, secret)), Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(cert.Password, secret)));
-
-                requestDto.SecurityCodeOverride = _signerService.GetSignatureValue(signedInd).Substring(0, 6);
-            }
-        }
-
-        string unsignedXml = _generatorService.GenerateUnsignedXml(requestDto, test.Step == 3);
         var activeCert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
         var secretKey = _encryptedService.DecryptString((await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)).SecretKey);
+
+        string unsignedXml = _generatorService.GenerateUnsignedXml(requestDto, test.Step == 3);
         string signedXml = _signerService.SignXml(unsignedXml, Convert.ToBase64String(_encryptedService.DecryptWithSecret(activeCert.Certificate, secretKey)), Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(activeCert.Password, secretKey)));
 
         var token = await _authService.GetTokenAsync(client.Rnc, DgiiEnvironment.CerteCF, Convert.ToBase64String(_encryptedService.DecryptWithSecret(activeCert.Certificate, secretKey)), Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(activeCert.Password, secretKey)));
@@ -827,4 +866,11 @@ public class CertificationService : ICertificationService
     }
 
     #endregion Automation & Hangfire
+    private string GenerateRandomCode(int length)
+    {
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        var random = new Random();
+        return new string(Enumerable.Repeat(chars, length)
+            .Select(s => s[random.Next(s.Length)]).ToArray());
+    }
 }

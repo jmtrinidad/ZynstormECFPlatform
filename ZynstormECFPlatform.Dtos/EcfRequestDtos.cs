@@ -16,6 +16,9 @@ public class EcfInvoiceRequestDto
     [Required]
     public string Ncf { get; set; } = null!;
 
+    /// <summary>Explicit TipoeCF (e.g. 31, 33, 34). If provided, overrides the extraction from Ncf.</summary>
+    public int? EcfType { get; set; }
+
     /// <summary>Optional external reference / internal invoice number from the integrating system.</summary>
     [Required]
     public string ExternalReference { get; set; } = null!;
@@ -235,7 +238,7 @@ public class EcfItemRequestDto
     public decimal ItbisAmount { get; set; }
 
     /// <summary>1: Bien (Good), 2: Servicio (Service).</summary>
-    public int ItemType { get; set; } = 1;
+    public int? ItemType { get; set; }
 
     /// <summary>
     /// Explicit billing indicator from DGII catalog (IndicadorFacturacion).

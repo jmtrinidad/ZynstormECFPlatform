@@ -11,10 +11,10 @@ public class RfceXmlIdDoc
     public string Ncf { get; set; } = null!;
 
     [XmlElement("TipoIngresos", Order = 3)]
-    public string TipoIngresos { get; set; } = "01";
+    public string? TipoIngresos { get; set; }
 
     [XmlElement("TipoPago", Order = 4)]
-    public int TipoPago { get; set; } = 1;
+    public int? TipoPago { get; set; }
 
     [XmlElement("TablaFormasPago", Order = 5)]
     public RfceXmlTablaFormasPago? TablaFormasPago { get; set; }

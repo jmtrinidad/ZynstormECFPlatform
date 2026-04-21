@@ -126,7 +126,7 @@ public class DgiiTransmissionService : IDgiiTransmissionService
 
         return new DgiiTransmissionResult 
         { 
-            Error = !response.IsSuccessStatusCode ? (response.ReasonPhrase ?? "Unknown HTTP Error") : "Des-serialization error",
+            Error = !response.IsSuccessStatusCode ? $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}: {responseString}" : "Des-serialization error",
             Mensaje = responseString
         };
     }
