@@ -387,7 +387,7 @@ public class CertificationService : ICertificationService
         return _dateOffset.HasValue ? date.Value.Add(_dateOffset.Value) : date;
     }
 
-    private EcfInvoiceRequestDto MapRowToRequest(IDictionary<string, object> row, int currentStep)
+    private EcfInvoiceRequestDto MapRowToRequest(IDictionary<string, object> row, int step, DateTime? fallbackDate = null)
     {
         var dto = new EcfInvoiceRequestDto
         {
@@ -447,7 +447,7 @@ public class CertificationService : ICertificationService
             Items = new List<EcfItemRequestDto>()
         };
 
-        dto.IssueDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaEmision")) ?? DateTime.Now);
+        dto.IssueDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaEmision")) ?? fallbackDate ?? DateTime.Now);
         // dto.SignatureDateOverride = dto.IssueDate.Date.AddHours(12); // Removed as requested
 
         var expDate = ParseDgiiDate(GetStr(row, "FechaVencimientoSecuencia"));
@@ -652,6 +652,8 @@ public class CertificationService : ICertificationService
             status.TotalSteps = tests.Count;
             status.CurrentStep = 0;
             
+            var jobStartTime = DateTime.Now; // Stabilize all signatures in this job
+            
             // Create a 'Virtual' collection that exactly mirrors the tests mapping logic
             var virtualRows = new List<IDictionary<string, object>>();
             var rfceNcfSet = rfceRows.Select(r => CleanNcf(GetStr(r, "ENCF") ?? "")).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -668,7 +670,12 @@ public class CertificationService : ICertificationService
             }
 
             // For Step 4 (25-28)
-            virtualRows.AddRange(rfceRows);
+            foreach (var rfceRow in rfceRows)
+            {
+                var ncf = CleanNcf(GetStr(rfceRow, "ENCF") ?? "");
+                var ecfRow = ecfRows.FirstOrDefault(r => CleanNcf(GetStr(r, "ENCF") ?? "") == ncf) ?? rfceRow;
+                virtualRows.Add(ecfRow);
+            }
 
             var step4Xmls = new Dictionary<string, string>();
             var ncfSecurityCodes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -689,7 +696,7 @@ public class CertificationService : ICertificationService
                     string? sharedCode = null;
                     ncfSecurityCodes.TryGetValue(test.ENcf, out sharedCode);
                     
-                    var genResult = await GenerateSignedXmlForTestAsync(test, client, virtualRows, sharedCode);
+                    var genResult = await GenerateSignedXmlForTestAsync(test, client, virtualRows, sharedCode, jobStartTime);
                     step4Xmls[$"cert_test_{test.Index}_{test.ENcf}.xml"] = genResult;
                     
                     if (test.Step > status.HighestCompletedStep)
@@ -706,17 +713,54 @@ public class CertificationService : ICertificationService
                 }
                 else
                 {
-                    // For Steps 1, 2, 3: Generate a UNIQUE code (deduplicated against global cache)
-                    string forcedCode;
-                    int safetyIter = 0;
-                    do {
-                        forcedCode = GenerateRandomCode(6);
-                        safetyIter++;
-                    } while (globalUsedCodes.Contains(forcedCode) && safetyIter < 100);
+                    // For Steps 1, 2, 3: Generate a UNIQUE code
+                    string forcedCode = "";
+
+                    if (test.Step == 3)
+                    {
+                        try
+                        {
+                            var ncf = CleanNcf(test.ENcf);
+                            var ecfRow = ecfRows.FirstOrDefault(r => CleanNcf(GetStr(r, "ENCF") ?? "") == ncf);
+                            if (ecfRow != null)
+                            {
+                                var individualDto = MapRowToRequest(ecfRow, 4, jobStartTime);
+                                individualDto.SignatureDateOverride = jobStartTime;
+
+                                var activeCert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+                                var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId);
+                                var secretKey = _encryptedService.DecryptString(apiKey.SecretKey);
+
+                                string individualUnsigned = _generatorService.GenerateUnsignedXml(individualDto, false);
+                                string certBase64 = Convert.ToBase64String(_encryptedService.DecryptWithSecret(activeCert.Certificate, secretKey));
+                                string certPass = Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(activeCert.Password, secretKey));
+
+                                string signed = _signerService.SignXml(individualUnsigned, certBase64, certPass);
+                                string tag = "<SignatureValue>";
+                                var start = signed.IndexOf(tag);
+                                if (start != -1)
+                                {
+                                    var content = signed.Substring(start + tag.Length).TrimStart();
+                                    forcedCode = content.Substring(0, 6);
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+
+                    if (string.IsNullOrEmpty(forcedCode))
+                    {
+                        int safetyIter = 0;
+                        do
+                        {
+                            forcedCode = GenerateRandomCode(6);
+                            safetyIter++;
+                        } while (globalUsedCodes.Contains(forcedCode) && safetyIter < 100);
+                    }
 
                     globalUsedCodes.Add(forcedCode);
 
-                    var result = await RunTestInternalAsync(test, client, virtualRows, forcedCode);
+                    var result = await RunTestInternalAsync(test, client, virtualRows, forcedCode, jobStartTime);
 
                     status.CompletedSteps.Add(new CertificationStepResultDto
                     {
@@ -772,11 +816,12 @@ public class CertificationService : ICertificationService
         }
     }
 
-    private async Task<string> GenerateSignedXmlForTestAsync(CertificationTestDto test, Client client, List<IDictionary<string, object>> virtualRows, string? forcedCode = null)
+    private async Task<string> GenerateSignedXmlForTestAsync(CertificationTestDto test, Client client, List<IDictionary<string, object>> virtualRows, string? forcedCode = null, DateTime? fallbackDate = null)
     {
         var row = test.Index < virtualRows.Count ? virtualRows[test.Index] : virtualRows.Last();
 
-        var requestDto = MapRowToRequest(row, test.Step);
+        var requestDto = MapRowToRequest(row, test.Step, fallbackDate);
+        requestDto.SignatureDateOverride = fallbackDate;
         
         if (!string.IsNullOrEmpty(forcedCode))
         {
@@ -798,10 +843,11 @@ public class CertificationService : ICertificationService
         return _signerService.SignXml(unsignedXml, certBase64, certPass);
     }
 
-    private async Task<DgiiTransmissionResult> RunTestInternalAsync(CertificationTestDto test, Client client, List<IDictionary<string, object>> virtualRows, string? forcedCode = null)
+    private async Task<DgiiTransmissionResult> RunTestInternalAsync(CertificationTestDto test, Client client, List<IDictionary<string, object>> virtualRows, string? forcedCode = null, DateTime? fallbackDate = null)
     {
         var row = virtualRows[test.Index];
-        var requestDto = MapRowToRequest(row, test.Step);
+        var requestDto = MapRowToRequest(row, test.Step, fallbackDate);
+        requestDto.SignatureDateOverride = fallbackDate;
 
         // ALWAYS ensure randomization/forced code to avoid 'Already used' errors
         requestDto.SecurityCodeOverride = forcedCode;
