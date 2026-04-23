@@ -1,4 +1,4 @@
-﻿namespace ZynstormECFPlatform.Core.Entities;
+namespace ZynstormECFPlatform.Core.Entities;
 
 public class ENcf : BaseEntity
 {
@@ -7,6 +7,10 @@ public class ENcf : BaseEntity
     public int NcfTypeId { get; set; }
 
     public int Sequence { get; set; }
+
+    public int ClientId { get; set; }
+
+    public virtual Client Client { get; set; } = null!;
 
     public virtual EcfType EcfType { get; set; } = null!;
 

@@ -1,0 +1,244 @@
+{
+  "ncf": "E310000000060",
+  "externalReference": "069",
+  "issueDate": "2026-04-17T00:00:00",
+  "issuerRnc": "133009889",
+  "issuerName": "TRANSPORTE NJ, SRL",
+  "issuerAddress": "Ensanche Gregorio Luperon, Santiago de los Caballeros",
+  "issuerPhone": "809-876-4046",
+  "issuerActivityCode": "492310",
+  "customerRnc": "102620717",
+  "customerName": "MORTEROS DE EUROPA",
+  "customerAddress": "CARRETERA JANICO, LAS CHARCAS, SANTIAGO, R.D.",
+  "customerTelephone": "809-233-6060",
+  "paymentType": 2,
+  "paymentDeadline": "2026-05-02T00:00:00",
+  "paymentTerms": "15 DIAS",
+  "incomeType": "01",
+  "items": [
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 310013315 | Fecha: 01/04/2026 | Cliente: Tiles Import y Export | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 33389 | Fecha: 01/04/2026 | Cliente: National Service | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 33396 | Fecha: 01/04/2026 | Cliente: National Service | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 33397 | Fecha: 01/04/2026 | Cliente: National Service | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 33398 | Fecha: 01/04/2026 | Cliente: Morteros Santiago | Origen: National Service | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 33405 | Fecha: 06/04/2026 | Cliente: National Service | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 33406 | Fecha: 06/04/2026 | Cliente: Morteros Santiago | Origen: National Service | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Facturas: 310013422, 310013424 | Fecha: 07/04/2026 | Cliente: Tiles Import y Export | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 7 | Fecha: 08/04/2026 | Cliente: F. Ochoa(Las Carmelitas) | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 8 | Fecha: 08/04/2026 | Cliente: F. Ochoa(Las Charcas) | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 310013437 | Fecha: 08/04/2026 | Cliente: F. Ochoa(Las Charcas) | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 310013461 | Fecha: 09/04/2026 | Cliente: F. Ochoa(Las Charcas) | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 310013499 | Fecha: 09/04/2026 | Cliente: Tiles Import y Export | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 33441 | Fecha: 09/04/2026 | Cliente: National Service | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Facturas: 310013628, 310013631 | Fecha: 13/04/2026 | Cliente: Tiles Import y Export | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 310013650 | Fecha: 14/04/2026 | Cliente: Bellon(mao) | Origen: Morteros Santiago | Destino: Mao",
+      "quantity": 1.0,
+      "unitPrice": 14000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 310013695 | Fecha: 14/04/2026 | Cliente: Deposito Ferretero | Origen: Morteros Santiago | Destino: Pto Pta",
+      "quantity": 1.0,
+      "unitPrice": 14000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 310013758 | Fecha: 15/04/2026 | Cliente: F. Ochoa(Las Charcas) | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 310013720 | Fecha: 15/04/2026 | Cliente: F. Ochoa(Av Imbert) | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Facturas: 310013745, 310013746, 310013747, 310013748 | Fecha: 15/04/2026 | Cliente: Tiles Import y Export | Origen: Morteros Santiago | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: 310013761 | Fecha: 16/04/2026 | Cliente: F. Ochoa(Av Imbert) | Origen: Morteros Cotui | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 14000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    },
+    {
+      "name": "Servicio de Transporte de Carga",
+      "description": "Factura: N/A | Fecha: 09/04/2026 | Cliente: Morteros Santiago | Origen: National Service | Destino: Santiago",
+      "quantity": 1.0,
+      "unitPrice": 6000.0,
+      "taxPercentage": 0,
+      "billingIndicator": 4,
+      "itemType": 2,
+      "unitOfMeasure": 43
+    }
+  ],
+  "manualMontoTotal": 156000.0,
+  "manualTotalITBIS": 0.0,
+  "manualMontoExento": 156000.0,
+  "manualIndicadorMontoGravado": 0
+}

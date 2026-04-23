@@ -21,6 +21,11 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
     {
     }
 
+    public DbSet<CertificationProcess> CertificationProcesses { get; set; } = null!;
+    public DbSet<CertificationStep> CertificationSteps { get; set; } = null!;
+    public DbSet<CertificationDocument> CertificationDocuments { get; set; } = null!;
+    public DbSet<ENcf> ENcfs { get; set; } = null!;
+
     protected StorageContext()
     {
     }
@@ -1042,6 +1047,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
         modelBuilder.Entity<CertificationStep>(entity =>
         {
+            entity.ToTable("CertificationStep");
             entity.HasKey(c => c.CertificationStepId);
 
             entity.Property(e => e.Name)
@@ -1080,6 +1086,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
         modelBuilder.Entity<CertificationProcess>(entity =>
         {
+            entity.ToTable("CertificationProcess");
             entity.HasKey(c => c.CertificationProcessId);
 
             entity.Property(e => e.Environment)
@@ -1132,6 +1139,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
         modelBuilder.Entity<CertificationDocument>(entity =>
         {
+            entity.ToTable("CertificationDocument");
             entity.HasKey(c => c.CertificationDocumentId);
 
             entity.Property(e => e.ENcfSecuence)
@@ -1266,6 +1274,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
         modelBuilder.Entity<ENcf>(entity =>
         {
+            entity.ToTable("ENcf");
             entity.HasKey(c => c.ENcfId);
 
             entity.Property(e => e.Sequence)
@@ -1298,6 +1307,12 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasForeignKey(d => d.NcfTypeId)
                   .OnDelete(DeleteBehavior.ClientSetNull)
                   .HasConstraintName("FK_ENcf_EcfType");
+
+            entity.HasOne(d => d.Client)
+                  .WithMany(p => p.ENcfs)
+                  .HasForeignKey(d => d.ClientId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_ENcf_Client");
         });
     }
 }

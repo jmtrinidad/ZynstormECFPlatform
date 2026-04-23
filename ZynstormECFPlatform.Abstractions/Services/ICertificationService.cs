@@ -18,4 +18,8 @@ public interface ICertificationService
 
     // AEC Processing
     Task<List<DgiiTransmissionResult>> ProcessAprobacionComercialAsync(byte[] excelBytes);
+
+    // Simulation ECF
+    Task<string> EnqueueSimulacionEcfJobAsync(EcfInvoiceRequestDto dto, string webRootPath);
+    Task ProcessSimulacionEcfJobAsync(EcfInvoiceRequestDto dto, string jobId, string webRootPath);
 }

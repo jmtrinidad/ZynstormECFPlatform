@@ -12,6 +12,7 @@
     <PackageReference Include="MiniExcel" Version="1.43.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
     <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.5" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,6 +20,7 @@
     <ProjectReference Include="..\ZynstormECFPlatform.Common\ZynstormECFPlatform.Common.csproj" />
     <ProjectReference Include="..\ZynstormECFPlatform.Dtos\ZynstormECFPlatform.Dtos.csproj" />
     <ProjectReference Include="..\ZynstormECFPlatform.Schemas\ZynstormECFPlatform.Schemas.csproj" />
+    <ProjectReference Include="..\ZynstormECFPlatform.Data\ZynstormECFPlatform.Data.csproj" />
   </ItemGroup>
 
 </Project>

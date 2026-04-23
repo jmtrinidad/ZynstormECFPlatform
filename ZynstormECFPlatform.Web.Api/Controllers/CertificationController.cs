@@ -117,4 +117,21 @@ public class CertificationController : ControllerBase
 
         return Ok(results);
     }
+
+    [HttpPost("simulacion-ecf")]
+    public async Task<ActionResult<string>> SimulacionEcf([FromBody] EcfInvoiceRequestDto dto)
+    {
+        if (dto == null)
+            return BadRequest("Debe proporcionar los datos de la factura en formato JSON.");
+
+        try
+        {
+            var jobId = await _certificationService.EnqueueSimulacionEcfJobAsync(dto, _env.WebRootPath);
+            return Ok(new { JobId = jobId, Message = "Simulación de e-CF iniciada en segundo plano." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
 }

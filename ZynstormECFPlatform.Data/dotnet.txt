@@ -8,3 +8,7 @@ dotnet ef migrations remove --project ZynstormECFPlatform.Data --startup-project
 # Aplicar a la base de datos
 dotnet ef database update --project ZynstormECFPlatform.Data --startup-project ZynstormECFPlatform.Web.Api
 
+-- Ejemplo para ajustar Facturas de Crédito Fiscal (E31) para un cliente
+UPDATE "ENcf"
+SET "Sequence" = "Sequence" + 5
+WHERE "ClientId" = (SELECT "ClientId" FROM "Client" WHERE "ClientId" = 3) ;

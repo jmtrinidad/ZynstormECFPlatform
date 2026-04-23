@@ -57,12 +57,14 @@ public class EcfGeneratorService : IEcfGeneratorService
         // ── Step 1: Determine the ECF Type (Priority: explicit dto.EcfType > NCF extraction) ─────────────────────────
         var ecfType = dto.EcfType ?? NcfHelper.ExtractEcfType(dto.Ncf);
         
-        // Use the explicit flag if provided, otherwise fallback to the default rule for Type 32 < 250k
-        bool isRfceSummary = isSummary || (ecfType == 32 && (dto.ManualMontoTotal ?? 0) < 250000 && dto.Ncf.Length == 13);
-        
-        // SPECIAL CASE: For Step 4 (Individual Performance), we MUST use the ECF root
-        // even if it is a Type 32 < 250k. The portal explicitly requests an "eCF" for these tests.
-        if (ecfType == 32 && !isSummary && dto.ManualMontoTotal < 250000)
+        // Calculate actual total from items (do not rely on ManualMontoTotal which may be null)
+        decimal actualTotal = dto.ManualMontoTotal ?? dto.Items.Sum(i => (i.Quantity * i.UnitPrice) - i.Discount + (i.ManualRecargoMonto ?? 0));
+
+        // For Type 32: route to RFCE only if explicitly a summary OR if actual amount is below threshold
+        bool isRfceSummary = isSummary || (ecfType == 32 && actualTotal < 250000 && dto.Ncf.Length == 13 && !isSummary == false);
+
+        // SPECIAL CASE: if isSummary flag is NOT set, always use ECF path (not RFCE)
+        if (ecfType == 32 && !isSummary)
         {
             isRfceSummary = false;
         }
@@ -107,6 +109,16 @@ public class EcfGeneratorService : IEcfGeneratorService
             xml = System.Text.RegularExpressions.Regex.Replace(
                 xml, 
                 @"<Retencion\b[^>]*>.*?</Retencion>", 
+                string.Empty, 
+                System.Text.RegularExpressions.RegexOptions.Singleline);
+        }
+
+        // Selective removal of retention totals to satisfy mandatory requirements for 41/47
+        if (ecfType is not (41 or 47))
+        {
+            xml = System.Text.RegularExpressions.Regex.Replace(
+                xml, 
+                @"<(TotalISRRetencion|TotalITBISRetenido)\b[^>]*>.*?</\1>", 
                 string.Empty, 
                 System.Text.RegularExpressions.RegexOptions.Singleline);
         }
@@ -167,6 +179,7 @@ public class EcfGeneratorService : IEcfGeneratorService
     public List<string> ValidateDto(EcfInvoiceRequestDto dto)
     {
         var errors = new List<string>();
+        var ecfType = dto.EcfType ?? (string.IsNullOrWhiteSpace(dto.Ncf) ? 0 : NcfHelper.ExtractEcfType(dto.Ncf));
 
         // NCF format validation
         if (string.IsNullOrWhiteSpace(dto.Ncf))
@@ -187,10 +200,14 @@ public class EcfGeneratorService : IEcfGeneratorService
         if (string.IsNullOrWhiteSpace(dto.IssuerAddress))
             errors.Add("La dirección del emisor es requerida.");
 
-        if (string.IsNullOrWhiteSpace(dto.CustomerRnc))
+        // For type 47 (Pagos al Exterior): IdentificadorExtranjero replaces CustomerRnc
+        // For type 32 (Consumo): buyer data is optional
+        bool buyerRncRequired = ecfType != 47 && ecfType != 32;
+        if (buyerRncRequired && string.IsNullOrWhiteSpace(dto.CustomerRnc) && string.IsNullOrWhiteSpace(dto.CustomerForeignId))
             errors.Add("El RNC/Cédula del comprador es requerido.");
 
-        if (string.IsNullOrWhiteSpace(dto.CustomerName))
+        bool buyerNameRequired = ecfType != 32;
+        if (buyerNameRequired && string.IsNullOrWhiteSpace(dto.CustomerName))
             errors.Add("El nombre del comprador es requerido.");
 
         if (dto.Items.Count == 0)
@@ -338,6 +355,10 @@ public class EcfGeneratorService : IEcfGeneratorService
                 };
             }
 
+            // ── Retentions handling (ONLY if non-zero and for allowed types)
+            var isrRetAmount = item.ManualMontoISRRetenido ?? item.IsrRetentionAmount ?? 0;
+            var itbisRetAmount = (ecfType is 41) ? (item.ManualMontoITBISRetenido ?? itbisRetenido) : 0;
+
             xmlItems.Add(new EcfXmlItem
             {
                 EcfType = ecfType,
@@ -347,7 +368,7 @@ public class EcfGeneratorService : IEcfGeneratorService
                 ItemType = item.ItemType,
                 DescripcionItem = item.Description,
                 CantidadItem = item.Quantity,
-                UnidadMedida = item.UnitOfMeasure, // Remove hardcoded 43
+                UnidadMedida = item.UnitOfMeasure, 
                 FechaElaboracion = item.FechaElaboracion,
                 FechaVencimientoItem = item.FechaVencimientoItem,
 
@@ -359,18 +380,15 @@ public class EcfGeneratorService : IEcfGeneratorService
                 TablaImpuestoAdicional = tablaImpuesto,
                 MontoItem = item.ManualMontoItem ?? (taxableAmount + itbisAmount + iscItemTotal + surchargeAmount),
 
-
-            // ── Retentions handling (ONLY for Purchase 41 and Exportation 47)
-            Retencion = (ecfType is 41 or 47) ? new EcfXmlItemRetencion
-            {
-                Indicador = 1, // Retención
-                MontoITBISRetenido = (ecfType is 41) ? itbisRetenido : null,
-                MontoISRRetenido = item.ManualMontoISRRetenido ?? (item.IsrRetentionAmount ?? 0)
-            } : null
-
+                Retencion = (ecfType is 41 or 47) && (isrRetAmount > 0 || itbisRetAmount > 0) ? new EcfXmlItemRetencion
+                {
+                    Indicador = 1,
+                    MontoITBISRetenido = itbisRetAmount > 0 ? itbisRetAmount : null,
+                    MontoISRRetenido = isrRetAmount > 0 ? isrRetAmount : null
+                } : null
             });
 
-            totalItemDiscounts += discountAmount;
+
             totalItbis += itbisAmount;
 
 
@@ -379,14 +397,16 @@ public class EcfGeneratorService : IEcfGeneratorService
                 case 1:
                 case 2:
                 case 3:
-                    totalBase += baseAmount; break;
+                    totalBase += baseAmount; 
+                    totalItemDiscounts += discountAmount;
+                    break;
                 case 4:  // Exento
-                    totalExempt += taxableAmount; break;
+                    totalExempt += (taxableAmount + surchargeAmount); 
+                    break;
                 case 0:  // No facturable
-                    totalNoFacturable += taxableAmount; break;
+                    totalNoFacturable += (taxableAmount + surchargeAmount); 
+                    break;
             }
-
-
         }
 
         // ── ISC Totales ────────────────────────────────────────────────────────
@@ -422,7 +442,7 @@ public class EcfGeneratorService : IEcfGeneratorService
             });
         }
 
-        var finalTotal = (totalBase - totalItemDiscounts + totalItbis + totalIsc) - dto.GlobalDiscountAmount;
+        var finalTotal = (totalBase - totalItemDiscounts + totalExempt + totalNoFacturable + totalItbis + totalIsc) - dto.GlobalDiscountAmount;
 
         // ── Totales block ──────────────────────────────────────────────────────
 
@@ -458,6 +478,11 @@ public class EcfGeneratorService : IEcfGeneratorService
             MontoTotal = dto.ManualMontoTotal ?? finalTotal
         };
 
+        int? derivedIndicador = null;
+        if (totalBase > 0 && totalExempt > 0) derivedIndicador = 3;
+        else if (totalBase > 0) derivedIndicador = 1;
+        else if (totalExempt > 0) derivedIndicador = 2;
+
         var root = new EcfXmlRoot
         {
             Encabezado = new EcfXmlEncabezado
@@ -469,7 +494,7 @@ public class EcfGeneratorService : IEcfGeneratorService
                     Ncf = dto.Ncf,
                     SequenceExpirationDate = expirationDate,
                     IndicadorNotaCredito = dto.ManualIndicadorNotaCredito,
-                    IndicadorMontoGravado = dto.ManualIndicadorMontoGravado,
+                    IndicadorMontoGravado = dto.ManualIndicadorMontoGravado ?? derivedIndicador,
 
                     IncomeType = dto.IncomeType,
 

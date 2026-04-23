@@ -15,6 +15,10 @@ using ZynstormECFPlatform.Dtos;
 
 using System.IO.Compression;
 using ZynstormECFPlatform.Core.Entities;
+using Microsoft.EntityFrameworkCore;
+using ZynstormECFPlatform.Data;
+using Microsoft.AspNetCore.Hosting;
+using System.Text.Json;
 
 namespace ZynstormECFPlatform.Services;
 
@@ -29,6 +33,7 @@ public class CertificationService : ICertificationService
     private readonly IApiKeyService _apiKeyService;
     private readonly IClientCertificateService _clientCertificateService;
     private readonly IEncryptedService _encryptedService;
+    private readonly StorageContext _context;
 
     // In-memory store for certification state
     private static List<CertificationTestDto>? _cachedTests;
@@ -48,7 +53,8 @@ public class CertificationService : ICertificationService
         IClientService clientService,
         IApiKeyService apiKeyService,
         IClientCertificateService clientCertificateService,
-        IEncryptedService encryptedService)
+        IEncryptedService encryptedService,
+        StorageContext context)
     {
         _configuration = configuration;
         _generatorService = generatorService;
@@ -59,6 +65,7 @@ public class CertificationService : ICertificationService
         _apiKeyService = apiKeyService;
         _clientCertificateService = clientCertificateService;
         _encryptedService = encryptedService;
+        _context = context;
     }
 
     public async Task<List<CertificationTestDto>> GetTestsAsync()
@@ -1174,6 +1181,430 @@ public class CertificationService : ICertificationService
     }
 
     #endregion AEC Processing
+
+    public async Task<string> EnqueueSimulacionEcfJobAsync(EcfInvoiceRequestDto dto, string webRootPath)
+    {
+        string jobId = Guid.NewGuid().ToString("N").Substring(0, 8);
+        _jobStatuses[jobId] = new CertificationJobStatusDto { JobId = jobId, Status = "Pending" };
+
+        BackgroundJob.Enqueue<ICertificationService>(x => x.ProcessSimulacionEcfJobAsync(dto, jobId, webRootPath));
+
+        return jobId;
+    }
+
+    [AutomaticRetry(Attempts = 0)]
+    public async Task ProcessSimulacionEcfJobAsync(EcfInvoiceRequestDto dto, string jobId, string webRootPath)
+    {
+        if (!_jobStatuses.ContainsKey(jobId))
+        {
+            _jobStatuses[jobId] = new CertificationJobStatusDto { JobId = jobId, Status = "Processing" };
+        }
+
+        var status = _jobStatuses[jobId];
+        status.Status = "Processing";
+
+        try
+        {
+            // 1. Validate Client
+            var client = await _clientService.GetByAsync(c => c.Rnc == dto.IssuerRnc)
+                ?? throw new Exception($"Cliente con RNC {dto.IssuerRnc} no encontrado.");
+
+            // 2. Manage Certification Process (Reuse if ongoing)
+            var step4 = await _context.CertificationSteps.FirstOrDefaultAsync(s => s.Order == 4);
+            if (step4 == null)
+            {
+                step4 = new CertificationStep
+                {
+                    Name = "Pruebas Simulación e-CF",
+                    Order = 4,
+                    IsRequired = true,
+                    RegisteredAt = DateTime.Now
+                };
+                _context.CertificationSteps.Add(step4);
+                await _context.SaveChangesAsync();
+            }
+
+            var process = await _context.CertificationProcesses
+                .OrderByDescending(p => p.RegisteredAt)
+                .FirstOrDefaultAsync(p => p.ClientId == client.ClientId &&
+                                          (p.Status == CertificationStatus.Pending || p.Status == CertificationStatus.InProgress));
+
+            if (process != null)
+            {
+                // When the simulation restarts, mark ALL previously sent documents as Rejected
+                // to reflect the DGII's "reinicio" state. The send history is still kept in DB
+                // so the next run can skip re-sending them.
+                // Exception: if the process is already Approved/Completed, leave everything as-is.
+                var docsToInvalidate = await _context.CertificationDocuments
+                    .Where(d => d.CertificationProcessId == process.CertificationProcessId
+                             && d.Status != DocumentStatus.Rejected) // only update non-rejected ones
+                    .ToListAsync();
+
+                if (docsToInvalidate.Any())
+                {
+                    foreach (var doc in docsToInvalidate)
+                        doc.Status = DocumentStatus.Rejected;
+
+                    await _context.SaveChangesAsync();
+                }
+            }
+            else
+            {
+                process = new CertificationProcess
+                {
+                    ClientId = client.ClientId,
+                    Environment = DgiiEnvironment.CerteCF,
+                    Status = CertificationStatus.InProgress,
+                    StartDate = DateTime.Now,
+                    CurrentStepId = step4.CertificationStepId,
+                    RegisteredAt = DateTime.Now
+                };
+                _context.CertificationProcesses.Add(process);
+                await _context.SaveChangesAsync();
+            }
+
+            // 3. Prepare Credentials
+            var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)
+                ?? throw new Exception("ApiKey no encontrada.");
+            var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
+            var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId)
+                ?? throw new Exception("Certificado no encontrado.");
+            var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
+            var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
+            var certBase64 = Convert.ToBase64String(certificateBytes);
+            var certPass = Encoding.UTF8.GetString(passwordBytes);
+
+            string token = await _authService.GetTokenAsync(dto.IssuerRnc, DgiiEnvironment.CerteCF, certBase64, certPass);
+
+            // 4. Define Simulation Matrix (Full Matrix in DGII Order)
+            var matrix = new (int Type, int Count, bool IsSummary, bool IsManual, decimal? MinAmount, decimal? MaxAmount)[] {
+                // Primero: Invoices and Special Documents
+                (31, 4, false, false, null, null),
+                (32, 2, false, false, 250000, null),
+                (41, 2, false, false, null, null),
+                (43, 2, false, false, null, null),
+                (44, 2, false, false, null, null),
+                (45, 2, false, false, null, null),
+                (46, 2, false, false, null, null),
+                (47, 2, false, false, null, null),
+                // Segundo: Notes
+                (33, 1, false, false, null, null),
+                (34, 2, false, false, null, null),
+                // Tercero: RFCE (Summaries < 250k)
+                (32, 4, true, false, 10, 249999),
+                // Cuarto: Individual Consumo < 250k (Manual)
+                (32, 4, false, true, 10, 249999)
+            };
+
+            status.TotalSteps = matrix.Sum(m => m.Count);
+            status.CurrentStep = 0;
+            string? firstType31Ncf = null;
+            DateTime? firstType31IssueDate = null;
+            string? firstType31CustomerRnc = null;
+
+            // In-memory list to track documents sent in THIS run (for DB persistence)
+            var sentDocsThisRun = new List<CertificationDocument>();
+
+            foreach (var item in matrix)
+            {
+                for (int i = 0; i < item.Count; i++)
+                {
+                    status.CurrentStep++;
+
+                    var currentDto = CloneDto(dto);
+                    currentDto.EcfType = item.Type;
+                    currentDto.SequenceExpirationDate = new DateTime(2028, 12, 31);
+
+                    // ── Step 1: Force exempt, clear retentions (keep all other item data intact)
+                    foreach (var itm in currentDto.Items)
+                    {
+                        itm.BillingIndicator = 4;
+                        itm.TaxPercentage = 0;
+                        itm.ItbisAmount = 0;
+                        itm.ManualMontoISRRetenido = null;
+                        itm.IsrRetentionAmount = null;
+                        itm.ManualMontoITBISRetenido = null;
+                        itm.ManualMontoItem = null; // Let generator recalculate
+                    }
+
+                    // ── Step 2: Clear manual totals so the generator calculates from items
+                    currentDto.ManualMontoGravadoTotal = null;
+                    currentDto.ManualTotalITBIS = null;
+                    currentDto.ManualMontoExento = null;
+                    currentDto.ManualTotalISRRetencion = null;
+                    currentDto.ManualTotalITBISRetenido = null;
+                    currentDto.ManualMontoTotal = null;
+
+                    // ── Step 3: Calculate current total from items (base for adjustments)
+                    decimal itemsTotal = currentDto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) - (itm.ManualDescuentoMonto ?? itm.Discount));
+
+                    // ── Step 4: Scale item prices proportionally if min/max constraints apply
+                    if (item.MinAmount.HasValue && itemsTotal < item.MinAmount.Value)
+                    {
+                        decimal scaleFactor = item.MinAmount.Value / (itemsTotal > 0 ? itemsTotal : 1);
+                        foreach (var itm in currentDto.Items)
+                            itm.UnitPrice = Math.Round(itm.UnitPrice * scaleFactor, 2);
+                    }
+                    else if (item.MaxAmount.HasValue && itemsTotal > item.MaxAmount.Value)
+                    {
+                        decimal scaleFactor = item.MaxAmount.Value / (itemsTotal > 0 ? itemsTotal : 1);
+                        foreach (var itm in currentDto.Items)
+                            itm.UnitPrice = Math.Round(itm.UnitPrice * scaleFactor, 2);
+                    }
+
+                    // ── Step 5: Add variety (small offset per step to avoid duplicate rejection)
+                    if (currentDto.Items.Any())
+                        currentDto.Items[0].UnitPrice += status.CurrentStep;
+
+                    // ── Step 6: Type-specific header field adjustments only
+                    switch (item.Type)
+                    {
+                        case 31: // Crédito Fiscal — use data as-is from JSON
+                            break;
+
+                        case 32: // Consumo — contado, anonymous buyer allowed
+                            currentDto.PaymentType = 1;
+                            currentDto.PaymentDeadline = null;
+                            currentDto.PaymentTerms = null;
+                            // For B2B (>=250k) keep customerRnc; for B2C (<250k) it's anonymous
+                            if (item.MinAmount.HasValue && item.MinAmount.Value >= 250000)
+                                currentDto.IncomeType = currentDto.IncomeType ?? "01";
+                            break;
+
+                        case 33: // Nota de Crédito — needs reference
+                            currentDto.IncomeType = currentDto.IncomeType ?? "01";
+                            break;
+
+                        case 34: // Nota de Débito — needs IndicadorNotaCredito + reference
+                            currentDto.ManualIndicadorNotaCredito = 1;
+                            currentDto.IncomeType = currentDto.IncomeType ?? "01";
+                            break;
+
+                        case 41: // Compras — buyer is a supplier (use cédula if RNC is 9-digit company)
+                            // Keep the RNC as-is if it's already a cédula (11 digits), else use a valid cédula
+                            if ((currentDto.CustomerRnc?.Length ?? 0) != 11)
+                                currentDto.CustomerRnc = "00112345678";
+                            currentDto.IncomeType = null;
+                            currentDto.PaymentType = 1;
+                            currentDto.PaymentDeadline = null;
+                            currentDto.PaymentTerms = null;
+                            break;
+
+                        case 43: // Gastos Menores — small amounts, cash
+                            // Scale down to small amounts (max ~500 per item)
+                            foreach (var itm in currentDto.Items)
+                                itm.UnitPrice = Math.Round(500m / currentDto.Items.Count, 2) + i;
+                            currentDto.IncomeType = null;
+                            currentDto.PaymentType = 1;
+                            currentDto.PaymentDeadline = null;
+                            currentDto.PaymentTerms = null;
+                            break;
+
+                        case 44: // Regímenes Especiales — keep data as-is
+                            break;
+
+                        case 45: // Gubernamentales — keep data as-is
+                            break;
+
+                        case 46: // Exportaciones — keep data as-is
+                            currentDto.IncomeType = currentDto.IncomeType ?? "01";
+                            break;
+
+                        case 47: // Pagos al Exterior — foreign buyer, no Dominican RNC
+                            currentDto.CustomerRnc = null;
+                            currentDto.CustomerName = "FOREIGN SERVICES PROVIDER";
+                            currentDto.CustomerForeignId = $"FOREIGN{i + 1:D6}";
+                            currentDto.CustomerCountry = "US";
+                            currentDto.CustomerAddress = null;
+                            currentDto.IncomeType = null;
+                            currentDto.PaymentType = 1;
+                            currentDto.PaymentDeadline = null;
+                            currentDto.PaymentTerms = null;
+                            break;
+                    }
+
+                    // C. Reference logic (needs to be set before generation)
+                    if (item.Type == 33 || item.Type == 34)
+                    {
+                        if (firstType31Ncf == null)
+                        {
+                            // Skip if we don't have an accepted type 31 to reference
+                            status.CompletedSteps.Add(new CertificationStepResultDto
+                            {
+                                Index = status.CurrentStep,
+                                Ncf = $"E{item.Type}0000000000",
+                                Status = "Saltado",
+                                Message = "No se encontró un e-CF tipo 31 aceptado para referenciar."
+                            });
+                            continue;
+                        }
+                        currentDto.ReferenceNcf = firstType31Ncf;
+                        currentDto.ReferenceIssueDate = firstType31IssueDate ?? dto.IssueDate;
+                        currentDto.ReferenceReasonCode = 1;
+                        currentDto.ReferenceCustomerRnc = firstType31CustomerRnc ?? dto.CustomerRnc;
+                    }
+
+                    // D. Generate with temp NCF for XSD validation BEFORE consuming sequence
+                    currentDto.Ncf = $"E{item.Type}0000000000"; // Temp NCF for validation only
+                    string unsignedXmlTemp = _generatorService.GenerateUnsignedXml(currentDto, item.IsSummary);
+
+                    // XSD Validation BEFORE sequence management (to avoid burning NCFs)
+                    var xsdErrors = _generatorService.ValidateXmlAgainstSchema(unsignedXmlTemp, item.Type);
+                    if (xsdErrors.Any())
+                    {
+                        status.CompletedSteps.Add(new CertificationStepResultDto
+                        {
+                            Index = status.CurrentStep,
+                            Ncf = currentDto.Ncf,
+                            Status = "Error XSD",
+                            Message = string.Join(" | ", xsdErrors.Take(3))
+                        });
+                        // DO NOT consume sequence - skip without incrementing
+                        continue;
+                    }
+
+                    // B. Sequence Management (AFTER XSD validation passes)
+                    var ecfTypeRecord = await _context.Set<Core.Entities.EcfType>().FirstOrDefaultAsync(t => t.Code == item.Type.ToString());
+                    if (ecfTypeRecord == null) throw new Exception($"Tipo de e-CF {item.Type} no soportado en la base de datos.");
+
+                    var encfRecord = await _context.ENcfs.FirstOrDefaultAsync(e => e.NcfTypeId == ecfTypeRecord.EcfTypeId && e.ClientId == client.ClientId);
+                    if (encfRecord == null)
+                    {
+                        encfRecord = new ENcf { NcfTypeId = ecfTypeRecord.EcfTypeId, ClientId = client.ClientId, Sequence = 1, RegisteredAt = DateTime.Now };
+                        _context.ENcfs.Add(encfRecord);
+                        await _context.SaveChangesAsync();
+                    }
+
+                    int seq = encfRecord.Sequence++;
+                    currentDto.Ncf = $"E{item.Type}{seq:D10}";
+                    _context.Entry(encfRecord).State = EntityState.Modified;
+                    await _context.SaveChangesAsync();
+
+                    // Re-generate with the real NCF
+                    string unsignedXml = _generatorService.GenerateUnsignedXml(currentDto, item.IsSummary);
+
+                    string signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
+
+                    bool isAccepted = false;
+                    string? trackId = null;
+                    string? error = null;
+                    string? downloadUrl = null;
+
+                    if (item.IsManual)
+                    {
+                        // Manual Upload Rule: Save to downloads folder
+                        string simulationFolder = Path.Combine(webRootPath, "downloads", "simulation", client.Rnc);
+                        if (!Directory.Exists(simulationFolder)) Directory.CreateDirectory(simulationFolder);
+                        string fileName = $"{currentDto.Ncf}.xml";
+                        string filePath = Path.Combine(simulationFolder, fileName);
+                        await File.WriteAllTextAsync(filePath, signedXml);
+
+                        downloadUrl = $"/downloads/simulation/{client.Rnc}/{fileName}";
+                        isAccepted = true; // Manual documents are "accepted" once generated for upload
+                    }
+                    else
+                    {
+                        // Calculate the real total from items for correct routing
+                        decimal actualTransmissionTotal = currentDto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) - itm.Discount + (itm.ManualRecargoMonto ?? 0));
+
+                        // API Transmission
+                        var result = await _transmissionService.SendEcfAsync(
+                            DgiiEnvironment.CerteCF,
+                            token,
+                            signedXml,
+                            item.Type,
+                            actualTransmissionTotal,
+                            dto.IssuerRnc,
+                            currentDto.Ncf,
+                            item.IsSummary);
+
+                        if (result.Success && !string.IsNullOrEmpty(result.TrackId))
+                        {
+                            // Poll DGII to get actual acceptance/rejection
+                            var finalStatus = await PollDgiiStatusAsync(result.TrackId, dto.IssuerRnc);
+                            isAccepted = finalStatus.Estado == "Aceptado" || (item.IsSummary && finalStatus.Estado == "Generado");
+                            trackId = result.TrackId;
+                            if (!isAccepted)
+                                error = $"DGII: {finalStatus.Estado} - {string.Join(" | ", finalStatus.Mensajes?.Select(m => m.Valor) ?? new[] { "Sin mensaje" })}";
+                        }
+                        else
+                        {
+                            isAccepted = false;
+                            error = result.Error;
+                        }
+                    }
+
+                    // Save ALL sent documents (accepted or rejected) to allow audit trail
+                    var doc = new CertificationDocument
+                    {
+                        CertificationProcessId = process.CertificationProcessId,
+                        ENcfSecuence = currentDto.Ncf,
+                        ENcfId = encfRecord.ENcfId,
+                        EcfTypeId = ecfTypeRecord.EcfTypeId,
+                        XmlSent = signedXml,
+                        TrackId = trackId,
+                        Status = isAccepted ? DocumentStatus.Accepted : DocumentStatus.Rejected,
+                        SentAt = DateTime.Now,
+                        RegisteredAt = DateTime.Now
+                    };
+                    _context.CertificationDocuments.Add(doc);
+                    sentDocsThisRun.Add(doc);
+                    await _context.SaveChangesAsync();
+
+                    // Track first accepted type 31 for use by notes (33/34)
+                    if (item.Type == 31 && isAccepted && firstType31Ncf == null)
+                    {
+                        firstType31Ncf = currentDto.Ncf;
+                        firstType31IssueDate = currentDto.IssueDate;
+                        firstType31CustomerRnc = currentDto.CustomerRnc;
+                    }
+
+                    status.CompletedSteps.Add(new CertificationStepResultDto
+                    {
+                        Index = status.CurrentStep,
+                        Ncf = currentDto.Ncf,
+                        Status = isAccepted ? "Aceptado" : "Rechazado",
+                        Message = isAccepted ? (item.IsManual ? $"Manual: {downloadUrl}" : $"TrackId: {trackId}") : error
+                    });
+                }
+            }
+
+            process.Status = CertificationStatus.Approved;
+            process.EndDate = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            status.Status = "Completed";
+        }
+        catch (Exception ex)
+        {
+            status.Status = "Failed";
+            status.ErrorMessage = ex.Message;
+
+            try
+            {
+                var client = await _clientService.GetByAsync(c => c.Rnc == dto.IssuerRnc);
+                if (client != null)
+                {
+                    var process = await _context.CertificationProcesses
+                        .OrderByDescending(p => p.RegisteredAt)
+                        .FirstOrDefaultAsync(p => p.ClientId == client.ClientId && p.Status == CertificationStatus.InProgress);
+                    if (process != null)
+                    {
+                        process.Status = CertificationStatus.Rejected;
+                        process.EndDate = DateTime.Now;
+                        await _context.SaveChangesAsync();
+                    }
+                }
+            }
+            catch { }
+        }
+    }
+
+    private EcfInvoiceRequestDto CloneDto(EcfInvoiceRequestDto source)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(source);
+        return System.Text.Json.JsonSerializer.Deserialize<EcfInvoiceRequestDto>(json)!;
+    }
 
     private string GenerateRandomCode(int length)
     {
