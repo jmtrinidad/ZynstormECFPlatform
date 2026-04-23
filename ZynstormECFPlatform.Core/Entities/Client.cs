@@ -20,9 +20,10 @@ public partial class Client : BaseEntity
 
     public bool IsDgiiProduction { get; set; }
 
-
     public virtual Status Status { get; set; } = null!;
 
+    public virtual ICollection<CertificationInvoicePrintTemplate> CertificationInvoicePrintTemplates { get; set; } = [];
+    public virtual ICollection<CertificationProcess> CertificationProcesses { get; set; } = [];
     public virtual ICollection<ApiKey> ApiKeys { get; set; } = [];
 
     public virtual ICollection<ClientBranche> ClientBranches { get; set; } = [];

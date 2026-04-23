@@ -29,6 +29,7 @@ public class DgiiAuthService : IDgiiAuthService
         string cacheKey = $"{rncEmisor}_{environment}_DgiiToken";
 
         string? cachedToken = _cacheService.Get<string>(cacheKey);
+
         if (!string.IsNullOrEmpty(cachedToken))
         {
             return cachedToken;

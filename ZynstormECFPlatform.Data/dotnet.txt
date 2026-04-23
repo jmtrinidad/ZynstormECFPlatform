@@ -1,0 +1,10 @@
+# Crear migración
+dotnet ef migrations add NombreDeTuMigracion --project ZynstormECFPlatform.Data --startup-project ZynstormECFPlatform.Web.Api
+
+# Borrar la migración
+dotnet ef migrations remove --project ZynstormECFPlatform.Data --startup-project ZynstormECFPlatform.Web.Api
+
+
+# Aplicar a la base de datos
+dotnet ef database update --project ZynstormECFPlatform.Data --startup-project ZynstormECFPlatform.Web.Api
+

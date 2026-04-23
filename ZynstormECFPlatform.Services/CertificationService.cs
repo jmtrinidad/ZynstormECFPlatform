@@ -786,6 +786,7 @@ public class CertificationService : ICertificationService
             if (string.IsNullOrEmpty(rncEmisor)) throw new Exception("Could not find RNCEmisor in the excel.");
 
             var client = await _clientService.GetByAsync(c => c.Rnc == rncEmisor);
+
             if (client == null) throw new Exception($"Client with RNC {rncEmisor} not found in the database.");
 
             var tests = await GetTestsFromExcelAsync(tempFilePath);
