@@ -1369,8 +1369,14 @@ public class CertificationService : ICertificationService
 
                         // ── Step 2: Clear manual totals so the generator calculates from items
                         currentDto.ManualMontoGravadoTotal = null;
-                        currentDto.ManualTotalITBIS = null;
+                        currentDto.ManualMontoGravadoI1 = null;
+                        currentDto.ManualMontoGravadoI2 = null;
+                        currentDto.ManualMontoGravadoI3 = null;
                         currentDto.ManualMontoExento = null;
+                        currentDto.ManualTotalITBIS = null;
+                        currentDto.ManualTotalITBIS1 = null;
+                        currentDto.ManualTotalITBIS2 = null;
+                        currentDto.ManualTotalITBIS3 = null;
                         currentDto.ManualTotalISRRetencion = null;
                         currentDto.ManualTotalITBISRetenido = null;
                         currentDto.ManualMontoTotal = null;
@@ -1503,13 +1509,21 @@ public class CertificationService : ICertificationService
 
                                 case 46:
                                     // Type 46 (Exportaciones): TipoPago & TipoIngresos are REQUIRED.
-                                    // IMPORTANT: MontoExento is FORBIDDEN in Type 46 XSD.
-                                    // We must ensure items use BillingIndicator 1, 2, or 3 (Gravado).
+                                    // IMPORTANT: MontoExento and ITBIS sub-totals are FORBIDDEN in Type 46 XSD.
+                                    // We must ensure items use BillingIndicator 3 (Gravado 0%).
                                     currentDto.IncomeType = currentDto.IncomeType ?? "01";
                                     currentDto.PaymentType = currentDto.PaymentType ?? 1;
+
+                                    // For exports, use Foreign ID and Country instead of local RNC.
+                                    currentDto.CustomerRnc = null;
+                                    currentDto.CustomerForeignId = currentDto.CustomerForeignId ?? $"EX{i + 1:D6}";
+                                    currentDto.CustomerCountry = currentDto.CustomerCountry ?? "USA";
+
                                     foreach (var itm in currentDto.Items)
                                     {
-                                        if (itm.BillingIndicator == 4) itm.BillingIndicator = 3; // Force Gravado 0%
+                                        itm.BillingIndicator = 3; // Type 46 MUST use Tasa Cero (3)
+                                        itm.TaxPercentage = 0;
+                                        itm.ItbisAmount = 0;
                                     }
                                     break;
 
@@ -1517,8 +1531,8 @@ public class CertificationService : ICertificationService
                                     // Type 47 (Pagos al Exterior): Comprador is optional (minOccurs=0)
                                     // No RNC, no Dominican fields — just foreign identifier
                                     currentDto.CustomerRnc = null;
-                                    currentDto.CustomerName = "FOREIGN SERVICES PROVIDER";
-                                    currentDto.CustomerForeignId = $"FOREIGN{i + 1:D6}";
+                                    currentDto.CustomerName = currentDto.CustomerName ?? "FOREIGN SERVICES PROVIDER";
+                                    currentDto.CustomerForeignId = currentDto.CustomerForeignId ?? $"FOREIGN{i + 1:D6}";
                                     currentDto.CustomerCountry = null; // PaisComprador excluded for 47 in serializer
                                     currentDto.CustomerAddress = null;
                                     currentDto.IncomeType = null; // Not in type 47 XSD
@@ -1531,6 +1545,9 @@ public class CertificationService : ICertificationService
                                     currentDto.ManualTotalISRRetencion = 0;
                                     foreach (var itm in currentDto.Items)
                                     {
+                                        itm.BillingIndicator = 4; // Force Exento for 47
+                                        itm.TaxPercentage = 0;
+                                        itm.ItbisAmount = 0;
                                         itm.ManualMontoITBISRetenido = 0;
                                         itm.ManualMontoISRRetenido = 0;
                                         itm.IsrRetentionAmount = 0;
@@ -1626,6 +1643,8 @@ public class CertificationService : ICertificationService
 
                     // Re-generate with the real NCF
                     string unsignedXml = _generatorService.GenerateUnsignedXml(currentDto, item.IsSummary);
+
+
                     string signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
 
                     // E. Transmission

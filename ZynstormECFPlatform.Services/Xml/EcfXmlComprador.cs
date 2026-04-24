@@ -14,7 +14,7 @@ public class EcfXmlComprador
     [XmlElement("RNCComprador")]
     public string? RncComprador { get; set; }
     // Required for type 41 (minOccurs=1), optional for others, excluded for 47
-    public bool ShouldSerializeRncComprador() => !string.IsNullOrWhiteSpace(RncComprador) && EcfType != 47;
+    public bool ShouldSerializeRncComprador() => !string.IsNullOrWhiteSpace(RncComprador) && EcfType != 46 && EcfType != 47;
 
     [XmlElement("IdentificadorExtranjero")]
     public string? IdentificadorExtranjero { get; set; }

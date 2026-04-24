@@ -1,37 +1,35 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using MiniExcelLibs;
+using ZynstormECFPlatform.Dtos;
+using ZynstormECFPlatform.Services;
 
-namespace Scratch
+var generator = new EcfGeneratorService();
+
+var dto = new EcfInvoiceRequestDto
 {
-    public class Program
+    EcfType = 46,
+    Ncf = "E460000000001",
+    IssuerRnc = "101000001",
+    IssuerName = "EMPRESA EXPORTADORA",
+    IssuerAddress = "Calle 1, SD",
+    CustomerRnc = null,
+    CustomerName = "FOREIGN BUYER",
+    CustomerForeignId = "ID123",
+    CustomerCountry = "USA",
+    IncomeType = "01",
+    PaymentType = 1,
+    Items = new List<EcfItemRequestDto>
     {
-        public static void Main(string[] args)
+        new EcfItemRequestDto
         {
-            var filePath = @"C:\Projects\ZynstormECFPlatform\Aprobacion comerciar.xlsx";
-            if (!File.Exists(filePath))
-            {
-                Console.WriteLine("Excel file not found.");
-                return;
-            }
-
-            var rows = MiniExcel.Query(filePath, useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
-            if (rows.Any())
-            {
-                Console.WriteLine("Headers found:");
-                foreach (var key in rows.First().Keys)
-                {
-                    Console.WriteLine($"- {key}");
-                }
-                
-                Console.WriteLine("\nSample Row 1:");
-                foreach (var kvp in rows.First())
-                {
-                    Console.WriteLine($"{kvp.Key}: {kvp.Value}");
-                }
-            }
+            Name = "Item 1",
+            Quantity = 1,
+            UnitPrice = 100,
+            TaxPercentage = 0,
+            BillingIndicator = 3
         }
     }
-}
+};
+
+string xml = generator.GenerateUnsignedXml(dto);
+Console.WriteLine(xml);

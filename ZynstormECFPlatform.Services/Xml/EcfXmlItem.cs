@@ -23,7 +23,15 @@ public class EcfXmlItem
     [XmlElement("Retencion", Order = 3)]
     public EcfXmlItemRetencion? Retencion
     {
-        get => (EcfType is 41 or 47) ? _retencion : null;
+        get
+        {
+            if (EcfType is 41 or 47 && _retencion != null)
+            {
+                _retencion.EcfType = EcfType;
+                return _retencion;
+            }
+            return null;
+        }
         set => _retencion = value;
     }
 
@@ -146,12 +154,15 @@ public class EcfXmlSubRecargo
 
 public class EcfXmlItemRetencion
 {
+    [XmlIgnore]
+    public int EcfType { get; set; }
+
     [XmlElement("IndicadorAgenteRetencionoPercepcion")]
     public int Indicador { get; set; } // 1=Retencion, 2=Percepcion
 
     [XmlElement("MontoITBISRetenido")]
     public decimal? MontoITBISRetenido { get; set; }
-    public bool ShouldSerializeMontoITBISRetenido() => MontoITBISRetenido.HasValue;
+    public bool ShouldSerializeMontoITBISRetenido() => MontoITBISRetenido.HasValue && EcfType != 47;
 
     [XmlElement("MontoISRRetenido")]
     public decimal? MontoISRRetenido { get; set; }

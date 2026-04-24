@@ -123,6 +123,41 @@ public class EcfGeneratorService : IEcfGeneratorService
                 System.Text.RegularExpressions.RegexOptions.Singleline);
         }
 
+        // [NEW] Suppression of ITBIS breakdown for export (46) and foreign payments (47)
+        // More aggressive regex to handle prefixes, self-closing tags, and case variations.
+        if (ecfType is 46 or 47)
+        {
+            // For 46/47, we need to strip ITBIS sub-totals that are forbidden by XSD.
+            // Aggressively remove ITBIS breakdown fields for both types.
+            // For 46, we preserve MontoGravadoTotal and MontoGravadoI3 to satisfy Tasa Cero items.
+            var forbidden = new List<string> { 
+                "MontoGravadoI1", "MontoGravadoI2", 
+                "ITBIS1", "ITBIS2", "TotalITBIS1", "TotalITBIS2",
+                "TotalITBISRetenido", "TotalISRRetencion", "TotalITBISPercepcion", "TotalISRPercepcion"
+            };
+
+            // For Type 47, ITBIS3 and all ITBIS totals are forbidden.
+            // For Type 46, we MUST keep ITBIS3, TotalITBIS3 and TotalITBIS (set to 0) as Tasa Cero indicators.
+            if (ecfType == 47)
+            {
+                forbidden.AddRange(new[] { "ITBIS3", "TotalITBIS", "TotalITBIS3", "MontoGravadoTotal", "MontoGravadoI3" });
+            }
+            
+            if (ecfType == 46)
+            {
+                forbidden.Add("MontoExento");
+            }
+
+            foreach (var field in forbidden)
+            {
+                xml = System.Text.RegularExpressions.Regex.Replace(
+                    xml, 
+                    $@"<(?:[\w\-]+:)?{field}\b[^>]*>(?:.*?</(?:[\w\-]+:)?{field}>| />)", 
+                    string.Empty, 
+                    System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            }
+        }
+
 
         return xml;
     }
@@ -469,11 +504,11 @@ public class EcfGeneratorService : IEcfGeneratorService
             MontoGravadoI3 = dto.ManualMontoGravadoI3 ?? (taxableG3 > 0 ? taxableG3 : null),
             MontoExento = dto.ManualMontoExento ?? (totalExempt > 0 ? totalExempt : null),
 
-            ITBIS1 = (taxableG1 > 0 || dto.ManualTotalITBIS1.HasValue) ? 18 : null,
-            ITBIS2 = (taxableG2 > 0 || dto.ManualTotalITBIS2.HasValue) ? 16 : null,
-            ITBIS3 = (taxableG3 > 0 || dto.ManualTotalITBIS3.HasValue) ? 0 : null,
+            ITBIS1 = (ecfType is 46 or 47) ? null : ((taxableG1 > 0 || dto.ManualTotalITBIS1.HasValue) ? 18 : null),
+            ITBIS2 = (ecfType is 46 or 47) ? null : ((taxableG2 > 0 || dto.ManualTotalITBIS2.HasValue) ? 16 : null),
+            ITBIS3 = (ecfType is 47) ? null : ((taxableG3 > 0 || dto.ManualTotalITBIS3.HasValue) ? 0 : null),
 
-            TotalITBIS = dto.ManualTotalITBIS ?? (totalItbis > 0.00m ? totalItbis : null),
+            TotalITBIS = dto.ManualTotalITBIS ?? ((totalItbis > 0.00m || (ecfType == 46 && taxableG3 > 0)) ? totalItbis : null),
             TotalITBIS1 = dto.ManualTotalITBIS1 ?? (taxableG1 > 0.00m ? itbisG1 : null),
             TotalITBIS2 = dto.ManualTotalITBIS2 ?? (taxableG2 > 0.00m ? itbisG2 : null),
             TotalITBIS3 = dto.ManualTotalITBIS3 ?? (taxableG3 > 0.00m ? itbisG3 : null),

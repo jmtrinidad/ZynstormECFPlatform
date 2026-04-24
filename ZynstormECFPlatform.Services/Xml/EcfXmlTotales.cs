@@ -22,7 +22,7 @@ public class EcfXmlTotales
         get => MontoGravadoTotal?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
         set => MontoGravadoTotal = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
-    public bool ShouldSerializeMontoGravadoTotalString() => MontoGravadoTotal.HasValue;
+    public bool ShouldSerializeMontoGravadoTotalString() => (EcfType == 46 || (EcfType != 46 && EcfType != 47)) && MontoGravadoTotal.HasValue;
 
     [XmlIgnore]
     public decimal? MontoGravadoI1 { get; set; }
@@ -32,7 +32,7 @@ public class EcfXmlTotales
         get => (EcfType == 46 || EcfType == 47) ? null : MontoGravadoI1?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
         set => MontoGravadoI1 = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
-    public bool ShouldSerializeMontoGravadoI1String() => MontoGravadoI1.HasValue && EcfType != 46 && EcfType != 47;
+    public bool ShouldSerializeMontoGravadoI1String() => EcfType != 46 && EcfType != 47 && MontoGravadoI1.HasValue;
 
     [XmlIgnore]
     public decimal? MontoGravadoI2 { get; set; }
@@ -42,17 +42,17 @@ public class EcfXmlTotales
         get => (EcfType == 46 || EcfType == 47) ? null : MontoGravadoI2?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
         set => MontoGravadoI2 = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
-    public bool ShouldSerializeMontoGravadoI2String() => MontoGravadoI2.HasValue && EcfType != 46 && EcfType != 47;
+    public bool ShouldSerializeMontoGravadoI2String() => EcfType != 46 && EcfType != 47 && MontoGravadoI2.HasValue;
 
     [XmlIgnore]
     public decimal? MontoGravadoI3 { get; set; }
     [XmlElement("MontoGravadoI3", Order = 4)]
     public string? MontoGravadoI3String
     {
-        get => (EcfType == 46 || EcfType == 47) ? null : MontoGravadoI3?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        get => (EcfType == 47) ? null : MontoGravadoI3?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
         set => MontoGravadoI3 = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
-    public bool ShouldSerializeMontoGravadoI3String() => MontoGravadoI3.HasValue && EcfType != 46 && EcfType != 47;
+    public bool ShouldSerializeMontoGravadoI3String() => (EcfType == 46 || (EcfType != 46 && EcfType != 47)) && MontoGravadoI3.HasValue;
 
     [XmlIgnore]
     public decimal? MontoExento { get; set; }
@@ -62,21 +62,39 @@ public class EcfXmlTotales
         get => MontoExento?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
         set => MontoExento = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
-    public bool ShouldSerializeMontoExentoString() => MontoExento.HasValue && MontoExento > 0 && EcfType != 46;
+    public bool ShouldSerializeMontoExentoString() => EcfType != 46 && MontoExento.HasValue && MontoExento > 0;
 
     // ── ITBIS rates ────────────────────────────────────────────────────────
 
-    [XmlElement(Order = 6)]
+    [XmlIgnore]
     public int? ITBIS1 { get; set; }
-    public bool ShouldSerializeITBIS1() => ITBIS1.HasValue && EcfType != 46 && EcfType != 47;
+    [XmlElement("ITBIS1", Order = 6)]
+    public string? ITBIS1String
+    {
+        get => (EcfType == 46 || EcfType == 47) ? null : ITBIS1?.ToString();
+        set => ITBIS1 = string.IsNullOrEmpty(value) ? null : int.Parse(value);
+    }
+    public bool ShouldSerializeITBIS1String() => ITBIS1.HasValue && EcfType != 46 && EcfType != 47;
 
-    [XmlElement(Order = 7)]
+    [XmlIgnore]
     public int? ITBIS2 { get; set; }
-    public bool ShouldSerializeITBIS2() => ITBIS2.HasValue && EcfType != 46 && EcfType != 47;
+    [XmlElement("ITBIS2", Order = 7)]
+    public string? ITBIS2String
+    {
+        get => (EcfType == 46 || EcfType == 47) ? null : ITBIS2?.ToString();
+        set => ITBIS2 = string.IsNullOrEmpty(value) ? null : int.Parse(value);
+    }
+    public bool ShouldSerializeITBIS2String() => ITBIS2.HasValue && EcfType != 46 && EcfType != 47;
 
-    [XmlElement(Order = 8)]
+    [XmlIgnore]
     public int? ITBIS3 { get; set; }
-    public bool ShouldSerializeITBIS3() => ITBIS3.HasValue && EcfType != 46 && EcfType != 47;
+    [XmlElement("ITBIS3", Order = 8)]
+    public string? ITBIS3String
+    {
+        get => (EcfType == 47) ? null : ITBIS3?.ToString();
+        set => ITBIS3 = string.IsNullOrEmpty(value) ? null : int.Parse(value);
+    }
+    public bool ShouldSerializeITBIS3String() => EcfType != 47 && ITBIS3.HasValue;
 
     // ── ITBIS totals ───────────────────────────────────────────────────────
 
@@ -85,10 +103,10 @@ public class EcfXmlTotales
     [XmlElement("TotalITBIS", Order = 9)]
     public string? TotalITBISString
     {
-        get => (EcfType == 46 || EcfType == 47) ? null : TotalITBIS?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        get => (EcfType == 47) ? null : TotalITBIS?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
         set => TotalITBIS = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
-    public bool ShouldSerializeTotalITBISString() => TotalITBIS.HasValue && (TotalITBIS > 0 || (EcfType != 46 && EcfType != 47));
+    public bool ShouldSerializeTotalITBISString() => EcfType != 47 && TotalITBIS.HasValue;
 
     [XmlIgnore]
     public decimal? TotalITBIS1 { get; set; }
@@ -98,7 +116,7 @@ public class EcfXmlTotales
         get => (EcfType == 46 || EcfType == 47) ? null : TotalITBIS1?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
         set => TotalITBIS1 = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
-    public bool ShouldSerializeTotalITBIS1String() => TotalITBIS1.HasValue && (TotalITBIS1 > 0 || (EcfType != 46 && EcfType != 47));
+    public bool ShouldSerializeTotalITBIS1String() => EcfType != 46 && EcfType != 47 && TotalITBIS1.HasValue;
 
     [XmlIgnore]
     public decimal? TotalITBIS2 { get; set; }
@@ -108,17 +126,17 @@ public class EcfXmlTotales
         get => (EcfType == 46 || EcfType == 47) ? null : TotalITBIS2?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
         set => TotalITBIS2 = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
-    public bool ShouldSerializeTotalITBIS2String() => TotalITBIS2.HasValue && (TotalITBIS2 > 0 || (EcfType != 46 && EcfType != 47));
+    public bool ShouldSerializeTotalITBIS2String() => EcfType != 46 && EcfType != 47 && TotalITBIS2.HasValue;
 
     [XmlIgnore]
     public decimal? TotalITBIS3 { get; set; }
     [XmlElement("TotalITBIS3", Order = 12)]
     public string? TotalITBIS3String
     {
-        get => (EcfType == 46 || EcfType == 47) ? null : TotalITBIS3?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        get => (EcfType == 47) ? null : TotalITBIS3?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
         set => TotalITBIS3 = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
-    public bool ShouldSerializeTotalITBIS3String() => TotalITBIS3.HasValue && (TotalITBIS3 > 0 || (EcfType != 46 && EcfType != 47));
+    public bool ShouldSerializeTotalITBIS3String() => EcfType != 47 && TotalITBIS3.HasValue;
 
     // ── Additional taxes (ISC — Impuesto Selectivo al Consumo) ────────────
 
@@ -130,7 +148,7 @@ public class EcfXmlTotales
         get => MontoImpuestoAdicional?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
         set => MontoImpuestoAdicional = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
-    public bool ShouldSerializeMontoImpuestoAdicionalString() => MontoImpuestoAdicional.HasValue && MontoImpuestoAdicional > 0;
+    public bool ShouldSerializeMontoImpuestoAdicionalString() => EcfType != 46 && EcfType != 47 && MontoImpuestoAdicional.HasValue && MontoImpuestoAdicional > 0;
 
     [XmlElement("ImpuestosAdicionales", Order = 14)]
     public EcfXmlImpuestosAdicionales? ImpuestosAdicionales { get; set; }
