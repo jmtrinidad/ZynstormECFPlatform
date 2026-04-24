@@ -1210,6 +1210,9 @@ public class CertificationService : ICertificationService
         // Pool to track accepted Type 31 invoices to use as references for notes
         var accepted31Pool = new List<(string Ncf, DateTime IssueDate, string? CustomerRnc, EcfInvoiceRequestDto Dto)>();
 
+        // [NEW] Pool to track RFCE summaries to synchronize with Step 4 manual individuals
+        var rfcePool = new List<(string Ncf, string SecurityCode, EcfInvoiceRequestDto Dto)>();
+
         if (!_jobStatuses.ContainsKey(jobId))
         {
             _jobStatuses[jobId] = new CertificationJobStatusDto { JobId = jobId, Status = "Processing" };
@@ -1246,21 +1249,17 @@ public class CertificationService : ICertificationService
 
             if (process != null)
             {
-                // When the simulation restarts, mark ALL previously sent documents as Rejected
-                // to reflect the DGII's "reinicio" state. The send history is still kept in DB
-                // so the next run can skip re-sending them.
-                // Exception: if the process is already Approved/Completed, leave everything as-is.
-                var docsToInvalidate = await _context.CertificationDocuments
-                    .Where(d => d.CertificationProcessId == process.CertificationProcessId
-                             && d.Status != DocumentStatus.Rejected) // only update non-rejected ones
+                // When the simulation restarts, delete all previously sent documents for this process
+                // to start from a clean slate as requested.
+                var docsToDelete = await _context.CertificationDocuments
+                    .Where(d => d.CertificationProcessId == process.CertificationProcessId)
                     .ToListAsync();
 
-                if (docsToInvalidate.Any())
+                if (docsToDelete.Any())
                 {
-                    foreach (var doc in docsToInvalidate)
-                        doc.Status = DocumentStatus.Rejected;
-
+                    _context.CertificationDocuments.RemoveRange(docsToDelete);
                     await _context.SaveChangesAsync();
+                    Console.WriteLine($"[INFO] Limpieza de base de datos: {docsToDelete.Count} documentos eliminados para reiniciar simulación.");
                 }
             }
             else
@@ -1320,166 +1319,260 @@ public class CertificationService : ICertificationService
             // In-memory list to track documents sent in THIS run (for DB persistence)
             var sentDocsThisRun = new List<CertificationDocument>();
 
+            // [FIX] Define dtoRows correctly
+            var dtoRows = dto.Items.Select(it => new { Items = new List<EcfItemRequestDto> { it }, Total = it.Quantity * it.UnitPrice }).ToList();
+
             foreach (var item in matrix)
             {
                 for (int i = 0; i < item.Count; i++)
                 {
                     status.CurrentStep++;
 
-                    var currentDto = CloneDto(dto);
-                    currentDto.EcfType = item.Type;
-                    currentDto.SequenceExpirationDate = new DateTime(2028, 12, 31);
+                    // Prepare DTO for this step
+                    EcfInvoiceRequestDto currentDto;
+                    bool skipNcfConsumption = false;
 
-                    bool isNote = item.Type == 33 || item.Type == 34;
-
-                    // ── Step 1: Force exempt, clear retentions for all Type 31s
-                    foreach (var itm in currentDto.Items)
+                    // [NEW] Synchronization for Step 4: If this is a manual individual document (<250k)
+                    // and we have a corresponding summary in the pool, REUSE it.
+                    if (item.IsManual && item.Type == 32 && item.MaxAmount < 250000 && rfcePool.Count > 0)
                     {
-                        itm.BillingIndicator = 4; // Exento
-                        itm.TaxPercentage = 0;
-                        itm.ItbisAmount = 0;
-                        itm.ManualMontoISRRetenido = null;
-                        itm.IsrRetentionAmount = null;
-                        itm.ManualMontoITBISRetenido = null;
-                        itm.ManualMontoItem = null; // Let generator recalculate
-                    }
-
-                    // ── Step 2: Clear manual totals so the generator calculates from items
-                    currentDto.ManualMontoGravadoTotal = null;
-                    currentDto.ManualTotalITBIS = null;
-                    currentDto.ManualMontoExento = null;
-                    currentDto.ManualTotalISRRetencion = null;
-                    currentDto.ManualTotalITBISRetenido = null;
-                    currentDto.ManualMontoTotal = null;
-
-                    // ── Step 3-6: For Notes (33/34), use EXACT clone of the referenced Type 31
-                    //             For all other types, apply the standard adjustments
-
-                    if (isNote)
-                    {
-                        // Use references from the pool
-                        // Type 33 -> uses 1st accepted 31 (index 0)
-                        // Type 34 -> uses 2nd and 3rd accepted 31 (index 1, 2, ...)
-                        int poolIndex = (item.Type == 33) ? i : (1 + i);
-
-                        if (accepted31Pool.Count <= poolIndex)
-                        {
-                            status.CompletedSteps.Add(new CertificationStepResultDto
-                            {
-                                Index = status.CurrentStep,
-                                Ncf = $"E{item.Type}0000000000",
-                                Status = "Saltado",
-                                Message = $"No se encontró el e-CF tipo 31 (índice {poolIndex}) aceptado para referenciar."
-                            });
-                            continue;
-                        }
-
-                        var reference = accepted31Pool[poolIndex];
-
-                        // [MODIFIED] Take only the FIRST item to avoid total annulment
-                        var firstItem = CloneDto(reference.Dto)?.Items.FirstOrDefault();
-                        currentDto.Items = firstItem != null ? new List<EcfItemRequestDto> { firstItem } : new List<EcfItemRequestDto>();
-
-                        currentDto.CustomerRnc = reference.Dto.CustomerRnc;
-                        currentDto.CustomerName = reference.Dto.CustomerName;
-                        currentDto.CustomerAddress = reference.Dto.CustomerAddress;
-
-                        // Set reference fields
-                        currentDto.ReferenceNcf = reference.Ncf;
-                        currentDto.ReferenceIssueDate = reference.IssueDate;
-                        currentDto.ReferenceReasonCode = 3; // [MODIFIED] 3 = Correction of amounts (Partial)
-                        currentDto.ReferenceCustomerRnc = reference.CustomerRnc == currentDto.CustomerRnc ? null : reference.CustomerRnc;
-                        currentDto.ReferenceReasonDescription = "Ajuste parcial de montos";
-                        currentDto.IncomeType = currentDto.IncomeType ?? "01";
-
-                        if (item.Type == 34)
-                            currentDto.ManualIndicadorNotaCredito = 0; // [MODIFIED] 0 = <= 30 days (Correct for simulation)
-
-                        // Cash payment for notes
-                        currentDto.PaymentType = 1;
-                        currentDto.PaymentDeadline = null;
-                        currentDto.PaymentTerms = null;
+                        var pooled = rfcePool[i % rfcePool.Count]; // Match by index within the count
+                        currentDto = CloneDto(pooled.Dto)!;
+                        currentDto.Ncf = pooled.Ncf;
+                        currentDto.SecurityCodeOverride = pooled.SecurityCode;
+                        skipNcfConsumption = true;
+                        Console.WriteLine($"[SYNC] Reutilizando NCF {currentDto.Ncf} para documento individual Step 4.");
                     }
                     else
                     {
-                        // ── Step 3: Calculate current total from items (base for adjustments)
-                        decimal itemsTotal = currentDto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) - (itm.ManualDescuentoMonto ?? itm.Discount));
+                        var row = i < dtoRows.Count ? dtoRows[i] : dtoRows.Last();
+                        currentDto = CloneDto(dto)!;
+                        // Map items from the source JSON row
+                        currentDto.Items = row.Items;
+                        currentDto.ManualMontoTotal = row.Total;
+                        currentDto.EcfType = item.Type;
+                        currentDto.SequenceExpirationDate = new DateTime(2028, 12, 31);
 
-                        // ── Step 4: Scale item prices proportionally if min/max constraints apply
-                        if (item.MinAmount.HasValue && itemsTotal < item.MinAmount.Value)
+                        bool isNote = item.Type == 33 || item.Type == 34;
+
+                        // ── Step 1: Force exempt ONLY for Type 31 (Standard Invoices) to pass initial DGII steps
+                        if (item.Type == 31)
                         {
-                            decimal scaleFactor = item.MinAmount.Value / (itemsTotal > 0 ? itemsTotal : 1);
                             foreach (var itm in currentDto.Items)
-                                itm.UnitPrice = Math.Round(itm.UnitPrice * scaleFactor, 2);
+                            {
+                                itm.BillingIndicator = 4; // Exento
+                                itm.TaxPercentage = 0;
+                                itm.ItbisAmount = 0;
+                                itm.ManualMontoItem = null; // Let generator recalculate
+                            }
                         }
-                        else if (item.MaxAmount.HasValue && itemsTotal > item.MaxAmount.Value)
+
+                        // ── Step 2: Clear manual totals so the generator calculates from items
+                        currentDto.ManualMontoGravadoTotal = null;
+                        currentDto.ManualTotalITBIS = null;
+                        currentDto.ManualMontoExento = null;
+                        currentDto.ManualTotalISRRetencion = null;
+                        currentDto.ManualTotalITBISRetenido = null;
+                        currentDto.ManualMontoTotal = null;
+
+                        if (isNote)
                         {
-                            decimal scaleFactor = item.MaxAmount.Value / (itemsTotal > 0 ? itemsTotal : 1);
-                            foreach (var itm in currentDto.Items)
-                                itm.UnitPrice = Math.Round(itm.UnitPrice * scaleFactor, 2);
+                            // Use references from the pool
+                            // Type 33 -> uses 1st accepted 31 (index 0)
+                            // Type 34 -> uses 2nd and 3rd accepted 31 (index 1, 2, ...)
+                            int poolIndex = (item.Type == 33) ? i : (1 + i);
+
+                            if (accepted31Pool.Count <= poolIndex)
+                            {
+                                Console.WriteLine($"[SKIP] Saltando Paso {status.CurrentStep} (Tipo {item.Type}): No hay e-CF 31 aceptado en el índice {poolIndex}.");
+                                status.CompletedSteps.Add(new CertificationStepResultDto
+                                {
+                                    Index = status.CurrentStep,
+                                    Ncf = $"E{item.Type}0000000000",
+                                    Status = "Saltado",
+                                    Message = $"No se encontró el e-CF tipo 31 (índice {poolIndex}) aceptado para referenciar."
+                                });
+                                continue;
+                            }
+
+                            var reference = accepted31Pool[poolIndex];
+
+                            // [MODIFIED] Take only the FIRST item to avoid total annulment
+                            var firstItem = CloneDto(reference.Dto)?.Items.FirstOrDefault();
+                            currentDto.Items = firstItem != null ? new List<EcfItemRequestDto> { firstItem } : new List<EcfItemRequestDto>();
+
+                            currentDto.CustomerRnc = reference.Dto.CustomerRnc;
+                            currentDto.CustomerName = reference.Dto.CustomerName;
+                            currentDto.CustomerAddress = reference.Dto.CustomerAddress;
+
+                            // Set reference fields
+                            currentDto.ReferenceNcf = reference.Ncf;
+                            currentDto.ReferenceIssueDate = reference.IssueDate;
+                            currentDto.ReferenceReasonCode = 3; // [MODIFIED] 3 = Correction of amounts (Partial)
+                            currentDto.ReferenceCustomerRnc = reference.CustomerRnc == currentDto.CustomerRnc ? null : reference.CustomerRnc;
+                            currentDto.ReferenceReasonDescription = "Ajuste parcial de montos";
+                            currentDto.IncomeType = currentDto.IncomeType ?? "01";
+
+                            if (item.Type == 34)
+                                currentDto.ManualIndicadorNotaCredito = 0; // [MODIFIED] 0 = <= 30 days (Correct for simulation)
+
+                            // Cash payment for notes
+                            currentDto.PaymentType = 1;
+                            currentDto.PaymentDeadline = null;
+                            currentDto.PaymentTerms = null;
                         }
-
-                        // ── Step 5: Add variety (small offset per step to avoid duplicate rejection)
-                        if (currentDto.Items.Any())
-                            currentDto.Items[0].UnitPrice += status.CurrentStep;
-
-                        // ── Step 6: Type-specific header field adjustments only
-                        switch (item.Type)
+                        else
                         {
-                            case 31: break;
+                            // ── Step 3: Calculate current total from items (base for adjustments)
+                            decimal itemsTotal = currentDto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) - (itm.ManualDescuentoMonto ?? itm.Discount));
 
-                            case 32:
-                                currentDto.PaymentType = 1;
-                                currentDto.PaymentDeadline = null;
-                                currentDto.PaymentTerms = null;
-                                if (item.MinAmount.HasValue && item.MinAmount.Value >= 250000)
-                                    currentDto.IncomeType = currentDto.IncomeType ?? "01";
-                                break;
-
-                            case 41:
-                                // Type 41 (Compras): RNCComprador is REQUIRED (minOccurs=1)
-                                // Must be 9 digits (company RNC) or 11 digits (cédula)
-                                // The supplier/seller we're buying from — use a valid company RNC
-                                currentDto.CustomerRnc = "131793916"; // Valid 9-digit test RNC
-                                currentDto.CustomerName = "PROVEEDOR DE SERVICIOS SRL";
-                                currentDto.IncomeType = null; // Not in type 41 XSD
-                                currentDto.PaymentType = 1;
-                                currentDto.PaymentDeadline = null;
-                                currentDto.PaymentTerms = null;
-                                break;
-
-                            case 43:
+                            // ── Step 4: Scale item prices proportionally if min/max constraints apply
+                            if (item.MinAmount.HasValue && itemsTotal < item.MinAmount.Value)
+                            {
+                                decimal scaleFactor = item.MinAmount.Value / (itemsTotal > 0 ? itemsTotal : 1);
                                 foreach (var itm in currentDto.Items)
-                                    itm.UnitPrice = Math.Round(500m / currentDto.Items.Count, 2) + i;
-                                currentDto.IncomeType = null;
-                                currentDto.PaymentType = 1;
-                                currentDto.PaymentDeadline = null;
-                                currentDto.PaymentTerms = null;
-                                break;
+                                    itm.UnitPrice = Math.Round(itm.UnitPrice * scaleFactor, 2);
+                            }
+                            else if (item.MaxAmount.HasValue && itemsTotal > item.MaxAmount.Value)
+                            {
+                                decimal scaleFactor = item.MaxAmount.Value / (itemsTotal > 0 ? itemsTotal : 1);
+                                foreach (var itm in currentDto.Items)
+                                    itm.UnitPrice = Math.Round(itm.UnitPrice * scaleFactor, 2);
+                            }
 
-                            case 44: break;
-                            case 45: break;
+                            // ── Step 5: Add variety (small offset per step to avoid duplicate rejection)
+                            if (currentDto.Items.Any())
+                            {
+                                currentDto.Items[0].UnitPrice += status.CurrentStep;
+                                currentDto.Items[0].ManualMontoItem = null;
+                            }
 
-                            case 46:
-                                // Type 46 (Regímenes Especiales): TipoPago is REQUIRED (minOccurs=1)
-                                // Keep payment type from JSON but ensure IncomeType is set
-                                currentDto.IncomeType = currentDto.IncomeType ?? "01";
-                                // Keep paymentType/deadline/terms from the JSON as-is
-                                break;
+                            // ── Step 6: Type-specific header field adjustments only
+                            switch (item.Type)
+                            {
+                                case 31: break;
 
-                            case 47:
-                                // Type 47 (Pagos al Exterior): Comprador is optional (minOccurs=0)
-                                // No RNC, no Dominican fields — just foreign identifier
-                                currentDto.CustomerRnc = null;
-                                currentDto.CustomerName = "FOREIGN SERVICES PROVIDER";
-                                currentDto.CustomerForeignId = $"FOREIGN{i + 1:D6}";
-                                currentDto.CustomerCountry = null; // PaisComprador excluded for 47 in serializer
-                                currentDto.CustomerAddress = null;
-                                currentDto.IncomeType = null; // Not in type 47 XSD
-                                currentDto.PaymentType = 1;
-                                currentDto.PaymentDeadline = null;
-                                currentDto.PaymentTerms = null;
-                                break;
+                                case 32:
+                                    currentDto.PaymentType = 1;
+                                    currentDto.PaymentDeadline = null;
+                                    currentDto.PaymentTerms = null;
+                                    if (item.MinAmount.HasValue && item.MinAmount.Value >= 250000)
+                                    {
+                                        currentDto.IncomeType = currentDto.IncomeType ?? "01";
+                                        // Ensure we have a valid buyer RNC for large Type 32
+                                        if (string.IsNullOrEmpty(currentDto.CustomerRnc))
+                                        {
+                                            currentDto.CustomerRnc = "131793916";
+                                            currentDto.CustomerName = "CLIENTE PRUEBA CERTIFICACION";
+                                        }
+                                    }
+                                    break;
+
+                                case 41:
+                                    // Type 41 (Compras): RNCComprador is REQUIRED (minOccurs=1)
+                                    // The supplier/seller we're buying from — use a valid company RNC
+                                    currentDto.CustomerRnc = "131793916"; // Valid 9-digit test RNC
+                                    currentDto.CustomerName = "PROVEEDOR DE SERVICIOS SRL";
+                                    currentDto.IncomeType = null; // Not in type 41 XSD
+                                    currentDto.PaymentType = 1;
+                                    currentDto.PaymentDeadline = null;
+                                    currentDto.PaymentTerms = null;
+
+                                    // [NEW] satisfy XSD 41: <Retencion> is MANDATORY
+                                    currentDto.ManualTotalITBISRetenido = 0;
+                                    currentDto.ManualTotalISRRetencion = 0;
+                                    foreach (var itm in currentDto.Items)
+                                    {
+                                        itm.ManualMontoITBISRetenido = 0;
+                                        itm.ManualMontoISRRetenido = 0;
+                                    }
+                                    break;
+
+                                case 43:
+                                    // Type 43 (Gastos Menores): Comprador is forbidden in XSD.
+                                    currentDto.CustomerRnc = null;
+                                    currentDto.CustomerName = null;
+                                    currentDto.IncomeType = null;
+                                    currentDto.PaymentType = 1;
+                                    currentDto.PaymentDeadline = null;
+                                    currentDto.PaymentTerms = null;
+                                    break;
+
+                                case 44: break;
+                                case 45: break;
+
+                                case 46:
+                                    // Type 46 (Exportaciones): TipoPago & TipoIngresos are REQUIRED.
+                                    // IMPORTANT: MontoExento is FORBIDDEN in Type 46 XSD.
+                                    // We must ensure items use BillingIndicator 1, 2, or 3 (Gravado).
+                                    currentDto.IncomeType = currentDto.IncomeType ?? "01";
+                                    currentDto.PaymentType = currentDto.PaymentType ?? 1;
+                                    foreach (var itm in currentDto.Items)
+                                    {
+                                        if (itm.BillingIndicator == 4) itm.BillingIndicator = 3; // Force Gravado 0%
+                                    }
+                                    break;
+
+                                case 47:
+                                    // Type 47 (Pagos al Exterior): Comprador is optional (minOccurs=0)
+                                    // No RNC, no Dominican fields — just foreign identifier
+                                    currentDto.CustomerRnc = null;
+                                    currentDto.CustomerName = "FOREIGN SERVICES PROVIDER";
+                                    currentDto.CustomerForeignId = $"FOREIGN{i + 1:D6}";
+                                    currentDto.CustomerCountry = null; // PaisComprador excluded for 47 in serializer
+                                    currentDto.CustomerAddress = null;
+                                    currentDto.IncomeType = null; // Not in type 47 XSD
+                                    currentDto.PaymentType = 1;
+                                    currentDto.PaymentDeadline = null;
+                                    currentDto.PaymentTerms = null;
+
+                                    // [NEW] satisfy XSD 47: <Retencion> is MANDATORY
+                                    currentDto.ManualTotalITBISRetenido = 0;
+                                    currentDto.ManualTotalISRRetencion = 0;
+                                    foreach (var itm in currentDto.Items)
+                                    {
+                                        itm.ManualMontoITBISRetenido = 0;
+                                        itm.ManualMontoISRRetenido = 0;
+                                        itm.IsrRetentionAmount = 0;
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+
+                    // [NEW] For RFCE (Summary), we need manual totals because it doesn't have Items to calculate from
+                    if (item.IsSummary)
+                    {
+                        // Calculate totals from the current items before they are ignored by summary generator
+                        currentDto.ManualMontoGravadoTotal = currentDto.Items.Where(it => it.BillingIndicator == 1).Sum(it => it.Quantity * it.UnitPrice);
+                        currentDto.ManualMontoExento = currentDto.Items.Where(it => it.BillingIndicator == 4).Sum(it => it.Quantity * it.UnitPrice);
+                        currentDto.ManualTotalITBIS = currentDto.Items.Sum(it => it.ItbisAmount);
+                        currentDto.ManualMontoTotal = currentDto.Items.Sum(it => (it.Quantity * it.UnitPrice) + it.ItbisAmount);
+
+                        // [NEW] For RFCE B2C simulation, clear customer to ensure anonymous
+                        currentDto.CustomerRnc = null;
+                        currentDto.CustomerName = "CONSUMIDOR FINAL";
+                        currentDto.CustomerForeignId = null;
+
+                        // [NEW] Pre-calculate Security Code from an individual signature (Solution from RunTestAsync)
+                        try
+                        {
+                            // Generate as individual (IsSummary=false) to get a "valid" security code derived from a signature
+                            string indUnsigned = _generatorService.GenerateUnsignedXml(currentDto, false);
+                            string indSigned = _signerService.SignXml(indUnsigned, certBase64, certPass);
+                            string tag = "<SignatureValue>";
+                            var start = indSigned.IndexOf(tag);
+                            if (start != -1)
+                            {
+                                var content = indSigned.Substring(start + tag.Length);
+                                var realCode = content.TrimStart().Substring(0, 6);
+                                currentDto.SecurityCodeOverride = realCode;
+                                Console.WriteLine($"[RFCE] Código de Seguridad pre-calculado: {realCode}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[WARN] Error pre-calculando código de seguridad RFCE: {ex.Message}");
                         }
                     }
 
@@ -1491,97 +1584,106 @@ public class CertificationService : ICertificationService
                     var xsdErrors = _generatorService.ValidateXmlAgainstSchema(unsignedXmlTemp, item.Type);
                     if (xsdErrors.Any())
                     {
+                        string msg = string.Join(" | ", xsdErrors.Take(3));
+                        Console.WriteLine($"[ERR] Error XSD en Paso {status.CurrentStep} (Tipo {item.Type}): {msg}");
                         status.CompletedSteps.Add(new CertificationStepResultDto
                         {
                             Index = status.CurrentStep,
                             Ncf = currentDto.Ncf,
                             Status = "Error XSD",
-                            Message = string.Join(" | ", xsdErrors.Take(3))
+                            Message = msg
                         });
                         // DO NOT consume sequence - skip without incrementing
                         continue;
                     }
 
                     // B. Sequence Management (AFTER XSD validation passes)
-                    var ecfTypeRecord = await _context.Set<Core.Entities.EcfType>().FirstOrDefaultAsync(t => t.Code == item.Type.ToString());
-                    if (ecfTypeRecord == null) throw new Exception($"Tipo de e-CF {item.Type} no soportado en la base de datos.");
-
-                    var encfRecord = await _context.ENcfs.FirstOrDefaultAsync(e => e.NcfTypeId == ecfTypeRecord.EcfTypeId && e.ClientId == client.ClientId);
-                    if (encfRecord == null)
+                    ENcf? encfRecord = null;
+                    if (!skipNcfConsumption)
                     {
-                        encfRecord = new ENcf { NcfTypeId = ecfTypeRecord.EcfTypeId, ClientId = client.ClientId, Sequence = 1, RegisteredAt = DateTime.Now };
-                        _context.ENcfs.Add(encfRecord);
-                        await _context.SaveChangesAsync();
-                    }
+                        var ecfTypeRecord = await _context.Set<Core.Entities.EcfType>().FirstOrDefaultAsync(t => t.Code == item.Type.ToString());
+                        if (ecfTypeRecord == null) throw new Exception($"Tipo de e-CF {item.Type} no soportado en la base de datos.");
 
-                    int seq = encfRecord.Sequence++;
-                    currentDto.Ncf = $"E{item.Type}{seq:D10}";
-                    _context.Entry(encfRecord).State = EntityState.Modified;
-                    await _context.SaveChangesAsync();
+                        encfRecord = await _context.ENcfs.FirstOrDefaultAsync(e => e.NcfTypeId == ecfTypeRecord.EcfTypeId && e.ClientId == client.ClientId);
+                        if (encfRecord == null)
+                        {
+                            encfRecord = new ENcf { NcfTypeId = ecfTypeRecord.EcfTypeId, ClientId = client.ClientId, Sequence = 1, RegisteredAt = DateTime.Now };
+                            _context.ENcfs.Add(encfRecord);
+                            await _context.SaveChangesAsync();
+                        }
+
+                        int seq = encfRecord.Sequence++;
+                        currentDto.Ncf = $"E{item.Type}{seq:D10}";
+                        _context.Entry(encfRecord).State = EntityState.Modified;
+                        await _context.SaveChangesAsync();
+
+                        // [NEW] If this is a summary, store it in the pool AFTER we have the real NCF
+                        if (item.IsSummary)
+                        {
+                            rfcePool.Add((currentDto.Ncf, currentDto.SecurityCodeOverride ?? "", CloneDto(currentDto)!));
+                        }
+                    }
 
                     // Re-generate with the real NCF
                     string unsignedXml = _generatorService.GenerateUnsignedXml(currentDto, item.IsSummary);
-
                     string signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
+
+                    // E. Transmission
+                    // [NEW] Console Logging [TX]
+                    Console.WriteLine($"[TX] Enviando e-CF {currentDto.Ncf} tipo {item.Type} (Paso {status.CurrentStep}/{status.TotalSteps})...");
+
+                    decimal actualTransmissionTotal = currentDto.ManualMontoTotal ?? 0;
+                    if (actualTransmissionTotal == 0 && currentDto.Items.Any())
+                    {
+                        actualTransmissionTotal = currentDto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) - (itm.ManualDescuentoMonto ?? itm.Discount));
+                    }
+
+                    var result = await _transmissionService.SendEcfAsync(
+                        DgiiEnvironment.CerteCF,
+                        token,
+                        signedXml,
+                        item.Type,
+                        actualTransmissionTotal,
+                        dto.IssuerRnc,
+                        currentDto.Ncf,
+                        item.IsSummary);
 
                     bool isAccepted = false;
                     string? trackId = null;
                     string? error = null;
                     string? downloadUrl = null;
 
-                    if (item.IsManual)
+                    if (result.Success && !string.IsNullOrEmpty(result.TrackId))
                     {
-                        // Manual Upload Rule: Save to downloads folder
-                        string simulationFolder = Path.Combine(webRootPath, "downloads", "simulation", client.Rnc);
-                        if (!Directory.Exists(simulationFolder)) Directory.CreateDirectory(simulationFolder);
-                        string fileName = $"{currentDto.Ncf}.xml";
-                        string filePath = Path.Combine(simulationFolder, fileName);
-                        await File.WriteAllTextAsync(filePath, signedXml);
+                        // [NEW] Stability wait of 2 seconds as requested before polling
+                        await Task.Delay(2000);
 
-                        downloadUrl = $"/downloads/simulation/{client.Rnc}/{fileName}";
-                        isAccepted = true; // Manual documents are "accepted" once generated for upload
+                        // Poll DGII to get actual acceptance/rejection
+                        var finalStatus = await PollDgiiStatusAsync(result.TrackId, dto.IssuerRnc);
+                        isAccepted = finalStatus.Estado == "Aceptado" || (item.IsSummary && finalStatus.Estado == "Generado");
+                        trackId = result.TrackId;
+
+                        // [NEW] Console Logging [RX]
+                        Console.WriteLine($"[RX] Resultado e-CF {currentDto.Ncf}: {finalStatus.Estado}");
+
+                        if (!isAccepted)
+                            error = $"DGII: {finalStatus.Estado} - {string.Join(" | ", finalStatus.Mensajes?.Select(m => m.Valor) ?? new[] { "Sin mensaje" })}";
                     }
                     else
                     {
-                        // [NEW] Console Logging [TX]
-                        Console.WriteLine($"[TX] Enviando e-CF {currentDto.Ncf} tipo {item.Type} (Paso {status.CurrentStep}/{status.TotalSteps})...");
+                        isAccepted = false;
+                        error = result.Error;
+                        Console.WriteLine($"[RX] Error en envío e-CF {currentDto.Ncf}: {error}");
+                    }
 
-                        // Calculate the real total from items for correct routing
-                        decimal actualTransmissionTotal = currentDto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) - itm.Discount + (itm.ManualRecargoMonto ?? 0));
-
-                        // API Transmission
-                        var result = await _transmissionService.SendEcfAsync(
-                            DgiiEnvironment.CerteCF,
-                            token,
-                            signedXml,
-                            item.Type,
-                            actualTransmissionTotal,
-                            dto.IssuerRnc,
-                            currentDto.Ncf,
-                            item.IsSummary);
-
-                        if (result.Success && !string.IsNullOrEmpty(result.TrackId))
-                        {
-                            // [NEW] Stability wait of 2 seconds as requested before polling
-                            await Task.Delay(2000);
-
-                            // Poll DGII to get actual acceptance/rejection
-                            var finalStatus = await PollDgiiStatusAsync(result.TrackId, dto.IssuerRnc);
-                            isAccepted = finalStatus.Estado == "Aceptado" || (item.IsSummary && finalStatus.Estado == "Generado");
-                            trackId = result.TrackId;
-
-                            // [NEW] Console Logging [RX]
-                            Console.WriteLine($"[RX] Resultado e-CF {currentDto.Ncf}: {finalStatus.Estado}");
-
-                            if (!isAccepted)
-                                error = $"DGII: {finalStatus.Estado} - {string.Join(" | ", finalStatus.Mensajes?.Select(m => m.Valor) ?? new[] { "Sin mensaje" })}";
-                        }
-                        else
-                        {
-                            isAccepted = false;
-                            error = result.Error;
-                            Console.WriteLine($"[RX] Error en envío e-CF {currentDto.Ncf}: {error}");
-                        }
+                    if (item.IsManual)
+                    {
+                        // Manual documents for Step 4 download
+                        string fileName = $"cert_test_{status.CurrentStep}_{currentDto.Ncf}.xml";
+                        string fullPath = Path.Combine(webRootPath, "certification_files", fileName);
+                        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+                        await File.WriteAllTextAsync(fullPath, signedXml);
+                        downloadUrl = $"/certification_files/{fileName}";
                     }
 
                     // Save ALL sent documents (accepted or rejected) to allow audit trail
@@ -1589,8 +1691,8 @@ public class CertificationService : ICertificationService
                     {
                         CertificationProcessId = process.CertificationProcessId,
                         ENcfSecuence = currentDto.Ncf,
-                        ENcfId = encfRecord.ENcfId,
-                        EcfTypeId = ecfTypeRecord.EcfTypeId,
+                        ENcfId = encfRecord!.ENcfId,
+                        EcfTypeId = (await _context.Set<Core.Entities.EcfType>().FirstOrDefaultAsync(t => t.Code == item.Type.ToString()))?.EcfTypeId ?? 0,
                         XmlSent = signedXml,
                         TrackId = trackId,
                         Status = isAccepted ? DocumentStatus.Accepted : DocumentStatus.Rejected,
@@ -1619,17 +1721,17 @@ public class CertificationService : ICertificationService
                         Message = isAccepted ? (item.IsManual ? $"Manual: {downloadUrl}" : $"TrackId: {trackId}") : error
                     });
 
-                    // [NEW] Stop simulation on first error as requested (mirror EnqueueCertificationJobAsync behavior)
+                    // [NEW] Stop simulation on first error as requested
                     if (!isAccepted)
                     {
                         status.Status = "Failed";
                         status.ErrorMessage = $"Error en NCF {currentDto.Ncf}: {error}";
-                        goto EndOfJob; // Use goto or another way to exit nested loops
+                        goto EndOfJob;
                     }
                 }
             }
 
-            EndOfJob:
+        EndOfJob:
             if (status.Status != "Failed")
             {
                 process.Status = CertificationStatus.Approved;

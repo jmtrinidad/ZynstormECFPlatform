@@ -51,7 +51,7 @@ public class EcfXmlComprador
 
     [XmlElement("TelefonoAdicional")]
     public string? TelefonoAdicional { get; set; }
-    public bool ShouldSerializeTelefonoAdicional() => !string.IsNullOrWhiteSpace(TelefonoAdicional) && EcfType != 47;
+    public bool ShouldSerializeTelefonoAdicional() => !string.IsNullOrWhiteSpace(TelefonoAdicional) && EcfType != 47 && EcfType != 41;
 
     [XmlElement("FechaEntrega")]
     public string? FechaEntrega { get; set; }

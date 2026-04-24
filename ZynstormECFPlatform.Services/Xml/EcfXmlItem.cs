@@ -42,8 +42,15 @@ public class EcfXmlItem
     public string? DescripcionItem { get; set; }
     public bool ShouldSerializeDescripcionItem() => DescripcionItem != null;
 
-    [XmlElement("CantidadItem", Order = 7)]
+    [XmlIgnore]
     public decimal CantidadItem { get; set; }
+
+    [XmlElement("CantidadItem", Order = 7)]
+    public string CantidadItemString
+    {
+        get => CantidadItem.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        set => CantidadItem = decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+    }
 
     [XmlElement("UnidadMedida", Order = 8)]
     public int? UnidadMedida { get; set; }
@@ -57,8 +64,15 @@ public class EcfXmlItem
     public string? FechaVencimientoItem { get; set; }
     public bool ShouldSerializeFechaVencimientoItem() => !string.IsNullOrEmpty(FechaVencimientoItem);
 
-    [XmlElement("PrecioUnitarioItem", Order = 11)]
+    [XmlIgnore]
     public decimal PrecioUnitarioItem { get; set; }
+
+    [XmlElement("PrecioUnitarioItem", Order = 11)]
+    public string PrecioUnitarioItemString
+    {
+        get => PrecioUnitarioItem.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        set => PrecioUnitarioItem = decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+    }
 
     [XmlElement("DescuentoMonto", Order = 12)]
     public decimal? DescuentoMonto { get; set; }
@@ -80,8 +94,15 @@ public class EcfXmlItem
     public EcfXmlTablaImpuestoAdicionalItem? TablaImpuestoAdicional { get; set; }
     public bool ShouldSerializeTablaImpuestoAdicional() => TablaImpuestoAdicional != null && EcfType != 41 && EcfType != 43;
 
-    [XmlElement("MontoItem", Order = 17)]
+    [XmlIgnore]
     public decimal MontoItem { get; set; }
+
+    [XmlElement("MontoItem", Order = 17)]
+    public string MontoItemString
+    {
+        get => MontoItem.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        set => MontoItem = decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+    }
 
 }
 

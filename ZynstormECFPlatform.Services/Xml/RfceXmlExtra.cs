@@ -44,13 +44,27 @@ public class RfceXmlTotales
     public decimal? MontoGravadoI3 { get; set; }
     public bool ShouldSerializeMontoGravadoI3() => MontoGravadoI3.HasValue;
 
-    [XmlElement("MontoExento", Order = 5)]
+    [XmlIgnore]
     public decimal? MontoExento { get; set; }
-    public bool ShouldSerializeMontoExento() => MontoExento.HasValue;
+
+    [XmlElement("MontoExento", Order = 5)]
+    public string? MontoExentoString
+    {
+        get => MontoExento?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        set => MontoExento = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+    }
+    public bool ShouldSerializeMontoExentoString() => MontoExento.HasValue;
+
+    [XmlIgnore]
+    public decimal? TotalITBIS { get; set; }
 
     [XmlElement("TotalITBIS", Order = 6)]
-    public decimal? TotalITBIS { get; set; }
-    public bool ShouldSerializeTotalITBIS() => TotalITBIS.HasValue;
+    public string? TotalITBISString
+    {
+        get => TotalITBIS?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        set => TotalITBIS = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+    }
+    public bool ShouldSerializeTotalITBISString() => TotalITBIS.HasValue;
 
     [XmlElement("TotalITBIS1", Order = 7)]
     public decimal? TotalITBIS1 { get; set; }
@@ -72,8 +86,15 @@ public class RfceXmlTotales
     public RfceXmlImpuestosAdicionales? ImpuestosAdicionales { get; set; }
     public bool ShouldSerializeImpuestosAdicionales() => ImpuestosAdicionales != null && ImpuestosAdicionales.Items.Count > 0;
 
-    [XmlElement("MontoTotal", Order = 12)]
+    [XmlIgnore]
     public decimal MontoTotal { get; set; }
+
+    [XmlElement("MontoTotal", Order = 12)]
+    public string MontoTotalString
+    {
+        get => MontoTotal.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        set => MontoTotal = decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+    }
 
     [XmlElement("MontoNoFacturable", Order = 13)]
     public decimal? MontoNoFacturable { get; set; }

@@ -380,11 +380,11 @@ public class EcfGeneratorService : IEcfGeneratorService
                 TablaImpuestoAdicional = tablaImpuesto,
                 MontoItem = item.ManualMontoItem ?? (taxableAmount + itbisAmount + iscItemTotal + surchargeAmount),
 
-                Retencion = (ecfType is 41 or 47) && (isrRetAmount > 0 || itbisRetAmount > 0) ? new EcfXmlItemRetencion
+                Retencion = (ecfType is 41 or 47) ? new EcfXmlItemRetencion
                 {
                     Indicador = 1,
-                    MontoITBISRetenido = itbisRetAmount > 0 ? itbisRetAmount : null,
-                    MontoISRRetenido = isrRetAmount > 0 ? isrRetAmount : null
+                    MontoITBISRetenido = itbisRetAmount,
+                    MontoISRRetenido = isrRetAmount
                 } : null
             });
 
@@ -632,6 +632,9 @@ public class EcfGeneratorService : IEcfGeneratorService
                 CodigoSeguridadeCF = dto.SecurityCodeOverride ?? GenerateRandomCode(6)
             }
         };
+
+        var doc = new System.Xml.XmlDocument();
+        root.Signature = doc.CreateElement("Signature", "http://www.w3.org/2000/09/xmldsig#");
 
         return root;
     }
