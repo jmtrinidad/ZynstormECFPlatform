@@ -395,16 +395,28 @@ public class EcfGeneratorService : IEcfGeneratorService
             switch (billingIndicator)
             {
                 case 1:
+                    taxableG1 += taxableAmount;
+                    itbisG1 += itbisAmount;
+                    totalBase += baseAmount;
+                    totalItemDiscounts += discountAmount;
+                    break;
                 case 2:
+                    taxableG2 += taxableAmount;
+                    itbisG2 += itbisAmount;
+                    totalBase += baseAmount;
+                    totalItemDiscounts += discountAmount;
+                    break;
                 case 3:
-                    totalBase += baseAmount; 
+                    taxableG3 += taxableAmount;
+                    itbisG3 += itbisAmount;
+                    totalBase += baseAmount;
                     totalItemDiscounts += discountAmount;
                     break;
                 case 4:  // Exento
-                    totalExempt += (taxableAmount + surchargeAmount); 
+                    totalExempt += (taxableAmount + surchargeAmount);
                     break;
                 case 0:  // No facturable
-                    totalNoFacturable += (taxableAmount + surchargeAmount); 
+                    totalNoFacturable += (taxableAmount + surchargeAmount);
                     break;
             }
         }
@@ -554,7 +566,7 @@ public class EcfGeneratorService : IEcfGeneratorService
                     NCFModificado = dto.ReferenceNcf,
                     RNCOtroContribuyente = dto.ReferenceCustomerRnc,
                     FechaNCFModificado = (dto.ReferenceIssueDate ?? DateTime.UtcNow).ToString(DateFormat),
-                    CodigoModificacion = dto.ReferenceReasonCode ?? 1,
+                    CodigoModificacion = dto.ReferenceReasonCode ?? 3,
                     RazonModificacion = dto.ReferenceReasonDescription
                 } : null,
 

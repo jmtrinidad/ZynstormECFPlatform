@@ -13,6 +13,7 @@ public class EcfXmlComprador
 
     [XmlElement("RNCComprador")]
     public string? RncComprador { get; set; }
+    // Required for type 41 (minOccurs=1), optional for others, excluded for 47
     public bool ShouldSerializeRncComprador() => !string.IsNullOrWhiteSpace(RncComprador) && EcfType != 47;
 
     [XmlElement("IdentificadorExtranjero")]
@@ -45,6 +46,7 @@ public class EcfXmlComprador
 
     [XmlElement("PaisComprador")]
     public string? PaisComprador { get; set; }
+    // PaisComprador is valid for 31,32,33,34,41,44,45,46 but NOT for 47 (which uses PaisDestino in Items)
     public bool ShouldSerializePaisComprador() => !string.IsNullOrWhiteSpace(PaisComprador) && EcfType != 47;
 
     [XmlElement("TelefonoAdicional")]
