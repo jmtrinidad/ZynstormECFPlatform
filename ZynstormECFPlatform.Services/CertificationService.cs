@@ -1393,7 +1393,7 @@ public class CertificationService : ICertificationService
                         currentDto.IncomeType = currentDto.IncomeType ?? "01";
 
                         if (item.Type == 34)
-                            currentDto.ManualIndicadorNotaCredito = 1;
+                            currentDto.ManualIndicadorNotaCredito = 0; // [MODIFIED] 0 = <= 30 days (Correct for simulation)
 
                         // Cash payment for notes
                         currentDto.PaymentType = 1;
