@@ -1315,6 +1315,7 @@ public class CertificationService : ICertificationService
 
             status.TotalSteps = matrix.Sum(m => m.Count);
             status.CurrentStep = 0;
+            var signatureDate = DateTime.Now;
 
             // In-memory list to track documents sent in THIS run (for DB persistence)
             var sentDocsThisRun = new List<CertificationDocument>();
@@ -1582,6 +1583,7 @@ public class CertificationService : ICertificationService
 
                             var indDto = CloneDto(currentDto)!;
                             indDto.Ncf = realNcfForInd;
+                            indDto.SignatureDateOverride = signatureDate; // [FIX] Lock signature date for consistency
                             // Ensure the dry-run uses individual mode
                             string indUnsigned = _generatorService.GenerateUnsignedXml(indDto, false);
                             string indSigned = _signerService.SignXml(indUnsigned, certBase64, certPass);
@@ -1603,6 +1605,9 @@ public class CertificationService : ICertificationService
                             Console.WriteLine($"[WARN] Error sincronizando código RFCE: {ex.Message}");
                         }
                     }
+
+                    // Apply global signature date override to ensure consistency across all steps
+                    currentDto.SignatureDateOverride = signatureDate;
 
                     // D. Generate with temp NCF for XSD validation BEFORE consuming sequence
                     string realNcfBeforeValidation = currentDto.Ncf;
