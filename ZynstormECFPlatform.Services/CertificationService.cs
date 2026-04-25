@@ -1573,8 +1573,12 @@ public class CertificationService : ICertificationService
                     }
 
                     // D. Generate with temp NCF for XSD validation BEFORE consuming sequence
+                    string realNcfBeforeValidation = currentDto.Ncf;
                     currentDto.Ncf = $"E{item.Type}0000000000"; // Temp NCF for validation only
                     string unsignedXmlTemp = _generatorService.GenerateUnsignedXml(currentDto, item.IsSummary);
+                    
+                    // Restore NCF immediately after generating the temp XML for validation
+                    currentDto.Ncf = realNcfBeforeValidation;
 
                     // XSD Validation BEFORE sequence management (to avoid burning NCFs)
                     var xsdErrors = _generatorService.ValidateXmlAgainstSchema(unsignedXmlTemp, item.Type);
@@ -1594,12 +1598,12 @@ public class CertificationService : ICertificationService
                     }
 
                     // B. Sequence Management (AFTER XSD validation passes)
+                    var ecfTypeRecord = await _context.Set<Core.Entities.EcfType>().FirstOrDefaultAsync(t => t.Code == item.Type.ToString());
+                    if (ecfTypeRecord == null) throw new Exception($"Tipo de e-CF {item.Type} no soportado en la base de datos.");
+
                     ENcf? encfRecord = null;
                     if (!skipNcfConsumption)
                     {
-                        var ecfTypeRecord = await _context.Set<Core.Entities.EcfType>().FirstOrDefaultAsync(t => t.Code == item.Type.ToString());
-                        if (ecfTypeRecord == null) throw new Exception($"Tipo de e-CF {item.Type} no soportado en la base de datos.");
-
                         encfRecord = await _context.ENcfs.FirstOrDefaultAsync(e => e.NcfTypeId == ecfTypeRecord.EcfTypeId && e.ClientId == client.ClientId);
                         if (encfRecord == null)
                         {
@@ -1641,57 +1645,67 @@ public class CertificationService : ICertificationService
                             + (itm.IscSpecificAmount + itm.IscAdvaloremAmount + itm.OtherAdditionalTaxAmount));
                     }
 
-                    var result = await _transmissionService.SendEcfAsync(
-                        DgiiEnvironment.CerteCF,
-                        token,
-                        signedXml,
-                        item.Type,
-                        actualTransmissionTotal,
-                        dto.IssuerRnc,
-                        currentDto.Ncf,
-                        item.IsSummary);
-
                     bool isAccepted = false;
                     string? trackId = null;
                     string? error = null;
                     string? downloadUrl = null;
 
-                    if (result.Success)
+                    if (item.IsManual)
                     {
-                        if (!string.IsNullOrEmpty(result.TrackId))
+                        // For manual steps, just mark as generated and save
+                        isAccepted = true;
+                        trackId = "MANUAL";
+                        Console.WriteLine($"[TX] Paso MANUAL {currentDto.Ncf} tipo {item.Type} - Marcado como generado.");
+                    }
+                    else
+                    {
+                        var result = await _transmissionService.SendEcfAsync(
+                            DgiiEnvironment.CerteCF,
+                            token,
+                            signedXml,
+                            item.Type,
+                            actualTransmissionTotal,
+                            dto.IssuerRnc,
+                            currentDto.Ncf,
+                            item.IsSummary);
+
+                        if (result.Success)
                         {
-                            // [NEW] Stability wait of 2 seconds as requested before polling
-                            await Task.Delay(2000);
+                            if (!string.IsNullOrEmpty(result.TrackId))
+                            {
+                                // [NEW] Stability wait of 2 seconds as requested before polling
+                                await Task.Delay(2000);
 
-                            // Poll DGII to get actual acceptance/rejection
-                            var finalStatus = await PollDgiiStatusAsync(result.TrackId, dto.IssuerRnc);
-                            isAccepted = finalStatus.Estado == "Aceptado" || (item.IsSummary && finalStatus.Estado == "Generado");
-                            trackId = result.TrackId;
+                                // Poll DGII to get actual acceptance/rejection
+                                var finalStatus = await PollDgiiStatusAsync(result.TrackId, dto.IssuerRnc);
+                                isAccepted = finalStatus.Estado == "Aceptado" || (item.IsSummary && finalStatus.Estado == "Generado");
+                                trackId = result.TrackId;
 
-                            // [NEW] Console Logging [RX]
-                            Console.WriteLine($"[RX] Resultado e-CF {currentDto.Ncf}: {finalStatus.Estado}");
+                                // [NEW] Console Logging [RX]
+                                Console.WriteLine($"[RX] Resultado e-CF {currentDto.Ncf}: {finalStatus.Estado}");
 
-                            if (!isAccepted)
-                                error = $"DGII: {finalStatus.Estado} - {string.Join(" | ", finalStatus.Mensajes?.Select(m => m.Valor) ?? new[] { "Sin mensaje" })}";
-                        }
-                        else if (item.IsSummary && result.Estado == "Aceptado")
-                        {
-                            // Immediate acceptance for RFCE (no TrackId)
-                            isAccepted = true;
-                            trackId = "INMEDIATO";
-                            Console.WriteLine($"[RX] Resultado e-CF {currentDto.Ncf}: Aceptado (Inmediato)");
+                                if (!isAccepted)
+                                    error = $"DGII: {finalStatus.Estado} - {string.Join(" | ", finalStatus.Mensajes?.Select(m => m.Valor) ?? new[] { "Sin mensaje" })}";
+                            }
+                            else if (item.IsSummary && result.Estado == "Aceptado")
+                            {
+                                // Immediate acceptance for RFCE (no TrackId)
+                                isAccepted = true;
+                                trackId = "INMEDIATO";
+                                Console.WriteLine($"[RX] Resultado e-CF {currentDto.Ncf}: Aceptado (Inmediato)");
+                            }
+                            else
+                            {
+                                isAccepted = false;
+                                error = "DGII: No se recibió TrackId ni estado de aceptación inmediata.";
+                            }
                         }
                         else
                         {
                             isAccepted = false;
-                            error = "DGII: No se recibió TrackId ni estado de aceptación inmediata.";
+                            error = string.IsNullOrEmpty(result.Error) ? $"DGII {result.Estado}: {result.Mensaje}" : result.Error;
+                            Console.WriteLine($"[RX] Error en envío e-CF {currentDto.Ncf}: {error}");
                         }
-                    }
-                    else
-                    {
-                        isAccepted = false;
-                        error = string.IsNullOrEmpty(result.Error) ? $"DGII {result.Estado}: {result.Mensaje}" : result.Error;
-                        Console.WriteLine($"[RX] Error en envío e-CF {currentDto.Ncf}: {error}");
                     }
 
                     if (item.IsManual)
@@ -1709,8 +1723,8 @@ public class CertificationService : ICertificationService
                     {
                         CertificationProcessId = process.CertificationProcessId,
                         ENcfSecuence = currentDto.Ncf,
-                        ENcfId = encfRecord!.ENcfId,
-                        EcfTypeId = (await _context.Set<Core.Entities.EcfType>().FirstOrDefaultAsync(t => t.Code == item.Type.ToString()))?.EcfTypeId ?? 0,
+                        ENcfId = encfRecord?.ENcfId ?? (await _context.ENcfs.FirstOrDefaultAsync(e => e.NcfTypeId == ecfTypeRecord.EcfTypeId && e.ClientId == client.ClientId))?.ENcfId ?? 0,
+                        EcfTypeId = ecfTypeRecord.EcfTypeId,
                         XmlSent = signedXml,
                         TrackId = trackId,
                         Status = isAccepted ? DocumentStatus.Accepted : DocumentStatus.Rejected,
