@@ -1570,27 +1570,6 @@ public class CertificationService : ICertificationService
                         currentDto.CustomerRnc = null;
                         currentDto.CustomerName = "CONSUMIDOR FINAL";
                         currentDto.CustomerForeignId = null;
-
-                        // [NEW] Pre-calculate Security Code from an individual signature (Solution from RunTestAsync)
-                        try
-                        {
-                            // Generate as individual (IsSummary=false) to get a "valid" security code derived from a signature
-                            string indUnsigned = _generatorService.GenerateUnsignedXml(currentDto, false);
-                            string indSigned = _signerService.SignXml(indUnsigned, certBase64, certPass);
-                            string tag = "<SignatureValue>";
-                            var start = indSigned.IndexOf(tag);
-                            if (start != -1)
-                            {
-                                var content = indSigned.Substring(start + tag.Length);
-                                var realCode = content.TrimStart().Substring(0, 6);
-                                currentDto.SecurityCodeOverride = realCode;
-                                Console.WriteLine($"[RFCE] Código de Seguridad pre-calculado: {realCode}");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"[WARN] Error pre-calculando código de seguridad RFCE: {ex.Message}");
-                        }
                     }
 
                     // D. Generate with temp NCF for XSD validation BEFORE consuming sequence
@@ -1677,26 +1656,41 @@ public class CertificationService : ICertificationService
                     string? error = null;
                     string? downloadUrl = null;
 
-                    if (result.Success && !string.IsNullOrEmpty(result.TrackId))
+                    if (result.Success)
                     {
-                        // [NEW] Stability wait of 2 seconds as requested before polling
-                        await Task.Delay(2000);
+                        if (!string.IsNullOrEmpty(result.TrackId))
+                        {
+                            // [NEW] Stability wait of 2 seconds as requested before polling
+                            await Task.Delay(2000);
 
-                        // Poll DGII to get actual acceptance/rejection
-                        var finalStatus = await PollDgiiStatusAsync(result.TrackId, dto.IssuerRnc);
-                        isAccepted = finalStatus.Estado == "Aceptado" || (item.IsSummary && finalStatus.Estado == "Generado");
-                        trackId = result.TrackId;
+                            // Poll DGII to get actual acceptance/rejection
+                            var finalStatus = await PollDgiiStatusAsync(result.TrackId, dto.IssuerRnc);
+                            isAccepted = finalStatus.Estado == "Aceptado" || (item.IsSummary && finalStatus.Estado == "Generado");
+                            trackId = result.TrackId;
 
-                        // [NEW] Console Logging [RX]
-                        Console.WriteLine($"[RX] Resultado e-CF {currentDto.Ncf}: {finalStatus.Estado}");
+                            // [NEW] Console Logging [RX]
+                            Console.WriteLine($"[RX] Resultado e-CF {currentDto.Ncf}: {finalStatus.Estado}");
 
-                        if (!isAccepted)
-                            error = $"DGII: {finalStatus.Estado} - {string.Join(" | ", finalStatus.Mensajes?.Select(m => m.Valor) ?? new[] { "Sin mensaje" })}";
+                            if (!isAccepted)
+                                error = $"DGII: {finalStatus.Estado} - {string.Join(" | ", finalStatus.Mensajes?.Select(m => m.Valor) ?? new[] { "Sin mensaje" })}";
+                        }
+                        else if (item.IsSummary && result.Estado == "Aceptado")
+                        {
+                            // Immediate acceptance for RFCE (no TrackId)
+                            isAccepted = true;
+                            trackId = "INMEDIATO";
+                            Console.WriteLine($"[RX] Resultado e-CF {currentDto.Ncf}: Aceptado (Inmediato)");
+                        }
+                        else
+                        {
+                            isAccepted = false;
+                            error = "DGII: No se recibió TrackId ni estado de aceptación inmediata.";
+                        }
                     }
                     else
                     {
                         isAccepted = false;
-                        error = result.Error;
+                        error = string.IsNullOrEmpty(result.Error) ? $"DGII {result.Estado}: {result.Mensaje}" : result.Error;
                         Console.WriteLine($"[RX] Error en envío e-CF {currentDto.Ncf}: {error}");
                     }
 
