@@ -135,6 +135,24 @@ public class CertificationController : ControllerBase
         }
     }
 
+    [HttpPost("simulacion-uno-a-uno")]
+    public async Task<ActionResult<string>> SimulacionUnoAUno([FromBody] EcfInvoiceRequestDto dto)
+    {
+        if (dto == null)
+            return BadRequest("Debe proporcionar los datos de la factura en formato JSON.");
+
+        try
+        {
+            var result = await _certificationService.ProcessSimulacionUnoAUnoAsync(dto, _env.WebRootPath);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
     [HttpGet("files")]
     public ActionResult<List<string>> ListCertificationFiles()
     {
@@ -184,8 +202,8 @@ public class CertificationController : ControllerBase
     }
 
     /// <summary>
-    /// Endpoint para descargar todos los archivos .json generados para la simulación
-    /// para tenerlos de ejemplo para enviarlos.
+    /// Endpoint para descargar todos los archivos .json generados para la simulación para tenerlos de ejemplo para
+    /// enviarlos.
     /// </summary>
     /// <param name="jobId">Identificador del trabajo de simulación</param>
     /// <returns>Archivo ZIP con los payloads JSON</returns>

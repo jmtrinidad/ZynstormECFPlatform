@@ -24,6 +24,5 @@ public interface ICertificationService
     Task ProcessSimulacionEcfJobAsync(EcfInvoiceRequestDto dto, string jobId, string webRootPath);
 
     // Simulation Uno a Uno
-    Task<string> EnqueueSimulacionUnoAUnoJobAsync(List<EcfInvoiceRequestDto> dtos, string webRootPath);
-    Task ProcessSimulacionUnoAUnoJobAsync(List<EcfInvoiceRequestDto> dtos, string jobId, string webRootPath);
+    Task<string> ProcessSimulacionUnoAUnoAsync(EcfInvoiceRequestDto dto, string webRootPath);
 }

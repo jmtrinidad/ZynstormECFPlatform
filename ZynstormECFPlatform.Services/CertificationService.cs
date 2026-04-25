@@ -1914,6 +1914,160 @@ public class CertificationService : ICertificationService
         }
     }
 
+    public async Task<string> ProcessSimulacionUnoAUnoAsync(EcfInvoiceRequestDto dto, string webRootPath)
+    {
+        if (dto == null)
+            throw new ArgumentNullException(nameof(dto), "No se proporcionó el comprobante.");
+
+        try
+        {
+            // 1. Validate Client
+            var client = await _clientService.GetByAsync(c => c.Rnc == dto.IssuerRnc)
+                ?? throw new Exception($"Cliente con RNC {dto.IssuerRnc} no encontrado.");
+
+            // 2. Prepare Credentials
+            var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)
+                ?? throw new Exception("ApiKey no encontrada.");
+            var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
+            var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId)
+                ?? throw new Exception("Certificado no encontrado.");
+            var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
+            var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
+            var certBase64 = Convert.ToBase64String(certificateBytes);
+            var certPass = Encoding.UTF8.GetString(passwordBytes);
+
+            string token = await _authService.GetTokenAsync(dto.IssuerRnc, DgiiEnvironment.CerteCF, certBase64, certPass);
+
+            var signatureDate = DateTime.Now;
+            var currentDto = dto;
+            currentDto.SignatureDateOverride = signatureDate;
+            
+            int ecfType = currentDto.EcfType ?? (string.IsNullOrEmpty(currentDto.Ncf) ? 31 : int.Parse(currentDto.Ncf.Substring(1, 2)));
+
+            if (ecfType == 32) // RFCE Summary
+            {
+                // Validate totals from the current items before processing
+                decimal calculatedGravado = currentDto.Items.Where(it => it.BillingIndicator == 1).Sum(it => it.Quantity * it.UnitPrice);
+                decimal calculatedExento = currentDto.Items.Where(it => it.BillingIndicator == 4).Sum(it => it.Quantity * it.UnitPrice);
+                decimal calculatedITBIS = currentDto.Items.Sum(it => it.ItbisAmount);
+                decimal calculatedTotal = currentDto.Items.Sum(it => (it.Quantity * it.UnitPrice) + it.ItbisAmount);
+
+                if (Math.Abs((currentDto.ManualMontoGravadoTotal ?? 0) - calculatedGravado) > 0.01m)
+                {
+                    throw new Exception($"Discrepancia en Monto Gravado. Enviado: {currentDto.ManualMontoGravadoTotal}, Calculado: {calculatedGravado}");
+                }
+                if (Math.Abs((currentDto.ManualMontoExento ?? 0) - calculatedExento) > 0.01m)
+                {
+                    throw new Exception($"Discrepancia en Monto Exento. Enviado: {currentDto.ManualMontoExento}, Calculado: {calculatedExento}");
+                }
+                if (Math.Abs((currentDto.ManualTotalITBIS ?? 0) - calculatedITBIS) > 0.01m)
+                {
+                    throw new Exception($"Discrepancia en Total ITBIS. Enviado: {currentDto.ManualTotalITBIS}, Calculado: {calculatedITBIS}");
+                }
+                if (Math.Abs((currentDto.ManualMontoTotal ?? 0) - calculatedTotal) > 0.01m)
+                {
+                    throw new Exception($"Discrepancia en Monto Total. Enviado: {currentDto.ManualMontoTotal}, Calculado: {calculatedTotal}");
+                }
+
+                // For RFCE B2C simulation, clear customer to ensure anonymous
+                currentDto.CustomerRnc = null;
+                currentDto.CustomerName = "CONSUMIDOR FINAL";
+
+                // 1. Dry-run Individual signature to get Security Code
+                var indDto = CloneDto(currentDto)!;
+                indDto.SignatureDateOverride = signatureDate;
+                
+                string indUnsigned = _generatorService.GenerateUnsignedXml(indDto, false);
+                string indSigned = _signerService.SignXml(indUnsigned, certBase64, certPass);
+
+                string tag = "<SignatureValue>";
+                var start = indSigned.IndexOf(tag);
+                if (start != -1)
+                {
+                    var content = indSigned.Substring(start + tag.Length).TrimStart();
+                    var realCode = content.Substring(0, 6);
+                    currentDto.SecurityCodeOverride = realCode;
+                    indDto.SecurityCodeOverride = realCode;
+                }
+
+                // 2. Generate Summary XML
+                string unsignedSummaryXml = _generatorService.GenerateUnsignedXml(currentDto, true);
+                string signedSummaryXml = _signerService.SignXml(unsignedSummaryXml, certBase64, certPass);
+
+                // 3. Save Manual individual document
+                string indUnsignedFinal = _generatorService.GenerateUnsignedXml(indDto, false);
+                string indSignedFinal = _signerService.SignXml(indUnsignedFinal, certBase64, certPass);
+
+                string fileName = $"cert_test_manual_{indDto.Ncf}.xml";
+                string fullPath = Path.Combine(webRootPath, "certification_files", fileName);
+                Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+                await File.WriteAllTextAsync(fullPath, indSignedFinal);
+
+                // 4. Send Summary via API
+                decimal summaryTotal = currentDto.ManualMontoTotal ?? currentDto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) + itm.ItbisAmount);
+                var result = await _transmissionService.SendEcfAsync(
+                    DgiiEnvironment.CerteCF,
+                    token,
+                    signedSummaryXml,
+                    ecfType,
+                    summaryTotal,
+                    currentDto.IssuerRnc,
+                    currentDto.Ncf,
+                    true);
+                
+                if (result.Success && !string.IsNullOrEmpty(result.TrackId))
+                {
+                    await Task.Delay(2000);
+                    var finalStatus = await PollDgiiStatusAsync(result.TrackId, currentDto.IssuerRnc);
+                    result.Estado = finalStatus.Estado;
+                    result.Mensaje = string.Join(" | ", finalStatus.Mensajes?.Select(m => m.Valor) ?? new[] { "Sin mensaje" });
+                }
+                
+                return indSignedFinal;
+            }
+            else // Non-RFCE document
+            {
+                string unsignedXml = _generatorService.GenerateUnsignedXml(currentDto, false);
+                string signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
+
+                decimal actualTransmissionTotal = currentDto.ManualMontoTotal ?? 0;
+                if (actualTransmissionTotal == 0 && currentDto.Items.Any())
+                {
+                    actualTransmissionTotal = currentDto.Items.Sum(itm => 
+                        (itm.Quantity * itm.UnitPrice) 
+                        - (itm.ManualDescuentoMonto ?? itm.Discount) 
+                        + itm.ItbisAmount 
+                        + (itm.ManualRecargoMonto ?? 0)
+                        + (itm.IscSpecificAmount + itm.IscAdvaloremAmount + itm.OtherAdditionalTaxAmount));
+                }
+
+                var result = await _transmissionService.SendEcfAsync(
+                    DgiiEnvironment.CerteCF,
+                    token,
+                    signedXml,
+                    ecfType,
+                    actualTransmissionTotal,
+                    currentDto.IssuerRnc,
+                    currentDto.Ncf,
+                    false);
+                
+                if (result.Success && !string.IsNullOrEmpty(result.TrackId))
+                {
+                    await Task.Delay(2000);
+                    var finalStatus = await PollDgiiStatusAsync(result.TrackId, currentDto.IssuerRnc);
+                    result.Estado = finalStatus.Estado;
+                    result.Mensaje = string.Join(" | ", finalStatus.Mensajes?.Select(m => m.Valor) ?? new[] { "Sin mensaje" });
+                }
+
+                return System.Text.Json.JsonSerializer.Serialize(result);
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new Exception(ex.Message);
+        }
+    }
+
     private EcfInvoiceRequestDto? CloneDto(EcfInvoiceRequestDto source)
     {
         if (source == null) return null;
