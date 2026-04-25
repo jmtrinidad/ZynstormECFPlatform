@@ -23,7 +23,9 @@ public partial class Client : BaseEntity
     public virtual Status Status { get; set; } = null!;
 
     public virtual ICollection<CertificationInvoicePrintTemplate> CertificationInvoicePrintTemplates { get; set; } = [];
+
     public virtual ICollection<CertificationProcess> CertificationProcesses { get; set; } = [];
+
     public virtual ICollection<ApiKey> ApiKeys { get; set; } = [];
 
     public virtual ICollection<ClientBranche> ClientBranches { get; set; } = [];
@@ -37,5 +39,6 @@ public partial class Client : BaseEntity
     public virtual ICollection<SystemLog> SystemLogs { get; set; } = [];
 
     public virtual ICollection<UseClient> UseClients { get; set; } = [];
+
     public virtual ICollection<ENcf> ENcfs { get; set; } = [];
 }

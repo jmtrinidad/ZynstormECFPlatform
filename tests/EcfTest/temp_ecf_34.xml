@@ -5,7 +5,8 @@
     <IdDoc>
       <TipoeCF>34</TipoeCF>
       <eNCF>E340000000001</eNCF>
-      <FechaVencimientoSecuencia>08-04-2027</FechaVencimientoSecuencia>
+      <IndicadorNotaCredito p4:nil="true" xmlns:p4="http://www.w3.org/2001/XMLSchema-instance" />
+      <IndicadorMontoGravado>1</IndicadorMontoGravado>
       <TipoIngresos>01</TipoIngresos>
       <TipoPago>1</TipoPago>
     </IdDoc>
@@ -16,7 +17,7 @@
       <TablaTelefonoEmisor>
         <TelefonoEmisor>809-555-0000</TelefonoEmisor>
       </TablaTelefonoEmisor>
-      <FechaEmision>08-04-2026</FechaEmision>
+      <FechaEmision>25-04-2026</FechaEmision>
     </Emisor>
     <Comprador>
       <RNCComprador>101683457</RNCComprador>
@@ -24,12 +25,12 @@
       <DireccionComprador>Av. Winston Churchill</DireccionComprador>
     </Comprador>
     <Totales>
-      <MontoGravadoTotal>200</MontoGravadoTotal>
-      <MontoGravadoI1>200</MontoGravadoI1>
+      <MontoGravadoTotal>185.00</MontoGravadoTotal>
+      <MontoGravadoI1>185.00</MontoGravadoI1>
       <ITBIS1>18</ITBIS1>
-      <TotalITBIS>36.00</TotalITBIS>
-      <TotalITBIS1>36.00</TotalITBIS1>
-      <MontoTotal>236.00</MontoTotal>
+      <TotalITBIS>33.30</TotalITBIS>
+      <TotalITBIS1>33.30</TotalITBIS1>
+      <MontoTotal>218.30</MontoTotal>
     </Totales>
   </Encabezado>
   <DetallesItems>
@@ -37,13 +38,23 @@
       <NumeroLinea>1</NumeroLinea>
       <IndicadorFacturacion>1</IndicadorFacturacion>
       <NombreItem>Item de Prueba</NombreItem>
-      <IndicadorBienoServicio>1</IndicadorBienoServicio>
-      <CantidadItem>2</CantidadItem>
-      <UnidadMedida>43</UnidadMedida>
-      <PrecioUnitarioItem>100</PrecioUnitarioItem>
-      <MontoItem>236.00</MontoItem>
+      <CantidadItem>2.00</CantidadItem>
+      <PrecioUnitarioItem>100.00</PrecioUnitarioItem>
+      <DescuentoMonto>15.00</DescuentoMonto>
+      <TablaSubDescuento>
+        <SubDescuento>
+          <TipoSubDescuento>$</TipoSubDescuento>
+          <MontoSubDescuento>15.00</MontoSubDescuento>
+        </SubDescuento>
+      </TablaSubDescuento>
+      <MontoItem>218.30</MontoItem>
     </Item>
   </DetallesItems>
-  <FechaHoraFirma>08-04-2026 14:43:03</FechaHoraFirma>
+  <InformacionReferencia>
+    <NCFModificado>E310000000005</NCFModificado>
+    <FechaNCFModificado>20-04-2026</FechaNCFModificado>
+    <CodigoModificacion>3</CodigoModificacion>
+  </InformacionReferencia>
+  <FechaHoraFirma>25-04-2026 17:09:24</FechaHoraFirma>
   <Signature xmlns="http://www.w3.org/2000/09/xmldsig#" />
 </ECF>

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 
 namespace ZynstormECFPlatform.Data.Extensions
 {
@@ -8,8 +9,9 @@ namespace ZynstormECFPlatform.Data.Extensions
     {
         public PasswordResetTokenProvider(
             IDataProtectionProvider dataProtectionProvider,
-            IOptions<DataProtectionTokenProviderOptions> options)
-            : base(dataProtectionProvider, options)
+            IOptions<DataProtectionTokenProviderOptions> options,
+            ILogger<DataProtectorTokenProvider<TUser>> logger)
+            : base(dataProtectionProvider, options, logger)
         {
         }
     }
