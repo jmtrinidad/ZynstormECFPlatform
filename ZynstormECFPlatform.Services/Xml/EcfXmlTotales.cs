@@ -224,10 +224,10 @@ public class EcfXmlTotales
     [XmlElement("TotalITBISRetenido", Order = 21)]
     public string? TotalITBISRetenidoString
     {
-        get => TotalITBISRetenido?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        get => (EcfType == 32 || EcfType == 43 || EcfType == 47) ? null : TotalITBISRetenido?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
         set => TotalITBISRetenido = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
-    public bool ShouldSerializeTotalITBISRetenidoString() => TotalITBISRetenido.HasValue && EcfType != 32 && EcfType != 43;
+    public bool ShouldSerializeTotalITBISRetenidoString() => TotalITBISRetenido.HasValue && TotalITBISRetenido >= 0 && EcfType != 32 && EcfType != 43 && EcfType != 47;
 
     [XmlIgnore]
     public decimal? TotalISRRetencion { get; set; }

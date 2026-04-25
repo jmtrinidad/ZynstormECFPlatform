@@ -61,7 +61,7 @@ public class EcfGeneratorService : IEcfGeneratorService
         decimal actualTotal = dto.ManualMontoTotal ?? dto.Items.Sum(i => (i.Quantity * i.UnitPrice) - i.Discount + (i.ManualRecargoMonto ?? 0));
 
         // For Type 32: route to RFCE only if explicitly a summary OR if actual amount is below threshold
-        bool isRfceSummary = isSummary || (ecfType == 32 && actualTotal < 250000 && dto.Ncf.Length == 13 && !isSummary == false);
+        bool isRfceSummary = isSummary;
 
         // SPECIAL CASE: if isSummary flag is NOT set, always use ECF path (not RFCE)
         if (ecfType == 32 && !isSummary)
@@ -133,19 +133,19 @@ public class EcfGeneratorService : IEcfGeneratorService
             var forbidden = new List<string> { 
                 "MontoGravadoI1", "MontoGravadoI2", 
                 "ITBIS1", "ITBIS2", "TotalITBIS1", "TotalITBIS2",
-                "TotalITBISRetenido", "TotalISRRetencion", "TotalITBISPercepcion", "TotalISRPercepcion"
+                "TotalITBISPercepcion", "TotalISRPercepcion"
             };
 
             // For Type 47, ITBIS3 and all ITBIS totals are forbidden.
             // For Type 46, we MUST keep ITBIS3, TotalITBIS3 and TotalITBIS (set to 0) as Tasa Cero indicators.
             if (ecfType == 47)
             {
-                forbidden.AddRange(new[] { "ITBIS3", "TotalITBIS", "TotalITBIS3", "MontoGravadoTotal", "MontoGravadoI3" });
+                forbidden.AddRange(new[] { "ITBIS3", "TotalITBIS", "TotalITBIS3", "MontoGravadoTotal", "MontoGravadoI3", "TotalITBISRetenido" });
             }
             
             if (ecfType == 46)
             {
-                forbidden.Add("MontoExento");
+                forbidden.AddRange(new[] { "MontoExento", "TotalITBISRetenido", "TotalISRRetencion" });
             }
 
             foreach (var field in forbidden)

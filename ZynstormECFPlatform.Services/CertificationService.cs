@@ -1308,9 +1308,9 @@ public class CertificationService : ICertificationService
                 (46, 2, false, false, null, null),
                 (47, 2, false, false, null, null),
                 // Paso 4: RFCE (Resúmenes B2C < 250k - 4 requeridos)
-                (32, 4, true, false, 10, 249999),
+                (32, 4, true, false, 10, 249000),
                 // Paso 5: Consumo Individual B2C < 250k (Manual upload - 4 requeridos)
-                (32, 4, false, true, 10, 249999)
+                (32, 4, false, true, 10, 249000)
             };
 
             status.TotalSteps = matrix.Sum(m => m.Count);
@@ -1654,7 +1654,12 @@ public class CertificationService : ICertificationService
                     decimal actualTransmissionTotal = currentDto.ManualMontoTotal ?? 0;
                     if (actualTransmissionTotal == 0 && currentDto.Items.Any())
                     {
-                        actualTransmissionTotal = currentDto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) - (itm.ManualDescuentoMonto ?? itm.Discount));
+                        actualTransmissionTotal = currentDto.Items.Sum(itm => 
+                            (itm.Quantity * itm.UnitPrice) 
+                            - (itm.ManualDescuentoMonto ?? itm.Discount) 
+                            + itm.ItbisAmount 
+                            + (itm.ManualRecargoMonto ?? 0)
+                            + (itm.IscSpecificAmount + itm.IscAdvaloremAmount + itm.OtherAdditionalTaxAmount));
                     }
 
                     var result = await _transmissionService.SendEcfAsync(

@@ -30,7 +30,7 @@ public class DgiiTransmissionService : IDgiiTransmissionService
 
         if (environment == DgiiEnvironment.CerteCF)
         {
-            bool isB2CSummaryChannel = isSummary || (ecfType == 32 && totalAmount < 250000);
+            bool isB2CSummaryChannel = isSummary;
 
             if (isB2CSummaryChannel) 
             {
@@ -53,7 +53,7 @@ public class DgiiTransmissionService : IDgiiTransmissionService
             baseUrl = _configuration[$"DgiiUrls:{envKey}"] 
                 ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey} no fue encontrada en appsettings.json");
             
-            bool isResumenFacturaConsumo = (ecfType == 32 && totalAmount < 250000);
+            bool isResumenFacturaConsumo = isSummary;
             endpointUrl = isResumenFacturaConsumo 
                 ? $"{baseUrl}/recepcionfc/api/recepcion/ecf" 
                 : $"{baseUrl}/recepcion/api/facturaselectronicas";
