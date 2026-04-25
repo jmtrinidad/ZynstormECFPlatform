@@ -134,4 +134,52 @@ public class CertificationController : ControllerBase
             return BadRequest(ex.Message);
         }
     }
+
+    [HttpGet("files")]
+    public ActionResult<List<string>> ListCertificationFiles()
+    {
+        string folder = Path.Combine(_env.WebRootPath, "certification_files");
+        if (!Directory.Exists(folder)) return Ok(new List<string>());
+
+        var files = Directory.GetFiles(folder)
+            .Select(Path.GetFileName)
+            .Where(f => !string.IsNullOrEmpty(f))
+            .Cast<string>()
+            .ToList();
+        return Ok(files);
+    }
+
+    [HttpGet("files/{fileName}")]
+    public ActionResult DownloadFile(string fileName)
+    {
+        // Sanitize fileName to prevent path traversal
+        string safeFileName = Path.GetFileName(fileName);
+        string folder = Path.Combine(_env.WebRootPath, "certification_files");
+        string filePath = Path.Combine(folder, safeFileName);
+
+        if (!System.IO.File.Exists(filePath)) return NotFound("Archivo no encontrado.");
+
+        var bytes = System.IO.File.ReadAllBytes(filePath);
+        string contentType = safeFileName.EndsWith(".zip") ? "application/zip" : "text/xml";
+        return File(bytes, contentType, safeFileName);
+    }
+
+    [HttpGet("simulacion/download/{jobId}")]
+    public async Task<ActionResult> DownloadSimulacionZip(string jobId)
+    {
+        var status = await _certificationService.GetJobStatusAsync(jobId);
+
+        if (string.IsNullOrEmpty(status.DownloadUrl))
+            return BadRequest("El archivo ZIP de simulación aún no ha sido generado o el JobId es inválido.");
+
+        // The URL is relative like /certification_files/simulacion_xxx.zip
+        string relativePath = status.DownloadUrl.TrimStart('/');
+        string fullPath = Path.Combine(_env.WebRootPath, relativePath);
+
+        if (!System.IO.File.Exists(fullPath))
+            return NotFound("El archivo ZIP de simulación no se encontró en el servidor.");
+
+        var bytes = await System.IO.File.ReadAllBytesAsync(fullPath);
+        return File(bytes, "application/zip", $"simulacion_{jobId}.zip");
+    }
 }

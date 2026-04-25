@@ -1318,6 +1318,7 @@ public class CertificationService : ICertificationService
 
             // In-memory list to track documents sent in THIS run (for DB persistence)
             var sentDocsThisRun = new List<CertificationDocument>();
+            var simulationXmls = new Dictionary<string, string>();
 
             // [FIX] Define dtoRows correctly
             var dtoRows = dto.Items.Select(it => new { Items = new List<EcfItemRequestDto> { it }, Total = it.Quantity * it.UnitPrice }).ToList();
@@ -1327,6 +1328,7 @@ public class CertificationService : ICertificationService
                 for (int i = 0; i < item.Count; i++)
                 {
                     status.CurrentStep++;
+                    EcfInvoiceRequestDto? indDtoForPool = null;
 
                     // Prepare DTO for this step
                     EcfInvoiceRequestDto currentDto;
@@ -1569,7 +1571,37 @@ public class CertificationService : ICertificationService
                         // [NEW] For RFCE B2C simulation, clear customer to ensure anonymous
                         currentDto.CustomerRnc = null;
                         currentDto.CustomerName = "CONSUMIDOR FINAL";
-                        currentDto.CustomerForeignId = null;
+                                     // [NEW] Synchronize Security Code with the signature of the upcoming individual document
+                        try
+                        {
+                            // Peek at the sequence to know the NCF the individual will use
+                            var ecfTypeRecordForInd = await _context.Set<Core.Entities.EcfType>().FirstOrDefaultAsync(t => t.Code == item.Type.ToString());
+                            var encfRecordForInd = await _context.ENcfs.FirstOrDefaultAsync(e => e.NcfTypeId == ecfTypeRecordForInd!.EcfTypeId && e.ClientId == client.ClientId);
+                            int seqForInd = encfRecordForInd?.Sequence ?? 1;
+                            string realNcfForInd = $"E{item.Type}{seqForInd:D10}";
+
+                            var indDto = CloneDto(currentDto)!;
+                            indDto.Ncf = realNcfForInd;
+                            // Ensure the dry-run uses individual mode
+                            string indUnsigned = _generatorService.GenerateUnsignedXml(indDto, false);
+                            string indSigned = _signerService.SignXml(indUnsigned, certBase64, certPass);
+
+                            string tag = "<SignatureValue>";
+                            var start = indSigned.IndexOf(tag);
+                            if (start != -1)
+                            {
+                                var content = indSigned.Substring(start + tag.Length).TrimStart();
+                                var realCode = content.Substring(0, 6);
+                                currentDto.SecurityCodeOverride = realCode;
+                                indDto.SecurityCodeOverride = realCode;
+                                indDtoForPool = indDto; // [NEW] Store the EXACT DTO that was signed
+                                Console.WriteLine($"[RFCE] Sincronizando Código de Seguridad: {realCode} (NCF: {realNcfForInd})");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[WARN] Error sincronizando código RFCE: {ex.Message}");
+                        }
                     }
 
                     // D. Generate with temp NCF for XSD validation BEFORE consuming sequence
@@ -1620,7 +1652,8 @@ public class CertificationService : ICertificationService
                         // [NEW] If this is a summary, store it in the pool AFTER we have the real NCF
                         if (item.IsSummary)
                         {
-                            rfcePool.Add((currentDto.Ncf, currentDto.SecurityCodeOverride ?? "", CloneDto(currentDto)!));
+                            // [NEW] Store the individual DTO that was used for the dry-run signature
+                            rfcePool.Add((currentDto.Ncf, currentDto.SecurityCodeOverride ?? "", indDtoForPool ?? CloneDto(currentDto)!));
                         }
                     }
 
@@ -1629,6 +1662,10 @@ public class CertificationService : ICertificationService
 
 
                     string signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
+
+                    // [NEW] Collect for final ZIP with differentiation
+                    string zipName = (item.IsManual ? "SUBIR_DGII_" : "") + $"Paso_{status.CurrentStep}_{currentDto.Ncf}.xml";
+                    simulationXmls[zipName] = signedXml;
 
                     // E. Transmission
                     // [NEW] Console Logging [TX]
@@ -1779,6 +1816,37 @@ public class CertificationService : ICertificationService
             }
 
             await _context.SaveChangesAsync();
+
+            // [NEW] Generate ZIP results for the simulation
+            if (simulationXmls.Any())
+            {
+                try
+                {
+                    string zipDir = Path.Combine(webRootPath, "certification_files");
+                    if (!Directory.Exists(zipDir)) Directory.CreateDirectory(zipDir);
+
+                    string zipPath = Path.Combine(zipDir, $"simulacion_{jobId}.zip");
+                    using (var zipStream = new FileStream(zipPath, FileMode.Create))
+                    using (var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Create, true))
+                    {
+                        foreach (var entry in simulationXmls)
+                        {
+                            var zipEntry = archive.CreateEntry(entry.Key, System.IO.Compression.CompressionLevel.Optimal);
+                            using (var entryStream = zipEntry.Open())
+                            using (var writer = new StreamWriter(entryStream))
+                            {
+                                writer.Write(entry.Value);
+                            }
+                        }
+                    }
+                    status.DownloadUrl = $"/certification_files/simulacion_{jobId}.zip";
+                    Console.WriteLine($"[INFO] ZIP de simulación generado: {status.DownloadUrl}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ERR] Error generando ZIP de simulación: {ex.Message}");
+                }
+            }
         }
         catch (Exception ex)
         {
