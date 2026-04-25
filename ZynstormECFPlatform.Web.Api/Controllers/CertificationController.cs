@@ -182,4 +182,29 @@ public class CertificationController : ControllerBase
         var bytes = await System.IO.File.ReadAllBytesAsync(fullPath);
         return File(bytes, "application/zip", $"simulacion_{jobId}.zip");
     }
+
+    /// <summary>
+    /// Endpoint para descargar todos los archivos .json generados para la simulación
+    /// para tenerlos de ejemplo para enviarlos.
+    /// </summary>
+    /// <param name="jobId">Identificador del trabajo de simulación</param>
+    /// <returns>Archivo ZIP con los payloads JSON</returns>
+    [HttpGet("simulacion/download-json/{jobId}")]
+    public async Task<ActionResult> DownloadSimulacionJsonZip(string jobId)
+    {
+        var status = await _certificationService.GetJobStatusAsync(jobId);
+
+        if (string.IsNullOrEmpty(status.JsonDownloadUrl))
+            return BadRequest("El archivo ZIP de JSONs de simulación aún no ha sido generado o el JobId es inválido.");
+
+        // El URL es relativo como /certification_files/simulacion_json_xxx.zip
+        string relativePath = status.JsonDownloadUrl.TrimStart('/');
+        string fullPath = Path.Combine(_env.WebRootPath, relativePath);
+
+        if (!System.IO.File.Exists(fullPath))
+            return NotFound("El archivo ZIP de JSONs de simulación no se encontró en el servidor.");
+
+        var bytes = await System.IO.File.ReadAllBytesAsync(fullPath);
+        return File(bytes, "application/zip", $"simulacion_json_{jobId}.zip");
+    }
 }

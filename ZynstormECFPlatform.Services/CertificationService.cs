@@ -1320,6 +1320,7 @@ public class CertificationService : ICertificationService
             // In-memory list to track documents sent in THIS run (for DB persistence)
             var sentDocsThisRun = new List<CertificationDocument>();
             var simulationXmls = new Dictionary<string, string>();
+            var simulationJsons = new Dictionary<string, string>();
 
             // [FIX] Define dtoRows correctly
             var dtoRows = dto.Items.Select(it => new { Items = new List<EcfItemRequestDto> { it }, Total = it.Quantity * it.UnitPrice }).ToList();
@@ -1672,6 +1673,10 @@ public class CertificationService : ICertificationService
                     string zipName = (item.IsManual ? "SUBIR_DGII_" : "") + $"Paso_{status.CurrentStep}_{currentDto.Ncf}.xml";
                     simulationXmls[zipName] = signedXml;
 
+                    // [NEW] Capture the DTO JSON payload for example documentation
+                    string jsonZipName = (item.IsManual ? "SUBIR_DGII_" : "") + $"Paso_{status.CurrentStep}_{currentDto.Ncf}.json";
+                    simulationJsons[jsonZipName] = System.Text.Json.JsonSerializer.Serialize(currentDto, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
                     // E. Transmission
                     // [NEW] Console Logging [TX]
                     Console.WriteLine($"[TX] Enviando e-CF {currentDto.Ncf} tipo {item.Type} (Paso {status.CurrentStep}/{status.TotalSteps})...");
@@ -1850,6 +1855,37 @@ public class CertificationService : ICertificationService
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[ERR] Error generando ZIP de simulación: {ex.Message}");
+                }
+            }
+
+            // [NEW] Generate ZIP results for JSON payloads
+            if (simulationJsons.Any())
+            {
+                try
+                {
+                    string zipDir = Path.Combine(webRootPath, "certification_files");
+                    if (!Directory.Exists(zipDir)) Directory.CreateDirectory(zipDir);
+
+                    string zipPath = Path.Combine(zipDir, $"simulacion_json_{jobId}.zip");
+                    using (var zipStream = new FileStream(zipPath, FileMode.Create))
+                    using (var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Create, true))
+                    {
+                        foreach (var entry in simulationJsons)
+                        {
+                            var zipEntry = archive.CreateEntry(entry.Key, System.IO.Compression.CompressionLevel.Optimal);
+                            using (var entryStream = zipEntry.Open())
+                            using (var writer = new StreamWriter(entryStream))
+                            {
+                                writer.Write(entry.Value);
+                            }
+                        }
+                    }
+                    status.JsonDownloadUrl = $"/certification_files/simulacion_json_{jobId}.zip";
+                    Console.WriteLine($"[INFO] ZIP de JSONs de simulación generado: {status.JsonDownloadUrl}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ERR] Error generando ZIP de JSONs de simulación: {ex.Message}");
                 }
             }
         }

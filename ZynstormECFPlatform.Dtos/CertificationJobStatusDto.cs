@@ -15,6 +15,7 @@ public class CertificationJobStatusDto
     public List<CertificationStepResultDto> CompletedSteps { get; set; } = new();
     public int HighestCompletedStep { get; set; }
     public string DownloadUrl { get; set; } = string.Empty;
+    public string JsonDownloadUrl { get; set; } = string.Empty;
 }
 
 public class CertificationStepResultDto
