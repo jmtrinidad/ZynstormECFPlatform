@@ -1082,6 +1082,24 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasData(
+                new CertificationStep { CertificationStepId = 1, Name = "Registrado", Order = 1, IsRequired = true },
+                new CertificationStep { CertificationStepId = 2, Name = "Pruebas de Datos e-CF", Order = 2, IsRequired = true },
+                new CertificationStep { CertificationStepId = 3, Name = "Pruebas de Datos Aprobación Comercial", Order = 3, IsRequired = true },
+                new CertificationStep { CertificationStepId = 4, Name = "Pruebas Simulación e-CF", Order = 4, IsRequired = true },
+                new CertificationStep { CertificationStepId = 5, Name = "Pruebas Simulación Representación Impresa", Order = 5, IsRequired = true },
+                new CertificationStep { CertificationStepId = 6, Name = "Validación Representación Impresa", Order = 6, IsRequired = true },
+                new CertificationStep { CertificationStepId = 7, Name = "URL Servicios Prueba", Order = 7, IsRequired = true },
+                new CertificationStep { CertificationStepId = 8, Name = "Inicio Prueba Recepción e-CF", Order = 8, IsRequired = true },
+                new CertificationStep { CertificationStepId = 9, Name = "Recepción e-CF", Order = 9, IsRequired = true },
+                new CertificationStep { CertificationStepId = 10, Name = "Inicio Prueba Recepción Aprobación Comercial", Order = 10, IsRequired = true },
+                new CertificationStep { CertificationStepId = 11, Name = "Recepción Aprobación Comercial", Order = 11, IsRequired = true },
+                new CertificationStep { CertificationStepId = 12, Name = "URL Servicios Producción", Order = 12, IsRequired = true },
+                new CertificationStep { CertificationStepId = 13, Name = "Declaración Jurada", Order = 13, IsRequired = true },
+                new CertificationStep { CertificationStepId = 14, Name = "Verificación Estatus", Order = 14, IsRequired = true },
+                new CertificationStep { CertificationStepId = 15, Name = "Finalizado", Order = 15, IsRequired = true }
+            );
         });
 
         modelBuilder.Entity<CertificationProcess>(entity =>
