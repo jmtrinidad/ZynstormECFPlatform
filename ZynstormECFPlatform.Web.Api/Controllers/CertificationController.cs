@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Dtos;
 
@@ -32,10 +30,6 @@ public class CertificationController : ControllerBase
     [HttpPost("run/{index}")]
     public async Task<ActionResult<DgiiTransmissionResult>> RunTest(int index)
     {
-        /*
-        CON PROBLEMAS:
-        18,19,20,25,26,27
-        */
         var result = await _certificationService.RunTestAsync(index, _env.WebRootPath);
 
         if (result.Success)
@@ -152,6 +146,43 @@ public class CertificationController : ControllerBase
             return BadRequest(ex.Message);
         }
     }
+
+    [HttpGet("ejemplos-json")]
+    public ActionResult<List<object>> GetEjemplosJson()
+    {
+        try
+        {
+            string folder = Path.Combine(_env.ContentRootPath, "..", "SamplePayloads");
+            if (!Directory.Exists(folder))
+            {
+                folder = Path.Combine(_env.ContentRootPath, "SamplePayloads");
+            }
+
+            if (!Directory.Exists(folder))
+                return NotFound("Carpeta de ejemplos no encontrada.");
+
+            var files = Directory.GetFiles(folder, "*.json")
+                .OrderBy(f => Path.GetFileName(f))
+                .ToList();
+                
+            var result = new List<object>();
+
+            foreach (var file in files)
+            {
+                var jsonContent = System.IO.File.ReadAllText(file);
+                var obj = System.Text.Json.JsonSerializer.Deserialize<object>(jsonContent);
+                if (obj != null)
+                    result.Add(obj);
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
 
     [HttpGet("files")]
     public ActionResult<List<string>> ListCertificationFiles()

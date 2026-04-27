@@ -1,0 +1,42 @@
+﻿{
+    "CustomerForeignId":  "AWS-001",
+    "InternalOrderNumber":  "ORD-NJ-001",
+    "SequenceExpirationDate":  "2028-12-31T23:59:59",
+    "IssuerActivityCode":  "492310",
+    "PaymentTerms":  "15 DIAS",
+    "ManualMontoExento":  6000,
+    "InternalInvoiceNumber":  "FACT-NJ-001",
+    "ManualTotalITBIS":  0,
+    "CustomerTelephone":  "809-233-6060",
+    "IncomeType":  null,
+    "IssuerName":  "TRANSPORTE NJ, SRL",
+    "IssuerPhone":  "809-876-4046",
+    "BuyerInternalCode":  "CUST-NJ-001",
+    "_description":  "Pagos al Exterior (E47). Servicios por no residentes.",
+    "Items":  [
+                  {
+                      "Description":  "Factura de prueba",
+                      "TaxPercentage":  0,
+                      "BillingIndicator":  4,
+                      "UnitPrice":  6000,
+                      "ItemType":  2,
+                      "Discount":  0,
+                      "Name":  "Servicio de Transporte de Carga",
+                      "Quantity":  1,
+                      "ItbisAmount":  0
+                  }
+              ],
+    "CustomerAddress":  "CARRETERA JANICO, LAS CHARCAS, SANTIAGO, R.D.",
+    "EcfType":  47,
+    "Ncf":  "E470000000001",
+    "ManualMontoTotal":  6000,
+    "PaymentType":  2,
+    "ExternalReference":  "069",
+    "ManualIndicadorMontoGravado":  0,
+    "PaymentDeadline":  "2026-05-02T00:00:00",
+    "IssuerRnc":  "133009889",
+    "IssueDate":  "2026-04-17T00:00:00",
+    "CustomerRnc":  null,
+    "IssuerAddress":  "Ensanche Gregorio Luperon, Santiago de los Caballeros",
+    "CustomerName":  "AMAZON WEB SERVICES"
+}

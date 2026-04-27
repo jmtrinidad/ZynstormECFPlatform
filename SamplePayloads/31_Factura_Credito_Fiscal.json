@@ -1,0 +1,41 @@
+﻿{
+    "InternalOrderNumber":  "ORD-NJ-001",
+    "SequenceExpirationDate":  "2028-12-31T23:59:59",
+    "IssuerActivityCode":  "492310",
+    "PaymentTerms":  "15 DIAS",
+    "ManualMontoExento":  0,
+    "InternalInvoiceNumber":  "FACT-NJ-001",
+    "ManualTotalITBIS":  1080,
+    "CustomerTelephone":  "809-233-6060",
+    "IncomeType":  "01",
+    "IssuerName":  "TRANSPORTE NJ, SRL",
+    "IssuerPhone":  "809-876-4046",
+    "BuyerInternalCode":  "CUST-NJ-001",
+    "_description":  "Factura de CrÃ©dito Fiscal (E31). Sustenta costos y gastos.",
+    "Items":  [
+                  {
+                      "Description":  "Factura de prueba con ITBIS",
+                      "TaxPercentage":  18,
+                      "BillingIndicator":  1,
+                      "UnitPrice":  6000,
+                      "ItemType":  2,
+                      "Discount":  0,
+                      "Name":  "Servicio de Transporte de Carga Gravado",
+                      "Quantity":  1,
+                      "ItbisAmount":  1080
+                  }
+              ],
+    "CustomerAddress":  "CARRETERA JANICO, LAS CHARCAS, SANTIAGO, R.D.",
+    "EcfType":  31,
+    "Ncf":  "E310000000001",
+    "ManualMontoTotal":  7080,
+    "PaymentType":  2,
+    "ExternalReference":  "069",
+    "ManualIndicadorMontoGravado":  1,
+    "PaymentDeadline":  "2026-05-02T00:00:00",
+    "IssuerRnc":  "133009889",
+    "IssueDate":  "2026-04-17T00:00:00",
+    "CustomerRnc":  "102620717",
+    "IssuerAddress":  "Ensanche Gregorio Luperon, Santiago de los Caballeros",
+    "CustomerName":  "MORTEROS DE EUROPA"
+}

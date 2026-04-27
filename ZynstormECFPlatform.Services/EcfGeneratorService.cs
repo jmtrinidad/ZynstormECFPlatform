@@ -309,13 +309,15 @@ public class EcfGeneratorService : IEcfGeneratorService
 
             // Use explicit BillingIndicator from DTO if provided (e.g. from Excel certification data),
             // otherwise derive it from TaxPercentage as before.
-            var billingIndicator = item.BillingIndicator ?? item.TaxPercentage switch
+            var billingIndicator = (ecfType == 46) ? 3 : 
+                                   (ecfType == 47) ? 4 : 
+                                   (item.BillingIndicator ?? item.TaxPercentage switch
             {
                 18m => 1,
                 16m => 2,
                 0m => 3,
                 _ => 4
-            };
+            });
 
             // For exento (4) and no-facturable (0), force ITBIS to 0 regardless of TaxPercentage.
             if (billingIndicator is 4 or 0)
@@ -543,13 +545,11 @@ public class EcfGeneratorService : IEcfGeneratorService
                     IndicadorNotaCredito = dto.ManualIndicadorNotaCredito,
                     IndicadorMontoGravado = dto.ManualIndicadorMontoGravado ?? derivedIndicador,
 
-                    IncomeType = dto.IncomeType,
+                    IncomeType = (ecfType is 41 or 43 or 47) ? null : dto.IncomeType,
 
-
-                    PaymentType = dto.PaymentType,
-                    FechaLimitePago = dto.PaymentDeadline?.ToString(DateFormat),
-                    TerminoPago = dto.PaymentTerms
-
+                    PaymentType = (ecfType == 32) ? 1 : dto.PaymentType,
+                    FechaLimitePago = (ecfType == 32) ? null : dto.PaymentDeadline?.ToString(DateFormat),
+                    TerminoPago = (ecfType == 32) ? null : dto.PaymentTerms
                 },
                 Emisor = new EcfXmlEmisor
                 {
@@ -573,12 +573,12 @@ public class EcfGeneratorService : IEcfGeneratorService
                 Comprador = new EcfXmlComprador
                 {
                     EcfType = ecfType,
-                    RncComprador = dto.CustomerRnc,
+                    RncComprador = (ecfType is 43 or 46 or 47) ? null : dto.CustomerRnc,
                     IdentificadorExtranjero = dto.CustomerForeignId,
-                    RazonSocial = dto.CustomerName,
+                    RazonSocial = (ecfType == 43) ? null : dto.CustomerName,
                     ContactoComprador = dto.CustomerContact,
                     CorreoComprador = dto.CustomerEmail,
-                    DireccionComprador = dto.CustomerAddress,
+                    DireccionComprador = (ecfType == 47) ? null : dto.CustomerAddress,
                     PaisComprador = dto.CustomerCountry,
                     TelefonoAdicional = dto.CustomerTelephone,
                     MunicipioComprador = dto.CustomerMunicipality,
