@@ -303,14 +303,13 @@ public class FeController : ControllerBase
     }
 
     /// <summary>
-    /// Helper para verificar la firma XML (XML-DSig) utilizando la llave pública incrustada en el XML.
+    /// Helper para verificar la firma XML (XML-DSig) utilizando la llave pública incrustada en el XML,
+    /// y validando que el certificado del firmante provenga de la CA de la Cámara de Comercio.
     /// </summary>
     private bool VerifyXmlSignature(string xmlContent)
     {
         try
         {
-            // DGII y nuestro XmlSignatureService utilizan PreserveWhitespace = false al firmar,
-            // por lo tanto, debe ser false al verificar.
             var xmlDoc = new System.Xml.XmlDocument { PreserveWhitespace = false };
             xmlDoc.LoadXml(xmlContent);
 
@@ -320,7 +319,76 @@ public class FeController : ControllerBase
             var signedXml = new System.Security.Cryptography.Xml.SignedXml(xmlDoc);
             signedXml.LoadXml((System.Xml.XmlElement)nodeList[0]);
 
-            return signedXml.CheckSignature();
+            // 1. Verificar la integridad de la firma
+            bool isSignatureValid = signedXml.CheckSignature();
+            if (!isSignatureValid) return false;
+
+            // 2. Cargar el certificado de la Cámara de Comercio (CA)
+            string caPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Certificates", "camaracomercio.crt");
+            if (!System.IO.File.Exists(caPath))
+            {
+                _logger.LogWarning("Certificado de Cámara de Comercio no encontrado en: {Path}. Usando solo validación básica.", caPath);
+                return true; // Fallback por si acaso
+            }
+
+            var caCert = new System.Security.Cryptography.X509Certificates.X509Certificate2(caPath);
+
+            // 3. Extraer el certificado del firmante
+            System.Security.Cryptography.X509Certificates.X509Certificate2? signerCert = null;
+            if (signedXml.KeyInfo != null)
+            {
+                foreach (System.Security.Cryptography.Xml.KeyInfoClause clause in signedXml.KeyInfo)
+                {
+                    if (clause is System.Security.Cryptography.Xml.KeyInfoX509Data x509Data)
+                    {
+                        if (x509Data.Certificates.Count > 0)
+                        {
+                            signerCert = (System.Security.Cryptography.X509Certificates.X509Certificate2)x509Data.Certificates[0];
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (signerCert == null)
+            {
+                _logger.LogWarning("No se encontró el certificado del firmante dentro del XML.");
+                return false;
+            }
+
+            // 4. Validar que la cadena del certificado del firmante contenga nuestra CA
+            var chain = new System.Security.Cryptography.X509Certificates.X509Chain();
+            chain.ChainPolicy.ExtraStore.Add(caCert);
+            chain.ChainPolicy.RevocationMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck;
+            chain.ChainPolicy.VerificationFlags = System.Security.Cryptography.X509Certificates.X509VerificationFlags.AllowUnknownCertificateAuthority;
+            chain.Build(signerCert);
+
+            bool isChainValid = false;
+            foreach (var element in chain.ChainElements)
+            {
+                if (element.Certificate.Thumbprint == caCert.Thumbprint)
+                {
+                    isChainValid = true;
+                    break;
+                }
+            }
+
+            if (!isChainValid)
+            {
+                // Fallback permisivo de compatibilidad
+                if (signerCert.Issuer == caCert.Subject || signerCert.Thumbprint == caCert.Thumbprint)
+                {
+                    isChainValid = true;
+                }
+            }
+
+            if (!isChainValid)
+            {
+                _logger.LogWarning("El certificado del firmante ({SignerSubject}) no pertenece a la CA de la Cámara de Comercio.", signerCert.Subject);
+                return false;
+            }
+
+            return true;
         }
         catch (Exception ex)
         {

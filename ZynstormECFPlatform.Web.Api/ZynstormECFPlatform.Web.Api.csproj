@@ -29,6 +29,9 @@
 
   <ItemGroup>
     <Folder Include="wwwroot\downloads\simulation\133009889\" />
+    <None Update="Certificates\camaracomercio.crt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
