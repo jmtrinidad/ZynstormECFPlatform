@@ -170,6 +170,7 @@ public class FeController : ControllerBase
 
         // Validar Firma del XML entrante
         bool isValidSignature = VerifyXmlSignature(xmlContent);
+
         if (!isValidSignature)
         {
             estado = "1";
@@ -178,9 +179,9 @@ public class FeController : ControllerBase
 
         // Buscar el cliente receptor
         var client = await _clientService.GetByAsync(x => x.Rnc == rncComprador);
+
         if (client == null)
         {
-            _logger.LogWarning("RecepcionEcf: RNC Comprador no corresponde a un cliente válido ({RncComprador}).", rncComprador);
             estado = "1";
             motivoXml = "<CodigoMotivoNoRecibido>4</CodigoMotivoNoRecibido>";
 
@@ -199,6 +200,7 @@ public class FeController : ControllerBase
                 if (certificate != null)
                 {
                     var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == certificate.ClientId);
+
                     if (apiKey != null)
                     {
                         var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
@@ -210,14 +212,13 @@ public class FeController : ControllerBase
 
                         var signer = new ZynstormECFPlatform.Services.XmlSignatureService();
                         xmlResponse = signer.SignXml(xmlResponse, certificateBase64, certificatePassword);
-                        _logger.LogInformation("RecepcionEcf: Acuse de Recibo firmado exitosamente.");
 
                         var validationErrors = ValidateAgainstXsd(xmlResponse, "ARECF v1.0.xsd");
 
                         if (validationErrors.Count > 0)
                         {
                             var errorsJoined = string.Join(" | ", validationErrors);
-                            _logger.LogError("RecepcionEcf: El XML de Acuse de Recibo no cumple con el XSD. Errores: {Errors}", errorsJoined);
+
                             return BadRequest(new { Message = "El XML generado no cumple con el esquema XSD de la DGII.", Errors = validationErrors });
                         }
 
@@ -256,8 +257,6 @@ public class FeController : ControllerBase
     public async Task<IActionResult> AprobacionComercial()
     {
         var xmlContent = await GetXmlContentAsync();
-
-        _logger.LogError("=== APROBACION COMERCIAL RECIBIDA ===\n{Xml}", xmlContent);
 
         var rncEmisor = ExtractTag(xmlContent, "RNCEmisor");
         var rncComprador = ExtractTag(xmlContent, "RNCComprador");
@@ -322,9 +321,9 @@ public class FeController : ControllerBase
                         xmlResponse = signer.SignXml(xmlResponse, certificateBase64, certificatePassword);
 
                         var validationErrors = ValidateAgainstXsd(xmlResponse, "ACECF v.1.0.xsd");
+
                         if (validationErrors.Count > 0)
                         {
-                            _logger.LogError("AprobacionComercial: El XML de Aprobación Comercial no cumple con el XSD.");
                             return BadRequest(new { Message = "El XML generado no cumple con el esquema XSD de la DGII.", Errors = validationErrors });
                         }
                     }
@@ -491,7 +490,7 @@ public class FeController : ControllerBase
         {
             var basePath = AppContext.BaseDirectory;
             var xsdPath = System.IO.Path.Combine(basePath, "XSD", xsdFileName);
-            
+
             if (!System.IO.File.Exists(xsdPath))
             {
                 // Fallback for local development
@@ -504,7 +503,7 @@ public class FeController : ControllerBase
                 var assembly = System.Reflection.Assembly.Load("ZynstormECFPlatform.Schemas");
                 var resourceName = $"ZynstormECFPlatform.Schemas.XSD.{xsdFileName}";
                 using var stream = assembly.GetManifestResourceStream(resourceName);
-                
+
                 if (stream != null)
                 {
                     var schema = System.Xml.Schema.XmlSchema.Read(stream, null);
