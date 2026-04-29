@@ -92,28 +92,30 @@ public class FeController : ControllerBase
     //    }
     //}
 
-    /// <summary>
-    /// Autenticación B2B - Paso 1: Proveedor solicita semilla para firmarla.
-    /// </summary>
-    //[HttpGet("autenticacion/api/semilla")]
-    //public IActionResult ObtenerSemilla()
-    //{
-    //    // Genera semilla base64 larga para coincidir con la estructura de DGII
-    //    string valor = Convert.ToBase64String(Encoding.UTF8.GetBytes(Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N")));
+    / <summary>
+    / private Autenticación B2B -Paso 1: private Proveedor solicita private semilla para firmarla.
+    / </summary>
 
-    //    // Cachear semilla por 5 minutos
-    //    _cacheService.Set($"Semilla_B2B_{valor}", valor, TimeSpan.FromMinutes(5));
+    [HttpGet("autenticacion/api/semilla")]
+    [HttpGet("autenticacion/api/Semilla")]
+    public IActionResult ObtenerSemilla()
+    {
+        // Genera semilla base64 larga para coincidir con la estructura de DGII
+        string valor = Convert.ToBase64String(Encoding.UTF8.GetBytes(Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N")));
 
-    //    string fecha = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffffffzzz");
+        // Cachear semilla por 5 minutos
+        _cacheService.Set($"Semilla_B2B_{valor}", valor, TimeSpan.FromMinutes(5));
 
-    //    string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?>
-    //    <SemillaModel xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
-    //     <valor>{valor}</valor>
-    //     <fecha>{fecha}</fecha>
-    //    </SemillaModel>";
+        string fecha = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffffffzzz");
 
-    //    return Content(xmlResponse, "application/xml", Encoding.UTF8);
-    //}
+        string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?>
+        <SemillaModel xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
+         <valor>{valor}</valor>
+         <fecha>{fecha}</fecha>
+        </SemillaModel>";
+
+        return Content(xmlResponse, "application/xml", Encoding.UTF8);
+    }
 
     /// <summary>
     /// Autenticación B2B - Paso 2: El proveedor envía la semilla firmada para obtener el JWT.
@@ -139,7 +141,39 @@ public class FeController : ControllerBase
         }
 
         // 2. Si la firma es válida, devolvemos el Token (tal como lo espera la DGII).
-        // Se omitió la validación contra caché para facilitar pruebas de firmas.
+        string token = "MOCKED-JWT-FOR-B2B-VERIFICATION-EYJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9";
+
+        return Ok(new
+        {
+            token = token,
+            expira = DateTime.UtcNow.AddMinutes(55).ToString("yyyy-MM-ddTHH:mm:ssZ")
+        });
+    }
+
+    /// <summary>
+    /// Alternativa de Autenticación B2B para cubrir la ruta en mayúsculas /ValidacionCertificado
+    /// </summary>
+    [HttpPost("autenticacion/api/ValidacionCertificado")]
+    public async Task<IActionResult> ValidacionCertificado()
+    {
+        var xmlContent = await GetXmlContentAsync();
+
+        if (string.IsNullOrWhiteSpace(xmlContent))
+            return BadRequest(new { error = "No XML content provided" });
+
+        // LOGGEAR EL XML RECIBIDO COMO ERROR PARA PODER ANALIZARLO
+        _logger.LogError("=== SEMILLA FIRMADA RECIBIDA DE DGII (Ruta Alterna) ===\n{Xml}", xmlContent);
+
+        // 1. Verificar criptográficamente la firma del XML
+        bool isValidSignature = VerifyXmlSignature(xmlContent);
+
+        if (!isValidSignature)
+        {
+            _logger.LogWarning("ValidacionCertificado Rechazado: La firma del XML es inválida o no contiene firma.");
+            return Unauthorized(new { error = "Firma digital inválida." });
+        }
+
+        // 2. Si la firma es válida, devolvemos el Token (tal como lo espera la DGII).
         string token = "MOCKED-JWT-FOR-B2B-VERIFICATION-EYJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9";
 
         return Ok(new
@@ -303,8 +337,8 @@ public class FeController : ControllerBase
     }
 
     /// <summary>
-    /// Helper para verificar la firma XML (XML-DSig) utilizando la llave pública incrustada en el XML,
-    /// y validando que el certificado del firmante provenga de la CA de la Cámara de Comercio.
+    /// Helper para verificar la firma XML (XML-DSig) utilizando la llave pública incrustada en el XML, y validando que
+    /// el certificado del firmante provenga de la CA de la Cámara de Comercio.
     /// </summary>
     private bool VerifyXmlSignature(string xmlContent)
     {
