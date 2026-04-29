@@ -127,9 +127,6 @@ public class FeController : ControllerBase
         if (string.IsNullOrWhiteSpace(xmlContent))
             return BadRequest(new { error = "No XML content provided" });
 
-        // LOGGEAR EL XML RECIBIDO COMO ERROR PARA PODER ANALIZARLO
-        _logger.LogError("=== SEMILLA FIRMADA RECIBIDA DE DGII ===\n{Xml}", xmlContent);
-
         // 1. Verificar criptográficamente la firma del XML
         bool isValidSignature = VerifyXmlSignature(xmlContent);
 
@@ -186,7 +183,7 @@ public class FeController : ControllerBase
             _logger.LogWarning("RecepcionEcf: RNC Comprador no corresponde a un cliente válido ({RncComprador}).", rncComprador);
             estado = "1";
             motivoXml = "<CodigoMotivoNoRecibido>4</CodigoMotivoNoRecibido>";
-            
+
             // Usar el primer cliente disponible como fallback para firmar la respuesta
             var allClients = await _clientService.GetAllAsync();
             client = allClients.FirstOrDefault();
@@ -287,7 +284,6 @@ public class FeController : ControllerBase
         string fecha = DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
 
         string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?><ACECF><DetalleAprobacionComercial><Version>1.0</Version><RNCEmisor>{rncEmisor}</RNCEmisor><eNCF>{eNcf}</eNCF><FechaEmision>{fechaEmision}</FechaEmision><MontoTotal>{montoTotal}</MontoTotal><RNCComprador>{rncComprador}</RNCComprador><Estado>{estado}</Estado><FechaHoraAprobacionComercial>{fecha}</FechaHoraAprobacionComercial></DetalleAprobacionComercial></ACECF>";
-
 
         // BUSCAR EL CLIENTE POR RNC EMISOR PARA USAR SU CERTIFICADO
         try
@@ -473,6 +469,7 @@ public class FeController : ControllerBase
             return false;
         }
     }
+
     private List<string> ValidateAgainstXsd(string xml, string xsdFileName)
     {
         var errors = new List<string>();
