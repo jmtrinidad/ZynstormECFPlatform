@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
 using ZynstormECFPlatform.Abstractions.DataServices;
@@ -47,72 +48,72 @@ public class FeController : ControllerBase
     /// Endpoint para probar el login a la DGII usando el certificado del primer cliente en base de datos. Extrae la
     /// semilla, la firma y te permite ver el proceso (los XML se guardan en el Log por el DgiiAuthService).
     /// </summary>
-    [HttpGet("autenticacion/api/test-login")]
-    public async Task<IActionResult> TestLogin()
-    {
-        var clients = await _clientService.GetAllAsync();
-        var client = clients.FirstOrDefault();
-        if (client == null)
-            return BadRequest("No hay clientes en la base de datos para extraer el certificado.");
+    //[HttpGet("autenticacion/api/test-login")]
+    //public async Task<IActionResult> TestLogin()
+    //{
+    //    var clients = await _clientService.GetAllAsync();
+    //    var client = clients.FirstOrDefault();
+    //    if (client == null)
+    //        return BadRequest("No hay clientes en la base de datos para extraer el certificado.");
 
-        var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId);
-        var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+    //    var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId);
+    //    var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
 
-        if (apiKey == null || certificate == null)
-            return BadRequest($"El cliente con RNC {client.Rnc} no tiene ApiKey o Certificado configurado.");
+    //    if (apiKey == null || certificate == null)
+    //        return BadRequest($"El cliente con RNC {client.Rnc} no tiene ApiKey o Certificado configurado.");
 
-        var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
-        if (string.IsNullOrEmpty(decryptedSecretKey))
-            return BadRequest("No se pudo desencriptar la SecretKey del cliente.");
+    //    var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
+    //    if (string.IsNullOrEmpty(decryptedSecretKey))
+    //        return BadRequest("No se pudo desencriptar la SecretKey del cliente.");
 
-        var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
-        var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
+    //    var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
+    //    var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
 
-        if (certificateBytes.Length == 0 || passwordBytes.Length == 0)
-            return BadRequest("No se pudo desencriptar el certificado o la contraseña.");
+    //    if (certificateBytes.Length == 0 || passwordBytes.Length == 0)
+    //        return BadRequest("No se pudo desencriptar el certificado o la contraseña.");
 
-        var certificateBase64 = Convert.ToBase64String(certificateBytes);
-        var certificatePassword = Encoding.UTF8.GetString(passwordBytes);
+    //    var certificateBase64 = Convert.ToBase64String(certificateBytes);
+    //    var certificatePassword = Encoding.UTF8.GetString(passwordBytes);
 
-        try
-        {
-            // Llama a DGII (CerteCF). El DgiiAuthService registrará los XML original y firmado en consola.
-            var token = await _dgiiAuthService.GetTokenAsync(client.Rnc, DgiiEnvironment.CerteCF, certificateBase64, certificatePassword);
-            return Ok(new
-            {
-                mensaje = "Login exitoso. Revisa la consola para ver la estructura de la semilla XML original y la semilla firmada.",
-                rnc_utilizado = client.Rnc,
-                token = token
-            });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest($"Error al hacer login: {ex.Message}");
-        }
-    }
+    //    try
+    //    {
+    //        // Llama a DGII (CerteCF). El DgiiAuthService registrará los XML original y firmado en consola.
+    //        var token = await _dgiiAuthService.GetTokenAsync(client.Rnc, DgiiEnvironment.CerteCF, certificateBase64, certificatePassword);
+    //        return Ok(new
+    //        {
+    //            mensaje = "Login exitoso. Revisa la consola para ver la estructura de la semilla XML original y la semilla firmada.",
+    //            rnc_utilizado = client.Rnc,
+    //            token = token
+    //        });
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        return BadRequest($"Error al hacer login: {ex.Message}");
+    //    }
+    //}
 
     /// <summary>
     /// Autenticación B2B - Paso 1: Proveedor solicita semilla para firmarla.
     /// </summary>
-    [HttpGet("autenticacion/api/semilla")]
-    public IActionResult ObtenerSemilla()
-    {
-        // Genera semilla base64 larga para coincidir con la estructura de DGII
-        string valor = Convert.ToBase64String(Encoding.UTF8.GetBytes(Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N")));
+    //[HttpGet("autenticacion/api/semilla")]
+    //public IActionResult ObtenerSemilla()
+    //{
+    //    // Genera semilla base64 larga para coincidir con la estructura de DGII
+    //    string valor = Convert.ToBase64String(Encoding.UTF8.GetBytes(Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N")));
 
-        // Cachear semilla por 5 minutos
-        _cacheService.Set($"Semilla_B2B_{valor}", valor, TimeSpan.FromMinutes(5));
+    //    // Cachear semilla por 5 minutos
+    //    _cacheService.Set($"Semilla_B2B_{valor}", valor, TimeSpan.FromMinutes(5));
 
-        string fecha = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffffffzzz");
+    //    string fecha = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss.fffffffzzz");
 
-        string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?>
-        <SemillaModel xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
-	        <valor>{valor}</valor>
-	        <fecha>{fecha}</fecha>
-        </SemillaModel>";
+    //    string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?>
+    //    <SemillaModel xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
+    //     <valor>{valor}</valor>
+    //     <fecha>{fecha}</fecha>
+    //    </SemillaModel>";
 
-        return Content(xmlResponse, "application/xml", Encoding.UTF8);
-    }
+    //    return Content(xmlResponse, "application/xml", Encoding.UTF8);
+    //}
 
     /// <summary>
     /// Autenticación B2B - Paso 2: El proveedor envía la semilla firmada para obtener el JWT.
