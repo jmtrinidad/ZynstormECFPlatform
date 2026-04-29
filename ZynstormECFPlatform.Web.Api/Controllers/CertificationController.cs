@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Dtos;
+using ZynstormECFPlatform.Web.Api.Filters;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers;
 
@@ -27,6 +28,7 @@ public class CertificationController(ICertificationService certificationService,
         return BadRequest(result);
     }
 
+    [ApiKeyAuth]
     [HttpGet("status/{trackId}")]
     public ActionResult<DgiiStatusResponse> GetStatus(string trackId)
     {

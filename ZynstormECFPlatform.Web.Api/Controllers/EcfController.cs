@@ -2,11 +2,13 @@ using Microsoft.AspNetCore.Mvc;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Common.Utilities;
 using ZynstormECFPlatform.Dtos;
+using ZynstormECFPlatform.Web.Api.Filters;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers
 {
     [ApiController]
     [Route("[controller]")]
+    [ApiKeyAuth]
     public class EcfController(IEcfGeneratorService ecfGeneratorService) : ControllerBase
     {
         private readonly IEcfGeneratorService _ecfGeneratorService = ecfGeneratorService;

@@ -8,6 +8,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers;
 
 [ApiController]
 [Route("fe")]
+[AllowAnonymous]
 public class FeController : ControllerBase
 {
     private readonly ICacheService _cacheService;

@@ -135,22 +135,13 @@ else
 builder.Services.AddCors(c =>
 {
     c.AddPolicy("corsGlobalPolicy", builder =>
-        builder.WithOrigins(
-                            "http://localhost:3000",
-                            "http://localhost:3001",
-                            "http://localhost:3005",
-                            "http://217.216.91.10"
-                            )
-                        .SetIsOriginAllowedToAllowWildcardSubdomains()
+        builder.SetIsOriginAllowed(origin => true) // Permite peticiones desde CUALQUIER URL
                         .AllowAnyHeader()
                         .AllowAnyMethod()
                         .AllowCredentials());
 
     c.AddPolicy("corsPolicy", builder =>
-        builder.WithOrigins(
-                        //"http://localhost:3000",
-                        "https://zynstorm.com")
-                        .SetIsOriginAllowedToAllowWildcardSubdomains()
+        builder.SetIsOriginAllowed(origin => true) // Permite peticiones desde CUALQUIER URL
                         .AllowAnyHeader()
                         .AllowAnyMethod()
                         .AllowCredentials());
