@@ -170,17 +170,8 @@ public class FeController : ControllerBase
 
         string fecha = DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
 
-        string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?>
-                                <ARECF>
-                                  <DetalleAcusedeRecibo>
-                                    <Version>1.0</Version>
-                                    <RNCEmisor>{rncEmisor}</RNCEmisor>
-                                    <RNCComprador>{rncComprador}</RNCComprador>
-                                    <eNCF>{eNcf}</eNCF>
-                                    <Estado>0</Estado>
-                                    <FechaHoraAcuseRecibo>{fecha}</FechaHoraAcuseRecibo>
-                                  </DetalleAcusedeRecibo>
-                                </ARECF>";
+        string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?><ARECF><DetalleAcusedeRecibo><Version>1.0</Version><RNCEmisor>{rncEmisor}</RNCEmisor><RNCComprador>{rncComprador}</RNCComprador><eNCF>{eNcf}</eNCF><Estado>0</Estado><FechaHoraAcuseRecibo>{fecha}</FechaHoraAcuseRecibo></DetalleAcusedeRecibo></ARECF>";
+
 
         // BUSCAR EL CLIENTE POR RNC COMPRADOR PARA USAR SU CERTIFICADO
         try
@@ -299,19 +290,8 @@ public class FeController : ControllerBase
 
         string fecha = DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
 
-        string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?>
-                                <ACECF>
-                                  <DetalleAprobacionComercial>
-                                    <Version>1.0</Version>
-                                    <RNCEmisor>{rncEmisor}</RNCEmisor>
-                                    <eNCF>{eNcf}</eNCF>
-                                    <FechaEmision>{fechaEmision}</FechaEmision>
-                                    <MontoTotal>{montoTotal}</MontoTotal>
-                                    <RNCComprador>{rncComprador}</RNCComprador>
-                                    <Estado>{estado}</Estado>
-                                    <FechaHoraAprobacionComercial>{fecha}</FechaHoraAprobacionComercial>
-                                  </DetalleAprobacionComercial>
-                                </ACECF>";
+        string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?><ACECF><DetalleAprobacionComercial><Version>1.0</Version><RNCEmisor>{rncEmisor}</RNCEmisor><eNCF>{eNcf}</eNCF><FechaEmision>{fechaEmision}</FechaEmision><MontoTotal>{montoTotal}</MontoTotal><RNCComprador>{rncComprador}</RNCComprador><Estado>{estado}</Estado><FechaHoraAprobacionComercial>{fecha}</FechaHoraAprobacionComercial></DetalleAprobacionComercial></ACECF>";
+
 
         // BUSCAR EL CLIENTE POR RNC EMISOR PARA USAR SU CERTIFICADO
         try
