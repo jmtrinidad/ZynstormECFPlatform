@@ -159,7 +159,8 @@ _ = SeedData(app);
 
     app.UseSwaggerUI(options =>
     {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Zynstorm ECF API v1");
+        // Se utiliza ruta relativa './v1/swagger.json' para evitar problemas con reverse proxies (como Dokploy/Nginx)
+        options.SwaggerEndpoint("./v1/swagger.json", "Zynstorm ECF API v1");
         options.EnablePersistAuthorization();
     });
 // }
