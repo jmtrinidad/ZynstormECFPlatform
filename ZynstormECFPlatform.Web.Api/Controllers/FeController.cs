@@ -171,35 +171,40 @@ public class FeController : ControllerBase
         string fecha = DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
 
         string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?>
-<ARECF xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
-  <DetalleAcusedeRecibo>
-    <Version>1.0</Version>
-    <RNCEmisor>{rncEmisor}</RNCEmisor>
-    <RNCComprador>{rncComprador}</RNCComprador>
-    <eNCF>{eNcf}</eNCF>
-    <Estado>0</Estado>
-    <FechaHoraAcuseRecibo>{fecha}</FechaHoraAcuseRecibo>
-  </DetalleAcusedeRecibo>
-</ARECF>";
+                                <ARECF xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
+                                  <DetalleAcusedeRecibo>
+                                    <Version>1.0</Version>
+                                    <RNCEmisor>{rncEmisor}</RNCEmisor>
+                                    <RNCComprador>{rncComprador}</RNCComprador>
+                                    <eNCF>{eNcf}</eNCF>
+                                    <Estado>0</Estado>
+                                    <FechaHoraAcuseRecibo>{fecha}</FechaHoraAcuseRecibo>
+                                  </DetalleAcusedeRecibo>
+                                </ARECF>";
 
-        // INTENTAR FIRMAR EL XML CON EL PRIMER CERTIFICADO DISPONIBLE
+        // BUSCAR EL CLIENTE POR RNC COMPRADOR PARA USAR SU CERTIFICADO
         try
         {
-            var certificate = (await _clientCertificateService.GetAllAsync()).FirstOrDefault();
-            if (certificate != null)
+            var client = await _clientService.GetByAsync(x => x.Rnc == rncComprador);
+            if (client != null)
             {
-                var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == certificate.ClientId);
-                if (apiKey != null)
+                var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+
+                if (certificate != null)
                 {
-                    var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
-                    var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
-                    var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
+                    var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == certificate.ClientId);
+                    if (apiKey != null)
+                    {
+                        var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
+                        var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
+                        var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
 
-                    var certificateBase64 = Convert.ToBase64String(certificateBytes);
-                    var certificatePassword = Encoding.UTF8.GetString(passwordBytes);
+                        var certificateBase64 = Convert.ToBase64String(certificateBytes);
+                        var certificatePassword = Encoding.UTF8.GetString(passwordBytes);
 
-                    var signer = new ZynstormECFPlatform.Services.XmlSignatureService();
-                    xmlResponse = signer.SignXml(xmlResponse, certificateBase64, certificatePassword);
+                        var signer = new ZynstormECFPlatform.Services.XmlSignatureService();
+                        xmlResponse = signer.SignXml(xmlResponse, certificateBase64, certificatePassword);
+                    }
                 }
             }
         }
@@ -220,45 +225,82 @@ public class FeController : ControllerBase
     {
         var xmlContent = await GetXmlContentAsync();
 
-        _logger.LogError("=== APROBACION COMERCIAL RECIBIDA DE DGII ===\n{Xml}", xmlContent);
+        _logger.LogError("=== APROBACION COMERCIAL RECIBIDA ===\n{Xml}", xmlContent);
 
         var rncEmisor = ExtractTag(xmlContent, "RNCEmisor");
         var rncComprador = ExtractTag(xmlContent, "RNCComprador");
         var eNcf = ExtractTag(xmlContent, "eNCF");
+        var fechaEmision = ExtractTag(xmlContent, "FechaEmision");
+        var montoTotal = ExtractTag(xmlContent, "MontoTotal");
+        var estado = ExtractTag(xmlContent, "Estado");
 
         if (string.IsNullOrEmpty(rncEmisor)) rncEmisor = "131880600";
         if (string.IsNullOrEmpty(rncComprador)) rncComprador = "132880600";
         if (string.IsNullOrEmpty(eNcf)) eNcf = "E310000000001";
 
+        // Formatear FechaEmision a dd-MM-yyyy (XSD requiere este formato)
+        if (DateTime.TryParse(fechaEmision, out DateTime dateParsed))
+        {
+            fechaEmision = dateParsed.ToString("dd-MM-yyyy");
+        }
+        else
+        {
+            fechaEmision = DateTime.Now.ToString("dd-MM-yyyy");
+        }
+
+        // Formatear MontoTotal a exactamente 2 decimales (XSD requiere [0-9]+(\.[0-9]{2}))
+        if (decimal.TryParse(montoTotal, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal montoParsed))
+        {
+            montoTotal = montoParsed.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        }
+        else
+        {
+            montoTotal = "0.00";
+        }
+
+        if (estado != "1" && estado != "2")
+        {
+            estado = "1"; // 1: Aceptado
+        }
+
         string fecha = DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
 
         string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?>
-<AprobacionComercial xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
-  <RNCEmisor>{rncEmisor}</RNCEmisor>
-  <RNCComprador>{rncComprador}</RNCComprador>
-  <eNCF>{eNcf}</eNCF>
-  <Estado>0</Estado>
-  <FechaHoraAprobacion>{fecha}</FechaHoraAprobacion>
-</AprobacionComercial>";
+                                <ACECF xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
+                                  <DetalleAprobacionComercial>
+                                    <Version>1.0</Version>
+                                    <RNCEmisor>{rncEmisor}</RNCEmisor>
+                                    <eNCF>{eNcf}</eNCF>
+                                    <FechaEmision>{fechaEmision}</FechaEmision>
+                                    <MontoTotal>{montoTotal}</MontoTotal>
+                                    <RNCComprador>{rncComprador}</RNCComprador>
+                                    <Estado>{estado}</Estado>
+                                    <FechaHoraAprobacionComercial>{fecha}</FechaHoraAprobacionComercial>
+                                  </DetalleAprobacionComercial>
+                                </ACECF>";
 
-        // INTENTAR FIRMAR EL XML CON EL PRIMER CERTIFICADO DISPONIBLE
+        // BUSCAR EL CLIENTE POR RNC EMISOR PARA USAR SU CERTIFICADO
         try
         {
-            var certificate = (await _clientCertificateService.GetAllAsync()).FirstOrDefault();
-            if (certificate != null)
+            var client = await _clientService.GetByAsync(x => x.Rnc == rncEmisor);
+            if (client != null)
             {
-                var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == certificate.ClientId);
-                if (apiKey != null)
+                var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+                if (certificate != null)
                 {
-                    var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
-                    var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
-                    var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
+                    var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == certificate.ClientId);
+                    if (apiKey != null)
+                    {
+                        var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
+                        var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
+                        var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
 
-                    var certificateBase64 = Convert.ToBase64String(certificateBytes);
-                    var certificatePassword = Encoding.UTF8.GetString(passwordBytes);
+                        var certificateBase64 = Convert.ToBase64String(certificateBytes);
+                        var certificatePassword = Encoding.UTF8.GetString(passwordBytes);
 
-                    var signer = new ZynstormECFPlatform.Services.XmlSignatureService();
-                    xmlResponse = signer.SignXml(xmlResponse, certificateBase64, certificatePassword);
+                        var signer = new ZynstormECFPlatform.Services.XmlSignatureService();
+                        xmlResponse = signer.SignXml(xmlResponse, certificateBase64, certificatePassword);
+                    }
                 }
             }
         }
