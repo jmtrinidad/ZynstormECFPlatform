@@ -158,7 +158,7 @@ public class FeController : ControllerBase
     {
         var xmlContent = await GetXmlContentAsync();
 
-        _logger.LogError("=== ECF RECIBIDO DE DGII ===\n{Xml}", xmlContent);
+        //_logger.LogError("=== ECF RECIBIDO DE DGII ===\n{Xml}", xmlContent);
 
         var rncEmisor = ExtractTag(xmlContent, "RNCEmisor");
         var rncComprador = ExtractTag(xmlContent, "RNCComprador");
