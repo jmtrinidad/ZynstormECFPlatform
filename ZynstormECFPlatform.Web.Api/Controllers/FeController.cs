@@ -155,9 +155,9 @@ public class FeController : ControllerBase
     {
         var xmlContent = await GetXmlContentAsync();
 
-        var rncEmisor = ExtractTag(xmlContent, "RNCEmisor");
-        var rncComprador = ExtractTag(xmlContent, "RNCComprador");
-        var eNcf = ExtractTag(xmlContent, "eNCF");
+        var rncEmisor = ExtractTag(xmlContent, "RNCEmisor")?.Replace("-", "").Trim();
+        var rncComprador = ExtractTag(xmlContent, "RNCComprador")?.Replace("-", "").Trim();
+        var eNcf = ExtractTag(xmlContent, "eNCF")?.Trim();
 
         if (string.IsNullOrEmpty(rncEmisor)) rncEmisor = "131880600";
         if (string.IsNullOrEmpty(rncComprador)) rncComprador = "132880600";
@@ -216,7 +216,8 @@ public class FeController : ControllerBase
 
                         if (validationErrors.Count > 0)
                         {
-                            _logger.LogError("RecepcionEcf: El XML de Acuse de Recibo no cumple con el XSD.");
+                            var errorsJoined = string.Join(" | ", validationErrors);
+                            _logger.LogError("RecepcionEcf: El XML de Acuse de Recibo no cumple con el XSD. Errores: {Errors}", errorsJoined);
                             return BadRequest(new { Message = "El XML generado no cumple con el esquema XSD de la DGII.", Errors = validationErrors });
                         }
 
@@ -488,10 +489,32 @@ public class FeController : ControllerBase
         var errors = new List<string>();
         try
         {
-            var xsdPath = System.IO.Path.Combine(@"c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Schemas\XSD", xsdFileName);
+            var basePath = AppContext.BaseDirectory;
+            var xsdPath = System.IO.Path.Combine(basePath, "XSD", xsdFileName);
+            
             if (!System.IO.File.Exists(xsdPath))
             {
-                errors.Add($"No se encontró el archivo XSD en la ruta: {xsdPath}");
+                // Fallback for local development
+                xsdPath = System.IO.Path.Combine(@"c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Schemas\XSD", xsdFileName);
+            }
+
+            if (!System.IO.File.Exists(xsdPath))
+            {
+                // Attempt to read from Embedded Resources
+                var assembly = System.Reflection.Assembly.Load("ZynstormECFPlatform.Schemas");
+                var resourceName = $"ZynstormECFPlatform.Schemas.XSD.{xsdFileName.Replace(" ", "_")}";
+                using var stream = assembly.GetManifestResourceStream(resourceName);
+                
+                if (stream != null)
+                {
+                    var schema = System.Xml.Schema.XmlSchema.Read(stream, null);
+                    var embedSchemaSet = new System.Xml.Schema.XmlSchemaSet();
+                    embedSchemaSet.Add(schema);
+                    embedSchemaSet.Compile();
+                    return ExecuteValidation(xml, embedSchemaSet, errors);
+                }
+
+                errors.Add($"No se encontró el archivo XSD en la ruta local ni como recurso incrustado: {xsdFileName}");
                 return errors;
             }
 
@@ -499,29 +522,36 @@ public class FeController : ControllerBase
             schemaSet.Add(null, xsdPath);
             schemaSet.Compile();
 
-            var settings = new System.Xml.XmlReaderSettings
-            {
-                ValidationType = System.Xml.ValidationType.Schema,
-                Schemas = schemaSet,
-                ValidationFlags =
-                    System.Xml.Schema.XmlSchemaValidationFlags.ReportValidationWarnings |
-                    System.Xml.Schema.XmlSchemaValidationFlags.ProcessIdentityConstraints
-            };
-
-            settings.ValidationEventHandler += (_, e) =>
-            {
-                var severity = e.Severity == System.Xml.Schema.XmlSeverityType.Error ? "ERROR" : "WARNING";
-                errors.Add($"[{severity}] {e.Message}");
-            };
-
-            using var stringReader = new System.IO.StringReader(xml);
-            using var reader = System.Xml.XmlReader.Create(stringReader, settings);
-            while (reader.Read()) { }
+            return ExecuteValidation(xml, schemaSet, errors);
         }
         catch (Exception ex)
         {
             errors.Add($"[Excepción] {ex.Message}");
         }
+        return errors;
+    }
+
+    private List<string> ExecuteValidation(string xml, System.Xml.Schema.XmlSchemaSet schemaSet, List<string> errors)
+    {
+        var settings = new System.Xml.XmlReaderSettings
+        {
+            ValidationType = System.Xml.ValidationType.Schema,
+            Schemas = schemaSet,
+            ValidationFlags =
+                System.Xml.Schema.XmlSchemaValidationFlags.ReportValidationWarnings |
+                System.Xml.Schema.XmlSchemaValidationFlags.ProcessIdentityConstraints
+        };
+
+        settings.ValidationEventHandler += (_, e) =>
+        {
+            var severity = e.Severity == System.Xml.Schema.XmlSeverityType.Error ? "ERROR" : "WARNING";
+            errors.Add($"[{severity}] {e.Message}");
+        };
+
+        using var stringReader = new System.IO.StringReader(xml);
+        using var reader = System.Xml.XmlReader.Create(stringReader, settings);
+        while (reader.Read()) { }
+
         return errors;
     }
 }
