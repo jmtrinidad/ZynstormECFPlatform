@@ -213,25 +213,38 @@ public class FeController : ControllerBase
                         _logger.LogInformation("RecepcionEcf: Acuse de Recibo firmado exitosamente.");
 
                         var validationErrors = ValidateAgainstXsd(xmlResponse, "ARECF v1.0.xsd");
+
                         if (validationErrors.Count > 0)
                         {
                             _logger.LogError("RecepcionEcf: El XML de Acuse de Recibo no cumple con el XSD.");
                             return BadRequest(new { Message = "El XML generado no cumple con el esquema XSD de la DGII.", Errors = validationErrors });
                         }
+
+                        return Content(xmlResponse, "application/xml", new System.Text.UTF8Encoding(false));
                     }
+                    else
+                    {
+                        _logger.LogError("RecepcionEcf: No se encontró ApiKey para el cliente (ClientId: {ClientId}).", client.ClientId);
+                        return StatusCode(500, new { error = "No se encontró ApiKey para firmar." });
+                    }
+                }
+                else
+                {
+                    _logger.LogError("RecepcionEcf: No se encontró Certificado para el cliente (ClientId: {ClientId}).", client.ClientId);
+                    return StatusCode(500, new { error = "No se encontró Certificado para firmar." });
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "RecepcionEcf: Error al firmar el Acuse de Recibo XML.");
+                return StatusCode(500, new { error = "Error interno al firmar el Acuse de Recibo." });
             }
         }
         else
         {
-            _logger.LogError("RecepcionEcf: No hay clientes configurados para firmar el Acuse de Recibo.");
+            _logger.LogError("RecepcionEcf: No hay clientes configurados para firmar el Acuse de Recibo. La base de datos no tiene ningún cliente registrado o activo.");
+            return StatusCode(500, new { error = "Sistema sin clientes configurados." });
         }
-
-        return Content(xmlResponse, "application/xml", new System.Text.UTF8Encoding(false));
     }
 
     /// <summary>
