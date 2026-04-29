@@ -171,7 +171,7 @@ public class FeController : ControllerBase
         string fecha = DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
 
         string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?>
-                                <ARECF xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
+                                <ARECF>
                                   <DetalleAcusedeRecibo>
                                     <Version>1.0</Version>
                                     <RNCEmisor>{rncEmisor}</RNCEmisor>
@@ -185,13 +185,16 @@ public class FeController : ControllerBase
         // BUSCAR EL CLIENTE POR RNC COMPRADOR PARA USAR SU CERTIFICADO
         try
         {
+            _logger.LogInformation("RecepcionEcf: Buscando cliente con RNC Comprador: {RncComprador}", rncComprador);
             var client = await _clientService.GetByAsync(x => x.Rnc == rncComprador);
             if (client != null)
             {
+                _logger.LogInformation("RecepcionEcf: Cliente encontrado. Buscando certificado para ClientId: {ClientId}", client.ClientId);
                 var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
 
                 if (certificate != null)
                 {
+                    _logger.LogInformation("RecepcionEcf: Certificado encontrado. Buscando ApiKey...");
                     var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == certificate.ClientId);
                     if (apiKey != null)
                     {
@@ -202,15 +205,46 @@ public class FeController : ControllerBase
                         var certificateBase64 = Convert.ToBase64String(certificateBytes);
                         var certificatePassword = Encoding.UTF8.GetString(passwordBytes);
 
+                        try
+                        {
+                            using var x509Cert = new System.Security.Cryptography.X509Certificates.X509Certificate2(certificateBytes, certificatePassword);
+                            _logger.LogInformation("RecepcionEcf: Certificado a usar: {Subject}, Válido hasta: {NotAfter}", x509Cert.Subject, x509Cert.NotAfter);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning("RecepcionEcf: No se pudo extraer información del certificado para el log: {Error}", ex.Message);
+                        }
+
+                        _logger.LogInformation("RecepcionEcf: Firmando el Acuse de Recibo...");
                         var signer = new ZynstormECFPlatform.Services.XmlSignatureService();
                         xmlResponse = signer.SignXml(xmlResponse, certificateBase64, certificatePassword);
+                        _logger.LogInformation("RecepcionEcf: Acuse de Recibo firmado exitosamente.");
+
+                        var validationErrors = ValidateAgainstXsd(xmlResponse, "ARECF v1.0.xsd");
+                        if (validationErrors.Count > 0)
+                        {
+                            _logger.LogError("RecepcionEcf: El XML de Acuse de Recibo no cumple con el XSD.");
+                            return BadRequest(new { Message = "El XML generado no cumple con el esquema XSD de la DGII.", Errors = validationErrors });
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogError("RecepcionEcf: No se encontró ApiKey para el cliente con RNC: {RncComprador}", rncComprador);
                     }
                 }
+                else
+                {
+                    _logger.LogError("RecepcionEcf: No se encontró Certificado para el cliente con RNC: {RncComprador}", rncComprador);
+                }
+            }
+            else
+            {
+                _logger.LogError("RecepcionEcf: No se encontró Cliente en base de datos con RNC: {RncComprador}", rncComprador);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError("No se pudo firmar el Acuse de Recibo XML: {Error}", ex.Message);
+            _logger.LogError(ex, "RecepcionEcf: Error al firmar el Acuse de Recibo XML.");
         }
 
         return Content(xmlResponse, "application/xml", Encoding.UTF8);
@@ -266,7 +300,7 @@ public class FeController : ControllerBase
         string fecha = DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
 
         string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?>
-                                <ACECF xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
+                                <ACECF>
                                   <DetalleAprobacionComercial>
                                     <Version>1.0</Version>
                                     <RNCEmisor>{rncEmisor}</RNCEmisor>
@@ -300,6 +334,13 @@ public class FeController : ControllerBase
 
                         var signer = new ZynstormECFPlatform.Services.XmlSignatureService();
                         xmlResponse = signer.SignXml(xmlResponse, certificateBase64, certificatePassword);
+
+                        var validationErrors = ValidateAgainstXsd(xmlResponse, "ACECF v.1.0.xsd");
+                        if (validationErrors.Count > 0)
+                        {
+                            _logger.LogError("AprobacionComercial: El XML de Aprobación Comercial no cumple con el XSD.");
+                            return BadRequest(new { Message = "El XML generado no cumple con el esquema XSD de la DGII.", Errors = validationErrors });
+                        }
                     }
                 }
             }
@@ -336,14 +377,29 @@ public class FeController : ControllerBase
 
     private string ExtractTag(string xml, string tagName)
     {
-        var startTag = $"<{tagName}>";
-        var endTag = $"</{tagName}>";
-        var inicio = xml.IndexOf(startTag);
-        var fin = xml.IndexOf(endTag);
-        if (inicio != -1 && fin != -1)
+        if (string.IsNullOrWhiteSpace(xml)) return string.Empty;
+        try
         {
-            return xml.Substring(inicio + startTag.Length, fin - (inicio + startTag.Length)).Trim();
+            var doc = System.Xml.Linq.XDocument.Parse(xml);
+            var element = doc.Descendants().FirstOrDefault(x => x.Name.LocalName.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+            if (element != null) return element.Value.Trim();
         }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("ExtractTag: Error parseando XML con XDocument: {Error}. Usando fallback de Regex.", ex.Message);
+        }
+
+        try
+        {
+            var pattern = $"<(?:[^:>\\s]+:)?{tagName}(?:\\s+[^>]*)?>(.*?)</(?:[^:>\\s]+:)?{tagName}>";
+            var match = System.Text.RegularExpressions.Regex.Match(xml, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            if (match.Success) return match.Groups[1].Value.Trim();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("ExtractTag: Error en fallback de Regex: {Error}", ex.Message);
+        }
+
         return string.Empty;
     }
 
@@ -440,5 +496,46 @@ public class FeController : ControllerBase
             _logger.LogError(ex, "Error al verificar la firma del XML.");
             return false;
         }
+    }
+    private List<string> ValidateAgainstXsd(string xml, string xsdFileName)
+    {
+        var errors = new List<string>();
+        try
+        {
+            var xsdPath = System.IO.Path.Combine(@"c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Schemas\XSD", xsdFileName);
+            if (!System.IO.File.Exists(xsdPath))
+            {
+                errors.Add($"No se encontró el archivo XSD en la ruta: {xsdPath}");
+                return errors;
+            }
+
+            var schemaSet = new System.Xml.Schema.XmlSchemaSet();
+            schemaSet.Add(null, xsdPath);
+            schemaSet.Compile();
+
+            var settings = new System.Xml.XmlReaderSettings
+            {
+                ValidationType = System.Xml.ValidationType.Schema,
+                Schemas = schemaSet,
+                ValidationFlags =
+                    System.Xml.Schema.XmlSchemaValidationFlags.ReportValidationWarnings |
+                    System.Xml.Schema.XmlSchemaValidationFlags.ProcessIdentityConstraints
+            };
+
+            settings.ValidationEventHandler += (_, e) =>
+            {
+                var severity = e.Severity == System.Xml.Schema.XmlSeverityType.Error ? "ERROR" : "WARNING";
+                errors.Add($"[{severity}] {e.Message}");
+            };
+
+            using var stringReader = new System.IO.StringReader(xml);
+            using var reader = System.Xml.XmlReader.Create(stringReader, settings);
+            while (reader.Read()) { }
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"[Excepción] {ex.Message}");
+        }
+        return errors;
     }
 }
