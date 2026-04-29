@@ -260,6 +260,7 @@ public class FeController : ControllerBase
                 if (certificate != null)
                 {
                     var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == certificate.ClientId);
+
                     if (apiKey != null)
                     {
                         var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
@@ -298,7 +299,9 @@ public class FeController : ControllerBase
         if (Request.HasFormContentType)
         {
             var form = await Request.ReadFormAsync();
+
             var file = form.Files.GetFile("xml");
+
             if (file != null && file.Length > 0)
             {
                 using var ms = new MemoryStream();
@@ -309,6 +312,7 @@ public class FeController : ControllerBase
 
         // Fallback a leer el body si es raw application/xml
         using var reader = new StreamReader(Request.Body, Encoding.UTF8);
+
         return await reader.ReadToEndAsync();
     }
 
