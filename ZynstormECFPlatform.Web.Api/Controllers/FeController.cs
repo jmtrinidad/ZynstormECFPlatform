@@ -92,11 +92,10 @@ public class FeController : ControllerBase
     //    }
     //}
 
-    / <summary>
-    / private Autenticación B2B -Paso 1: private Proveedor solicita private semilla para firmarla.
-    / </summary>
+    /// <summary>
+    /// Autenticación B2B - Paso 1: Proveedor solicita semilla para firmarla.
+    /// </summary>
 
-    [HttpGet("autenticacion/api/semilla")]
     [HttpGet("autenticacion/api/Semilla")]
     public IActionResult ObtenerSemilla()
     {
@@ -150,38 +149,38 @@ public class FeController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Alternativa de Autenticación B2B para cubrir la ruta en mayúsculas /ValidacionCertificado
-    /// </summary>
-    [HttpPost("autenticacion/api/ValidacionCertificado")]
-    public async Task<IActionResult> ValidacionCertificado()
-    {
-        var xmlContent = await GetXmlContentAsync();
+    ///// <summary>
+    ///// Alternativa de Autenticación B2B para cubrir la ruta en mayúsculas /ValidacionCertificado
+    ///// </summary>
+    //[HttpPost("autenticacion/api/ValidacionCertificado")]
+    //public async Task<IActionResult> ValidacionCertificado()
+    //{
+    //    var xmlContent = await GetXmlContentAsync();
 
-        if (string.IsNullOrWhiteSpace(xmlContent))
-            return BadRequest(new { error = "No XML content provided" });
+    //    if (string.IsNullOrWhiteSpace(xmlContent))
+    //        return BadRequest(new { error = "No XML content provided" });
 
-        // LOGGEAR EL XML RECIBIDO COMO ERROR PARA PODER ANALIZARLO
-        _logger.LogError("=== SEMILLA FIRMADA RECIBIDA DE DGII (Ruta Alterna) ===\n{Xml}", xmlContent);
+    //    // LOGGEAR EL XML RECIBIDO COMO ERROR PARA PODER ANALIZARLO
+    //    _logger.LogError("=== SEMILLA FIRMADA RECIBIDA DE DGII (Ruta Alterna) ===\n{Xml}", xmlContent);
 
-        // 1. Verificar criptográficamente la firma del XML
-        bool isValidSignature = VerifyXmlSignature(xmlContent);
+    //    // 1. Verificar criptográficamente la firma del XML
+    //    bool isValidSignature = VerifyXmlSignature(xmlContent);
 
-        if (!isValidSignature)
-        {
-            _logger.LogWarning("ValidacionCertificado Rechazado: La firma del XML es inválida o no contiene firma.");
-            return Unauthorized(new { error = "Firma digital inválida." });
-        }
+    //    if (!isValidSignature)
+    //    {
+    //        _logger.LogWarning("ValidacionCertificado Rechazado: La firma del XML es inválida o no contiene firma.");
+    //        return Unauthorized(new { error = "Firma digital inválida." });
+    //    }
 
-        // 2. Si la firma es válida, devolvemos el Token (tal como lo espera la DGII).
-        string token = "MOCKED-JWT-FOR-B2B-VERIFICATION-EYJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9";
+    //    // 2. Si la firma es válida, devolvemos el Token (tal como lo espera la DGII).
+    //    string token = "MOCKED-JWT-FOR-B2B-VERIFICATION-EYJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9";
 
-        return Ok(new
-        {
-            token = token,
-            expira = DateTime.UtcNow.AddMinutes(55).ToString("yyyy-MM-ddTHH:mm:ssZ")
-        });
-    }
+    //    return Ok(new
+    //    {
+    //        token = token,
+    //        expira = DateTime.UtcNow.AddMinutes(55).ToString("yyyy-MM-ddTHH:mm:ssZ")
+    //    });
+    //}
 
     /// <summary>
     /// Receptor B2B - Recibe el archivo de la factura.
