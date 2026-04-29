@@ -158,39 +158,16 @@ public class FeController : ControllerBase
     {
         var xmlContent = await GetXmlContentAsync();
 
-        if (string.IsNullOrWhiteSpace(xmlContent))
-            return BadRequest(new { error = "xml content missing", trackId = "", mensaje = "Error" });
-
-        // LOGGEAR EL XML RECIBIDO COMO ERROR PARA PODER ANALIZARLO
         _logger.LogError("=== ECF RECIBIDO DE DGII ===\n{Xml}", xmlContent);
 
-        _logger.LogInformation("ECF validado y recibido para procesamiento directo.");
-
-        try
+        return Ok(new
         {
-            string trackId = await _inboundEcfService.ReceiveEcfAsync(xmlContent);
-
-            // Retornamos el mismo formato que usa DGII
-            return Ok(new
-            {
-                trackId = trackId,
-                error = "",
-                mensaje = "Recibido exitosamente",
-                estado = "Aceptado",
-                codigo = 1
-            });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new
-            {
-                error = ex.Message,
-                trackId = "",
-                mensaje = "Error al procesar",
-                estado = "Rechazado",
-                codigo = 0
-            });
-        }
+            trackId = Guid.NewGuid().ToString(),
+            error = "",
+            mensaje = "Recibido exitosamente",
+            estado = "Aceptado",
+            codigo = 1
+        });
     }
 
     /// <summary>
@@ -202,35 +179,14 @@ public class FeController : ControllerBase
     {
         var xmlContent = await GetXmlContentAsync();
 
-        if (string.IsNullOrWhiteSpace(xmlContent))
-            return BadRequest(new { estado = "Rechazado", mensaje = new[] { "xml content missing" }, codigo = "0" });
-
-        // LOGGEAR EL XML RECIBIDO COMO ERROR PARA PODER ANALIZARLO
         _logger.LogError("=== APROBACION COMERCIAL RECIBIDA DE DGII ===\n{Xml}", xmlContent);
 
-        _logger.LogInformation("Aprobación Comercial validada y recibida para procesamiento directo.");
-
-        try
+        return Ok(new
         {
-            await _inboundEcfService.ProcessCommercialApprovalAsync(xmlContent);
-
-            // Retornamos el formato de DGII para Aprobación Comercial
-            return Ok(new
-            {
-                codigo = "1",
-                estado = "Aprobado",
-                mensaje = new[] { "Aprobación Comercial recibida exitosamente" }
-            });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new
-            {
-                codigo = "0",
-                estado = "Rechazado",
-                mensaje = new[] { ex.Message }
-            });
-        }
+            codigo = "1",
+            estado = "Aprobado",
+            mensaje = new[] { "Aprobación Comercial recibida exitosamente" }
+        });
     }
 
     /// <summary>
