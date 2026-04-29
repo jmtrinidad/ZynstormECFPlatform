@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Core.Enums;
 using Microsoft.Extensions.Configuration;
@@ -15,13 +16,20 @@ public class DgiiAuthService : IDgiiAuthService
     private readonly IXmlSignatureService _xmlSignatureService;
     private readonly ICacheService _cacheService;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<DgiiAuthService> _logger;
 
-    public DgiiAuthService(HttpClient httpClient, IXmlSignatureService xmlSignatureService, ICacheService cacheService, IConfiguration configuration)
+    public DgiiAuthService(
+        HttpClient httpClient,
+        IXmlSignatureService xmlSignatureService,
+        ICacheService cacheService,
+        IConfiguration configuration,
+        ILogger<DgiiAuthService> logger)
     {
         _httpClient = httpClient;
         _xmlSignatureService = xmlSignatureService;
         _cacheService = cacheService;
         _configuration = configuration;
+        _logger = logger;
     }
 
     public async Task<string> GetTokenAsync(string rncEmisor, DgiiEnvironment environment, string certificateBase64, string certificatePassword)
@@ -69,8 +77,14 @@ public class DgiiAuthService : IDgiiAuthService
         semillaResponse.EnsureSuccessStatusCode();
         var semillaXml = await semillaResponse.Content.ReadAsStringAsync();
 
+        // LOGGING LA SEMILLA ORIGINAL (SIN FIRMAR) DE DGII PARA ANALIZAR ESTRUCTURA
+        //_logger.LogError("=== SEMILLA ORIGINAL (SIN FIRMAR) OBTENIDA DE DGII [{Env}] ===\n{Xml}", environment, semillaXml);
+
         // 2. Sign Semilla
         var signedSemillaXml = _xmlSignatureService.SignXml(semillaXml, certificateBase64, certificatePassword);
+
+        // LOGGING LA SEMILLA FIRMADA QUE LE ENVIAREMOS A LA DGII
+        //_logger.LogError("=== SEMILLA FIRMADA A ENVIAR A DGII [{Env}] ===\n{Xml}", environment, signedSemillaXml);
 
         // 3. Request Token
         HttpResponseMessage tokenResponse;

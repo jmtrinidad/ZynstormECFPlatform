@@ -6,23 +6,12 @@ namespace ZynstormECFPlatform.Web.Api.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class CertificationController : ControllerBase
+public class CertificationController(ICertificationService certificationService, ICacheService cacheService, IWebHostEnvironment env) : ControllerBase
 {
-    private readonly ICertificationService _certificationService;
-    private readonly ICacheService _cacheService;
-    private readonly IWebHostEnvironment _env;
-
-    public CertificationController(ICertificationService certificationService, ICacheService cacheService, IWebHostEnvironment env)
-    {
-        _certificationService = certificationService;
-        _cacheService = cacheService;
-        _env = env;
-    }
-
     [HttpGet("tests")]
     public async Task<ActionResult<List<CertificationTestDto>>> GetTests()
     {
-        var tests = await _certificationService.GetTestsAsync();
+        var tests = await certificationService.GetTestsAsync();
 
         return Ok(tests);
     }
@@ -30,7 +19,7 @@ public class CertificationController : ControllerBase
     [HttpPost("run/{index}")]
     public async Task<ActionResult<DgiiTransmissionResult>> RunTest(int index)
     {
-        var result = await _certificationService.RunTestAsync(index, _env.WebRootPath);
+        var result = await certificationService.RunTestAsync(index, env.WebRootPath);
 
         if (result.Success)
             return Ok(result);
@@ -42,7 +31,7 @@ public class CertificationController : ControllerBase
     public ActionResult<DgiiStatusResponse> GetStatus(string trackId)
     {
         string cacheKey = $"EcfStatus_{trackId}";
-        var status = _cacheService.Get<DgiiStatusResponse>(cacheKey);
+        var status = cacheService.Get<DgiiStatusResponse>(cacheKey);
 
         if (status == null)
             return NotFound("Status no encontrado o expirado.");
@@ -53,7 +42,7 @@ public class CertificationController : ControllerBase
     [HttpGet("summary")]
     public async Task<ActionResult<CertificationSummaryDto>> GetSummary()
     {
-        var summary = await _certificationService.GetSummaryAsync();
+        var summary = await certificationService.GetSummaryAsync();
         return Ok(summary);
     }
 
@@ -65,7 +54,7 @@ public class CertificationController : ControllerBase
 
         using var ms = new MemoryStream();
         await excelFile.CopyToAsync(ms);
-        var jobId = await _certificationService.EnqueueCertificationJobAsync(ms.ToArray(), excelFile.FileName, _env.WebRootPath);
+        var jobId = await certificationService.EnqueueCertificationJobAsync(ms.ToArray(), excelFile.FileName, env.WebRootPath);
 
         return Ok(new { JobId = jobId, Message = "Proceso de certificación iniciado en segundo plano." });
     }
@@ -73,14 +62,14 @@ public class CertificationController : ControllerBase
     [HttpGet("job-status/{jobId}")]
     public async Task<ActionResult<CertificationJobStatusDto>> GetJobStatus(string jobId)
     {
-        var status = await _certificationService.GetJobStatusAsync(jobId);
+        var status = await certificationService.GetJobStatusAsync(jobId);
         return Ok(status);
     }
 
     [HttpGet("download/{jobId}")]
     public async Task<ActionResult> DownloadStep4Results(string jobId)
     {
-        var status = await _certificationService.GetJobStatusAsync(jobId);
+        var status = await certificationService.GetJobStatusAsync(jobId);
 
         if (status.HighestCompletedStep < 3)
             return BadRequest("La descarga solo está permitida una vez que el Paso 3 (Resúmenes B2C) haya sido completado exitosamente.");
@@ -95,7 +84,7 @@ public class CertificationController : ControllerBase
     [HttpGet("job-status/{jobId}/logs")]
     public async Task<ActionResult<List<CertificationStepResultDto>>> GetJobLogs(string jobId)
     {
-        var logs = await _certificationService.GetJobLogsAsync(jobId);
+        var logs = await certificationService.GetJobLogsAsync(jobId);
         return Ok(logs);
     }
 
@@ -107,7 +96,7 @@ public class CertificationController : ControllerBase
 
         using var ms = new MemoryStream();
         await excelFile.CopyToAsync(ms);
-        var results = await _certificationService.ProcessAprobacionComercialAsync(ms.ToArray());
+        var results = await certificationService.ProcessAprobacionComercialAsync(ms.ToArray());
 
         return Ok(results);
     }
@@ -120,7 +109,7 @@ public class CertificationController : ControllerBase
 
         try
         {
-            var jobId = await _certificationService.EnqueueSimulacionEcfJobAsync(dto, _env.WebRootPath);
+            var jobId = await certificationService.EnqueueSimulacionEcfJobAsync(dto, env.WebRootPath);
             return Ok(new { JobId = jobId, Message = "Simulación de e-CF iniciada en segundo plano." });
         }
         catch (Exception ex)
@@ -137,7 +126,7 @@ public class CertificationController : ControllerBase
 
         try
         {
-            var result = await _certificationService.ProcessSimulacionUnoAUnoAsync(dto, _env.WebRootPath);
+            var result = await certificationService.ProcessSimulacionUnoAUnoAsync(dto, env.WebRootPath);
 
             return Ok(result);
         }
@@ -152,10 +141,10 @@ public class CertificationController : ControllerBase
     {
         try
         {
-            string folder = Path.Combine(_env.ContentRootPath, "..", "SamplePayloads");
+            string folder = Path.Combine(env.ContentRootPath, "..", "SamplePayloads");
             if (!Directory.Exists(folder))
             {
-                folder = Path.Combine(_env.ContentRootPath, "SamplePayloads");
+                folder = Path.Combine(env.ContentRootPath, "SamplePayloads");
             }
 
             if (!Directory.Exists(folder))
@@ -164,7 +153,7 @@ public class CertificationController : ControllerBase
             var files = Directory.GetFiles(folder, "*.json")
                 .OrderBy(f => Path.GetFileName(f))
                 .ToList();
-                
+
             var result = new List<object>();
 
             foreach (var file in files)
@@ -183,11 +172,10 @@ public class CertificationController : ControllerBase
         }
     }
 
-
     [HttpGet("files")]
     public ActionResult<List<string>> ListCertificationFiles()
     {
-        string folder = Path.Combine(_env.WebRootPath, "certification_files");
+        string folder = Path.Combine(env.WebRootPath, "certification_files");
         if (!Directory.Exists(folder)) return Ok(new List<string>());
 
         var files = Directory.GetFiles(folder)
@@ -203,7 +191,7 @@ public class CertificationController : ControllerBase
     {
         // Sanitize fileName to prevent path traversal
         string safeFileName = Path.GetFileName(fileName);
-        string folder = Path.Combine(_env.WebRootPath, "certification_files");
+        string folder = Path.Combine(env.WebRootPath, "certification_files");
         string filePath = Path.Combine(folder, safeFileName);
 
         if (!System.IO.File.Exists(filePath)) return NotFound("Archivo no encontrado.");
@@ -216,14 +204,14 @@ public class CertificationController : ControllerBase
     [HttpGet("simulacion/download/{jobId}")]
     public async Task<ActionResult> DownloadSimulacionZip(string jobId)
     {
-        var status = await _certificationService.GetJobStatusAsync(jobId);
+        var status = await certificationService.GetJobStatusAsync(jobId);
 
         if (string.IsNullOrEmpty(status.DownloadUrl))
             return BadRequest("El archivo ZIP de simulación aún no ha sido generado o el JobId es inválido.");
 
         // The URL is relative like /certification_files/simulacion_xxx.zip
         string relativePath = status.DownloadUrl.TrimStart('/');
-        string fullPath = Path.Combine(_env.WebRootPath, relativePath);
+        string fullPath = Path.Combine(env.WebRootPath, relativePath);
 
         if (!System.IO.File.Exists(fullPath))
             return NotFound("El archivo ZIP de simulación no se encontró en el servidor.");
@@ -241,14 +229,14 @@ public class CertificationController : ControllerBase
     [HttpGet("simulacion/download-json/{jobId}")]
     public async Task<ActionResult> DownloadSimulacionJsonZip(string jobId)
     {
-        var status = await _certificationService.GetJobStatusAsync(jobId);
+        var status = await certificationService.GetJobStatusAsync(jobId);
 
         if (string.IsNullOrEmpty(status.JsonDownloadUrl))
             return BadRequest("El archivo ZIP de JSONs de simulación aún no ha sido generado o el JobId es inválido.");
 
         // El URL es relativo como /certification_files/simulacion_json_xxx.zip
         string relativePath = status.JsonDownloadUrl.TrimStart('/');
-        string fullPath = Path.Combine(_env.WebRootPath, relativePath);
+        string fullPath = Path.Combine(env.WebRootPath, relativePath);
 
         if (!System.IO.File.Exists(fullPath))
             return NotFound("El archivo ZIP de JSONs de simulación no se encontró en el servidor.");
