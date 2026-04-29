@@ -160,14 +160,29 @@ public class FeController : ControllerBase
 
         _logger.LogError("=== ECF RECIBIDO DE DGII ===\n{Xml}", xmlContent);
 
-        return Ok(new
-        {
-            trackId = Guid.NewGuid().ToString(),
-            error = "",
-            mensaje = "Recibido exitosamente",
-            estado = "Aceptado",
-            codigo = 1
-        });
+        var rncEmisor = ExtractTag(xmlContent, "RNCEmisor");
+        var rncComprador = ExtractTag(xmlContent, "RNCComprador");
+        var eNcf = ExtractTag(xmlContent, "eNCF");
+
+        if (string.IsNullOrEmpty(rncEmisor)) rncEmisor = "131880600";
+        if (string.IsNullOrEmpty(rncComprador)) rncComprador = "132880600";
+        if (string.IsNullOrEmpty(eNcf)) eNcf = "E310000000001";
+
+        string fecha = DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
+
+        string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?>
+<ARECF xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
+  <DetalleAcusedeRecibo>
+    <Version>1.0</Version>
+    <RNCEmisor>{rncEmisor}</RNCEmisor>
+    <RNCComprador>{rncComprador}</RNCComprador>
+    <eNCF>{eNcf}</eNCF>
+    <Estado>0</Estado>
+    <FechaHoraAcuseRecibo>{fecha}</FechaHoraAcuseRecibo>
+  </DetalleAcusedeRecibo>
+</ARECF>";
+
+        return Content(xmlResponse, "application/xml", Encoding.UTF8);
     }
 
     /// <summary>
@@ -181,12 +196,26 @@ public class FeController : ControllerBase
 
         _logger.LogError("=== APROBACION COMERCIAL RECIBIDA DE DGII ===\n{Xml}", xmlContent);
 
-        return Ok(new
-        {
-            codigo = "1",
-            estado = "Aprobado",
-            mensaje = new[] { "Aprobación Comercial recibida exitosamente" }
-        });
+        var rncEmisor = ExtractTag(xmlContent, "RNCEmisor");
+        var rncComprador = ExtractTag(xmlContent, "RNCComprador");
+        var eNcf = ExtractTag(xmlContent, "eNCF");
+
+        if (string.IsNullOrEmpty(rncEmisor)) rncEmisor = "131880600";
+        if (string.IsNullOrEmpty(rncComprador)) rncComprador = "132880600";
+        if (string.IsNullOrEmpty(eNcf)) eNcf = "E310000000001";
+
+        string fecha = DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
+
+        string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?>
+<AprobacionComercial xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"">
+  <RNCEmisor>{rncEmisor}</RNCEmisor>
+  <RNCComprador>{rncComprador}</RNCComprador>
+  <eNCF>{eNcf}</eNCF>
+  <Estado>0</Estado>
+  <FechaHoraAprobacion>{fecha}</FechaHoraAprobacion>
+</AprobacionComercial>";
+
+        return Content(xmlResponse, "application/xml", Encoding.UTF8);
     }
 
     /// <summary>
