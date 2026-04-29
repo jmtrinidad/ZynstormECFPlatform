@@ -152,8 +152,9 @@ var app = builder.Build();
 _ = SeedData(app);
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
+// Temporalmente expuesto en producción para pruebas
+// if (app.Environment.IsDevelopment())
+// {
     app.UseSwagger();
 
     app.UseSwaggerUI(options =>
@@ -161,7 +162,7 @@ if (app.Environment.IsDevelopment())
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "Zynstorm ECF API v1");
         options.EnablePersistAuthorization();
     });
-}
+// }
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
