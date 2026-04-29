@@ -502,7 +502,7 @@ public class FeController : ControllerBase
             {
                 // Attempt to read from Embedded Resources
                 var assembly = System.Reflection.Assembly.Load("ZynstormECFPlatform.Schemas");
-                var resourceName = $"ZynstormECFPlatform.Schemas.XSD.{xsdFileName.Replace(" ", "_")}";
+                var resourceName = $"ZynstormECFPlatform.Schemas.XSD.{xsdFileName}";
                 using var stream = assembly.GetManifestResourceStream(resourceName);
                 
                 if (stream != null)
