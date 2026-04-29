@@ -182,6 +182,32 @@ public class FeController : ControllerBase
   </DetalleAcusedeRecibo>
 </ARECF>";
 
+        // INTENTAR FIRMAR EL XML CON EL PRIMER CERTIFICADO DISPONIBLE
+        try
+        {
+            var certificate = (await _clientCertificateService.GetAllAsync()).FirstOrDefault();
+            if (certificate != null)
+            {
+                var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == certificate.ClientId);
+                if (apiKey != null)
+                {
+                    var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
+                    var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
+                    var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
+
+                    var certificateBase64 = Convert.ToBase64String(certificateBytes);
+                    var certificatePassword = Encoding.UTF8.GetString(passwordBytes);
+
+                    var signer = new ZynstormECFPlatform.Services.XmlSignatureService();
+                    xmlResponse = signer.SignXml(xmlResponse, certificateBase64, certificatePassword);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("No se pudo firmar el Acuse de Recibo XML: {Error}", ex.Message);
+        }
+
         return Content(xmlResponse, "application/xml", Encoding.UTF8);
     }
 
@@ -214,6 +240,32 @@ public class FeController : ControllerBase
   <Estado>0</Estado>
   <FechaHoraAprobacion>{fecha}</FechaHoraAprobacion>
 </AprobacionComercial>";
+
+        // INTENTAR FIRMAR EL XML CON EL PRIMER CERTIFICADO DISPONIBLE
+        try
+        {
+            var certificate = (await _clientCertificateService.GetAllAsync()).FirstOrDefault();
+            if (certificate != null)
+            {
+                var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == certificate.ClientId);
+                if (apiKey != null)
+                {
+                    var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
+                    var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
+                    var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
+
+                    var certificateBase64 = Convert.ToBase64String(certificateBytes);
+                    var certificatePassword = Encoding.UTF8.GetString(passwordBytes);
+
+                    var signer = new ZynstormECFPlatform.Services.XmlSignatureService();
+                    xmlResponse = signer.SignXml(xmlResponse, certificateBase64, certificatePassword);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("No se pudo firmar el XML de Aprobación Comercial: {Error}", ex.Message);
+        }
 
         return Content(xmlResponse, "application/xml", Encoding.UTF8);
     }
