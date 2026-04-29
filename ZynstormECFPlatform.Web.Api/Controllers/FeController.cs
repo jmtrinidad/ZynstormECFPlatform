@@ -158,8 +158,6 @@ public class FeController : ControllerBase
     {
         var xmlContent = await GetXmlContentAsync();
 
-        //_logger.LogError("=== ECF RECIBIDO DE DGII ===\n{Xml}", xmlContent);
-
         var rncEmisor = ExtractTag(xmlContent, "RNCEmisor");
         var rncComprador = ExtractTag(xmlContent, "RNCComprador");
         var eNcf = ExtractTag(xmlContent, "eNCF");
@@ -170,22 +168,39 @@ public class FeController : ControllerBase
 
         string fecha = DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
 
-        string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?><ARECF><DetalleAcusedeRecibo><Version>1.0</Version><RNCEmisor>{rncEmisor}</RNCEmisor><RNCComprador>{rncComprador}</RNCComprador><eNCF>{eNcf}</eNCF><Estado>0</Estado><FechaHoraAcuseRecibo>{fecha}</FechaHoraAcuseRecibo></DetalleAcusedeRecibo></ARECF>";
+        string estado = "0";
+        string motivoXml = "";
 
-
-        // BUSCAR EL CLIENTE POR RNC COMPRADOR PARA USAR SU CERTIFICADO
-        try
+        // Validar Firma del XML entrante
+        bool isValidSignature = VerifyXmlSignature(xmlContent);
+        if (!isValidSignature)
         {
-            _logger.LogInformation("RecepcionEcf: Buscando cliente con RNC Comprador: {RncComprador}", rncComprador);
-            var client = await _clientService.GetByAsync(x => x.Rnc == rncComprador);
-            if (client != null)
-            {
-                _logger.LogInformation("RecepcionEcf: Cliente encontrado. Buscando certificado para ClientId: {ClientId}", client.ClientId);
-                var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+            estado = "1";
+            motivoXml = "<CodigoMotivoNoRecibido>2</CodigoMotivoNoRecibido>";
+        }
 
+        // Buscar el cliente receptor
+        var client = await _clientService.GetByAsync(x => x.Rnc == rncComprador);
+        if (client == null)
+        {
+            _logger.LogWarning("RecepcionEcf: RNC Comprador no corresponde a un cliente válido ({RncComprador}).", rncComprador);
+            estado = "1";
+            motivoXml = "<CodigoMotivoNoRecibido>4</CodigoMotivoNoRecibido>";
+            
+            // Usar el primer cliente disponible como fallback para firmar la respuesta
+            var allClients = await _clientService.GetAllAsync();
+            client = allClients.FirstOrDefault();
+        }
+
+        string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?><ARECF><DetalleAcusedeRecibo><Version>1.0</Version><RNCEmisor>{rncEmisor}</RNCEmisor><RNCComprador>{rncComprador}</RNCComprador><eNCF>{eNcf}</eNCF><Estado>{estado}</Estado>{motivoXml}<FechaHoraAcuseRecibo>{fecha}</FechaHoraAcuseRecibo></DetalleAcusedeRecibo></ARECF>";
+
+        if (client != null)
+        {
+            try
+            {
+                var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
                 if (certificate != null)
                 {
-                    _logger.LogInformation("RecepcionEcf: Certificado encontrado. Buscando ApiKey...");
                     var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == certificate.ClientId);
                     if (apiKey != null)
                     {
@@ -196,17 +211,6 @@ public class FeController : ControllerBase
                         var certificateBase64 = Convert.ToBase64String(certificateBytes);
                         var certificatePassword = Encoding.UTF8.GetString(passwordBytes);
 
-                        try
-                        {
-                            using var x509Cert = new System.Security.Cryptography.X509Certificates.X509Certificate2(certificateBytes, certificatePassword);
-                            _logger.LogInformation("RecepcionEcf: Certificado a usar: {Subject}, Válido hasta: {NotAfter}", x509Cert.Subject, x509Cert.NotAfter);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning("RecepcionEcf: No se pudo extraer información del certificado para el log: {Error}", ex.Message);
-                        }
-
-                        _logger.LogInformation("RecepcionEcf: Firmando el Acuse de Recibo...");
                         var signer = new ZynstormECFPlatform.Services.XmlSignatureService();
                         xmlResponse = signer.SignXml(xmlResponse, certificateBase64, certificatePassword);
                         _logger.LogInformation("RecepcionEcf: Acuse de Recibo firmado exitosamente.");
@@ -218,24 +222,16 @@ public class FeController : ControllerBase
                             return BadRequest(new { Message = "El XML generado no cumple con el esquema XSD de la DGII.", Errors = validationErrors });
                         }
                     }
-                    else
-                    {
-                        _logger.LogError("RecepcionEcf: No se encontró ApiKey para el cliente con RNC: {RncComprador}", rncComprador);
-                    }
-                }
-                else
-                {
-                    _logger.LogError("RecepcionEcf: No se encontró Certificado para el cliente con RNC: {RncComprador}", rncComprador);
                 }
             }
-            else
+            catch (Exception ex)
             {
-                _logger.LogError("RecepcionEcf: No se encontró Cliente en base de datos con RNC: {RncComprador}", rncComprador);
+                _logger.LogError(ex, "RecepcionEcf: Error al firmar el Acuse de Recibo XML.");
             }
         }
-        catch (Exception ex)
+        else
         {
-            _logger.LogError(ex, "RecepcionEcf: Error al firmar el Acuse de Recibo XML.");
+            _logger.LogError("RecepcionEcf: No hay clientes configurados para firmar el Acuse de Recibo.");
         }
 
         return Content(xmlResponse, "application/xml", new System.Text.UTF8Encoding(false));
