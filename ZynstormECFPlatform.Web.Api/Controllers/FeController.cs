@@ -149,43 +149,11 @@ public class FeController : ControllerBase
         });
     }
 
-    ///// <summary>
-    ///// Alternativa de Autenticación B2B para cubrir la ruta en mayúsculas /ValidacionCertificado
-    ///// </summary>
-    //[HttpPost("autenticacion/api/ValidacionCertificado")]
-    //public async Task<IActionResult> ValidacionCertificado()
-    //{
-    //    var xmlContent = await GetXmlContentAsync();
-
-    //    if (string.IsNullOrWhiteSpace(xmlContent))
-    //        return BadRequest(new { error = "No XML content provided" });
-
-    //    // LOGGEAR EL XML RECIBIDO COMO ERROR PARA PODER ANALIZARLO
-    //    _logger.LogError("=== SEMILLA FIRMADA RECIBIDA DE DGII (Ruta Alterna) ===\n{Xml}", xmlContent);
-
-    //    // 1. Verificar criptográficamente la firma del XML
-    //    bool isValidSignature = VerifyXmlSignature(xmlContent);
-
-    //    if (!isValidSignature)
-    //    {
-    //        _logger.LogWarning("ValidacionCertificado Rechazado: La firma del XML es inválida o no contiene firma.");
-    //        return Unauthorized(new { error = "Firma digital inválida." });
-    //    }
-
-    //    // 2. Si la firma es válida, devolvemos el Token (tal como lo espera la DGII).
-    //    string token = "MOCKED-JWT-FOR-B2B-VERIFICATION-EYJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9";
-
-    //    return Ok(new
-    //    {
-    //        token = token,
-    //        expira = DateTime.UtcNow.AddMinutes(55).ToString("yyyy-MM-ddTHH:mm:ssZ")
-    //    });
-    //}
-
     /// <summary>
     /// Receptor B2B - Recibe el archivo de la factura.
     /// </summary>
     [HttpPost("recepcion/api/ecf")]
+    [ZynstormECFPlatform.Web.Api.Filters.B2BTokenAuth]
     public async Task<IActionResult> RecepcionEcf()
     {
         var xmlContent = await GetXmlContentAsync();
@@ -196,21 +164,7 @@ public class FeController : ControllerBase
         // LOGGEAR EL XML RECIBIDO COMO ERROR PARA PODER ANALIZARLO
         _logger.LogError("=== ECF RECIBIDO DE DGII ===\n{Xml}", xmlContent);
 
-        // EXTRAER RNC COMPRADOR (Nosotros recibiendo el ECF)
-        var rncComprador = ExtractTag(xmlContent, "RNCComprador");
-
-        if (string.IsNullOrEmpty(rncComprador))
-            return BadRequest(new { error = "RNCComprador no encontrado en el XML", trackId = "", mensaje = "Error de validación", estado = "Rechazado", codigo = 0 });
-
-        var client = await _clientService.GetByAsync(x => x.Rnc == rncComprador);
-
-        if (client == null)
-        {
-            _logger.LogWarning("ECF Rechazado: El RNCComprador {Rnc} extraído del XML no existe en nuestra base de datos de clientes.", rncComprador);
-            return BadRequest(new { error = $"Cliente no encontrado para el RNC {rncComprador}", trackId = "", mensaje = "Rechazado", estado = "Rechazado", codigo = 0 });
-        }
-
-        _logger.LogInformation("ECF validado correctamente para el cliente {Rnc}", rncComprador);
+        _logger.LogInformation("ECF validado y recibido para procesamiento directo.");
 
         try
         {
@@ -243,6 +197,7 @@ public class FeController : ControllerBase
     /// Aprobación Comercial B2B.
     /// </summary>
     [HttpPost("aprobacioncomercial/api/ecf")]
+    [ZynstormECFPlatform.Web.Api.Filters.B2BTokenAuth]
     public async Task<IActionResult> AprobacionComercial()
     {
         var xmlContent = await GetXmlContentAsync();
@@ -253,29 +208,7 @@ public class FeController : ControllerBase
         // LOGGEAR EL XML RECIBIDO COMO ERROR PARA PODER ANALIZARLO
         _logger.LogError("=== APROBACION COMERCIAL RECIBIDA DE DGII ===\n{Xml}", xmlContent);
 
-        // EXTRAER EL NCF PARA CONSULTAR EN BASE DE DATOS
-        var eNcf = ExtractTag(xmlContent, "eNCF");
-
-        if (!string.IsNullOrEmpty(eNcf))
-        {
-            _logger.LogError("=== NCF A CONSULTAR EN LA BASE DE DATOS PARA APROBAR: {eNcf} ===", eNcf);
-        }
-
-        // EXTRAER RNC EMISOR (Nosotros, los que emitimos el ECF originalmente y ahora recibimos su aprobación)
-        var rncEmisor = ExtractTag(xmlContent, "RNCEmisor");
-
-        if (string.IsNullOrEmpty(rncEmisor))
-            return BadRequest(new { estado = "Rechazado", mensaje = new[] { "RNCEmisor no encontrado en el XML" }, codigo = "0" });
-
-        var client = await _clientService.GetByAsync(x => x.Rnc == rncEmisor);
-
-        if (client == null)
-        {
-            _logger.LogWarning("Aprobación Comercial Rechazada: El RNCEmisor {Rnc} extraído del XML no existe en nuestra base de datos de clientes.", rncEmisor);
-            return BadRequest(new { estado = "Rechazado", mensaje = new[] { $"Cliente no encontrado para el RNC {rncEmisor}" }, codigo = "0" });
-        }
-
-        _logger.LogInformation("Aprobación Comercial validada correctamente para el cliente {Rnc}", rncEmisor);
+        _logger.LogInformation("Aprobación Comercial validada y recibida para procesamiento directo.");
 
         try
         {
