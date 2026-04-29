@@ -18,8 +18,9 @@ public static class ServiceCollectionExtensions
                     builder.EnableRetryOnFailure();
                     builder.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
                 }
-
-            ).EnableSensitiveDataLogging());
+            )
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
+            .EnableSensitiveDataLogging());
 
         services.AddIdentityCore<User>(options =>
         {
