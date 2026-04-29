@@ -113,7 +113,7 @@ public class FeController : ControllerBase
          <fecha>{fecha}</fecha>
         </SemillaModel>";
 
-        return Content(xmlResponse, "application/xml", Encoding.UTF8);
+        return Content(xmlResponse, "application/xml", new System.Text.UTF8Encoding(false));
     }
 
     /// <summary>
@@ -238,7 +238,7 @@ public class FeController : ControllerBase
             _logger.LogError(ex, "RecepcionEcf: Error al firmar el Acuse de Recibo XML.");
         }
 
-        return Content(xmlResponse, "application/xml", Encoding.UTF8);
+        return Content(xmlResponse, "application/xml", new System.Text.UTF8Encoding(false));
     }
 
     /// <summary>
@@ -330,7 +330,7 @@ public class FeController : ControllerBase
             _logger.LogError("No se pudo firmar el XML de Aprobación Comercial: {Error}", ex.Message);
         }
 
-        return Content(xmlResponse, "application/xml", Encoding.UTF8);
+        return Content(xmlResponse, "application/xml", new System.Text.UTF8Encoding(false));
     }
 
     /// <summary>
