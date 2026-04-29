@@ -149,7 +149,7 @@ builder.Services.AddCors(c =>
 
 var app = builder.Build();
 
-_ = SeedData(app);
+await SeedData(app);
 
 // Configure the HTTP request pipeline.
 // Temporalmente expuesto en producción para pruebas
