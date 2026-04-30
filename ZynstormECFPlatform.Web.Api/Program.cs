@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication;
+using Asp.Versioning;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using ZynstormECFPlatform.Abstractions.Data;
@@ -30,7 +31,18 @@ builder.Services.AddControllersWithViews()
     });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = new UrlSegmentApiVersionReader();
+}).AddMvc().AddApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+    options.SubstituteApiVersionInUrl = true;
+});
 
 builder.Services.AddAutoMapper(c => { }, typeof(ZynstormECFPlatform.Mappings.MappingProfiles));
 
@@ -60,7 +72,7 @@ if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddSwaggerGen(c =>
     {
-        c.SwaggerDoc("v1", new OpenApiInfo { Title = "Zynstorm ECF_Platform Api", Version = "v1" });
+        c.SwaggerDoc("v1", new OpenApiInfo { Title = "Zynstorm ECF Platform API", Version = "v1" });
         c.ResolveConflictingActions(r => r.First());
         c.AddSecurityDefinition("Swagger", new OpenApiSecurityScheme
         {

@@ -1,14 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Web.Api.Filters;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers;
 
+[ApiVersion("1.0")]
+[Route("v{version:apiVersion}/[controller]")]
 [ApiController]
-[Route("[controller]")]
 public class CertificationController(ICertificationService certificationService, ICacheService cacheService, IWebHostEnvironment env) : ControllerBase
 {
+    //TODO: AGREGAR UNA CONFIGURACION PARA CONFIGURAR UN ENVIO DEL LISTADO DE FACTURAS ENVIADAS A LA DGII EN UN LAPSO DE TIEMPO CON SU ESTATUS Y TODO LO DE LA FACTURA
     [HttpGet("tests")]
     public async Task<ActionResult<List<CertificationTestDto>>> GetTests()
     {

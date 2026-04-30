@@ -1,6 +1,7 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using ZynstormECFPlatform.Abstractions.Data;
@@ -11,7 +12,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers;
 //[JsonConverter(typeof(JsonInheritanceConverter), "discriminator")]
 //[KnownType(typeof(UserController))]
 //[Authorize]
-[Route("[controller]")]
+[ApiVersion("1.0")]
+[Route("v{version:apiVersion}/[controller]")]
 [ApiController]
 public abstract class BaseController<TController, TModel, TCreateDto, TUpdateDto, TViewDto>(
     IRepository<TModel> repository,

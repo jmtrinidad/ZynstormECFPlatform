@@ -10,11 +10,13 @@ using IConfiguration = Microsoft.Extensions.Configuration.IConfiguration;
 using Hangfire;
 using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Abstractions.Services;
+using ZynstormECFPlatform.Common;
+using ZynstormECFPlatform.Common.Utilities;
+using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
 
 using System.IO.Compression;
-using ZynstormECFPlatform.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 using ZynstormECFPlatform.Data;
 using Microsoft.AspNetCore.Hosting;
@@ -218,10 +220,12 @@ public class CertificationService : ICertificationService
             }
 
             test.ENcf = GetStr(row, "ENCF");
+            if(string.IsNullOrEmpty(test.ENcf)) test.ENcf = test.CaseNumber;
+             GetStr(row, "ENCF");
 
             var requestDto = MapRowToRequest(row, test.Step);
 
-            string issuerRnc = requestDto.IssuerRnc;
+            string issuerRnc = requestDto.ECF.Encabezado.Emisor.RNCEmisor;
             if (string.IsNullOrEmpty(issuerRnc))
                 issuerRnc = _configuration["Certification:IssuerRnc"] ?? "133009889";
 
@@ -267,7 +271,7 @@ public class CertificationService : ICertificationService
                             var content = individualSigned.Substring(start + tag.Length);
                             var realCode = content.TrimStart().Substring(0, 6);
                             requestDto.SecurityCodeOverride = realCode;
-                            requestDto.IssuerWebSite = $"[DEBUG-PRECALC] RNC={individualDto.IssuerRnc}, NCF={individualDto.Ncf}, Date={individualDto.IssueDate:yyyy-MM-dd}, Total={individualDto.ManualMontoTotal}";
+                            requestDto.ECF.Encabezado.Emisor.WebSite = $"[DEBUG-PRECALC] RNC={individualDto.ECF.Encabezado.Emisor.RNCEmisor}, NCF={individualDto.ECF.Encabezado.IdDoc.eNCF}, Date={individualDto.ECF.Encabezado.Emisor.FechaEmision}, Total={individualDto.ECF.Encabezado.Totales.MontoTotal}";
                         }
                     }
                 }
@@ -538,82 +542,90 @@ public class CertificationService : ICertificationService
     {
         var dto = new EcfInvoiceRequestDto
         {
-            EcfType = int.TryParse(GetStr(row, "TipoeCF"), out int t) ? t : 0,
-            Ncf = CleanNcf(GetStr(row, "ENCF") ?? GetStr(row, "CasoPrueba") ?? "") ?? "",
-            IssuerRnc = GetStr(row, "RNCEmisor") ?? "",
-            IssuerName = GetStr(row, "RazonSocialEmisor") ?? "",
-            IssuerAddress = GetStr(row, "DireccionEmisor") ?? "",
-            IssuerCommercialName = GetStr(row, "NombreComercial"),
-            IssuerBranchCode = GetStr(row, "Sucursal"),
-            IssuerActivityCode = GetStr(row, "ActividadEconomica"),
-            IssuerMunicipality = GetStr(row, "Municipio"),
-            IssuerProvince = GetStr(row, "Provincia"),
-            IssuerPhone = GetStr(row, "TelefonoEmisor[1]"),
-            IssuerEmail = GetStr(row, "CorreoEmisor"),
-            IssuerWebSite = GetStr(row, "WebSite"),
-            IssuerSellerCode = GetStr(row, "CodigoVendedor"),
-            CustomerRnc = GetStr(row, "RNCComprador") ?? "",
-            CustomerForeignId = GetStr(row, "IdentificadorExtranjero"),
-            CustomerName = GetStr(row, "RazonSocialComprador") ?? "",
-            CustomerCountry = GetStr(row, "PaisComprador"),
-            CustomerAddress = GetStr(row, "DireccionComprador"),
-            CustomerContact = GetStr(row, "ContactoComprador"),
-            CustomerTelephone = GetStr(row, "TelefonoAdicional"),
-            CustomerEmail = GetStr(row, "CorreoComprador"),
-            CustomerMunicipality = GetStr(row, "MunicipioComprador"),
-            CustomerProvince = GetStr(row, "ProvinciaComprador"),
-            BuyerInternalCode = GetStr(row, "CodigoInternoComprador"),
-            InternalInvoiceNumber = GetStr(row, "NumeroFacturaInterna"),
-            InternalOrderNumber = GetStr(row, "NumeroPedidoInterno"),
-            SalesZone = GetStr(row, "ZonaVenta"),
-            OrderNumber = GetStr(row, "NumeroOrdenCompra"),
-            PaymentType = int.TryParse(GetStr(row, "TipoPago"), out int p) ? p : null,
-            PaymentDeadline = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaLimitePago"))),
-            IncomeType = GetStr(row, "TipoIngresos"),
-            ManualMontoGravadoTotal = GetDec(row, "MontoGravadoTotal"),
-            ManualMontoExento = GetDec(row, "MontoExento"),
-            ManualMontoTotal = GetDec(row, "MontoTotal"),
-            ManualTotalITBIS = GetDec(row, "TotalITBIS"),
-            ManualTotalITBIS1 = GetDec(row, "TotalITBIS1"),
-            ManualTotalITBIS2 = GetDec(row, "TotalITBIS2"),
-            ManualTotalITBIS3 = GetDec(row, "TotalITBIS3"),
-            ManualMontoPeriodo = GetDec(row, "MontoPeriodo"),
-            ManualValorPagar = GetDec(row, "ValorPagar"),
-            ManualIndicadorMontoGravado = int.TryParse(GetStr(row, "IndicadorMontoGravado"), out int img) ? img : null,
-            ManualTotalITBISRetenido = GetDec(row, "TotalITBISRetenido"),
-            ManualTotalISRRetencion = GetDec(row, "TotalISRRetencion"),
-            ManualMontoGravadoI1 = GetDec(row, "MontoGravadoI1"),
-            ManualIndicadorNotaCredito = int.TryParse(GetStr(row, "IndicadorNotaCredito"), out int inc) ? inc : null,
-            ManualMontoNoFacturable = GetDec(row, "MontoNoFacturable"),
-            ManualMontoGravadoI2 = GetDec(row, "MontoGravadoI2"),
-            ManualMontoGravadoI3 = GetDec(row, "MontoGravadoI3"),
-            ReferenceNcf = CleanNcf(GetStr(row, "NCFModificado")),
-            ReferenceCustomerRnc = GetStr(row, "RNCOtroContribuyente"),
-            ReferenceReasonCode = int.TryParse(GetStr(row, "CodigoModificacion"), out int rc) ? rc : null,
-            ReferenceReasonDescription = GetStr(row, "RazonModificacion"),
-            Items = new List<EcfItemRequestDto>()
+            ExternalReference = GetStr(row, "NumeroFacturaInterna") ?? "",
+            ECF = new EcfRequest
+            {
+                Encabezado = new EcfEncabezadoRequest
+                {
+                    IdDoc = new EcfIdDocRequest
+                    {
+                        TipoeCF = GetStr(row, "TipoeCF"),
+                        eNCF = CleanNcf(GetStr(row, "ENCF") ?? GetStr(row, "CasoPrueba") ?? "") ?? "",
+                        FechaVencimientoSecuencia = GetStr(row, "FechaVencimientoSecuencia"),
+                        IndicadorEnvioDiferido = GetStr(row, "IndicadorEnvioDiferido"),
+                        IndicadorMontoGravado = GetStr(row, "IndicadorMontoGravado"),
+                        TipoIngresos = GetStr(row, "TipoIngresos"),
+                        TipoPago = GetStr(row, "TipoPago"),
+                        FechaLimitePago = GetStr(row, "FechaLimitePago"),
+                        IndicadorNotaCredito = GetStr(row, "IndicadorNotaCredito"),
+                        TerminoPago = GetStr(row, "TerminoPago")
+                    },
+                    Emisor = new EcfEmisorRequest
+                    {
+                        RNCEmisor = GetStr(row, "RNCEmisor") ?? "",
+                        RazonSocialEmisor = GetStr(row, "RazonSocialEmisor") ?? "",
+                        NombreComercial = GetStr(row, "NombreComercial"),
+                        Sucursal = GetStr(row, "Sucursal"),
+                        DireccionEmisor = GetStr(row, "DireccionEmisor") ?? "",
+                        Municipio = GetStr(row, "Municipio"),
+                        Provincia = GetStr(row, "Provincia"),
+                        Telefono = GetStr(row, "TelefonoEmisor[1]"),
+                        CorreoEmisor = GetStr(row, "CorreoEmisor"),
+                        WebSite = GetStr(row, "WebSite"),
+                        ActividadEconomica = GetStr(row, "ActividadEconomica"),
+                        CodigoVendedor = GetStr(row, "CodigoVendedor"),
+                        NumeroFacturaInterna = GetStr(row, "NumeroFacturaInterna"),
+                        NumeroPedidoInterno = GetStr(row, "NumeroPedidoInterno"),
+                        ZonaVenta = GetStr(row, "ZonaVenta"),
+                        FechaEmision = GetStr(row, "FechaEmision") ?? fallbackDate?.ToString("dd-MM-yyyy") ?? DateTime.Now.ToString("dd-MM-yyyy")
+                    },
+                    Comprador = new EcfCompradorRequest
+                    {
+                        RNCComprador = GetStr(row, "RNCComprador"),
+                        IdentificadorExtranjero = GetStr(row, "IdentificadorExtranjero"),
+                        RazonSocialComprador = GetStr(row, "RazonSocialComprador"),
+                        ContactoComprador = GetStr(row, "ContactoComprador"),
+                        CorreoComprador = GetStr(row, "CorreoComprador"),
+                        DireccionComprador = GetStr(row, "DireccionComprador"),
+                        PaisComprador = GetStr(row, "PaisComprador"),
+                        TelefonoAdicional = GetStr(row, "TelefonoAdicional"),
+                        MunicipioComprador = GetStr(row, "MunicipioComprador"),
+                        ProvinciaComprador = GetStr(row, "ProvinciaComprador"),
+                        FechaEntrega = GetStr(row, "FechaEntrega"),
+                        FechaOrdenCompra = GetStr(row, "FechaOrdenCompra"),
+                        NumeroOrdenCompra = GetStr(row, "NumeroOrdenCompra"),
+                        CodigoInternoComprador = GetStr(row, "CodigoInternoComprador")
+                    },
+                    Totales = new EcfTotalesRequest
+                    {
+                        MontoGravadoTotal = GetDec(row, "MontoGravadoTotal"),
+                        MontoGravadoI1 = GetDec(row, "MontoGravadoI1"),
+                        MontoGravadoI2 = GetDec(row, "MontoGravadoI2"),
+                        MontoGravadoI3 = GetDec(row, "MontoGravadoI3"),
+                        MontoExento = GetDec(row, "MontoExento"),
+                        TotalITBIS = GetDec(row, "TotalITBIS"),
+                        TotalITBIS1 = GetDec(row, "TotalITBIS1"),
+                        TotalITBIS2 = GetDec(row, "TotalITBIS2"),
+                        TotalITBIS3 = GetDec(row, "TotalITBIS3"),
+                        MontoTotal = GetDec(row, "MontoTotal"),
+                        MontoNoFacturable = GetDec(row, "MontoNoFacturable"),
+                        MontoPeriodo = GetDec(row, "MontoPeriodo"),
+                        ValorPagar = GetDec(row, "ValorPagar"),
+                        TotalITBISRetenido = GetDec(row, "TotalITBISRetenido"),
+                        TotalISRRetencion = GetDec(row, "TotalISRRetencion"),
+                        MontoImpuestoAdicional = GetDec(row, "MontoImpuestoAdicional")
+                    }
+                },
+                InformacionReferencia = (GetStr(row, "TipoeCF") == "33" || GetStr(row, "TipoeCF") == "34") ? new EcfInformacionReferenciaRequest
+                {
+                    NCFModificado = CleanNcf(GetStr(row, "NCFModificado")),
+                    RNCOtroContribuyente = GetStr(row, "RNCOtroContribuyente"),
+                    FechaNCFModificado = GetStr(row, "FechaNCFModificado"),
+                    CodigoModificacion = GetStr(row, "CodigoModificacion") ?? "3",
+                    RazonModificacion = GetStr(row, "RazonModificacion") ?? "Ajuste parcial de montos"
+                } : null
+            }
         };
-
-        dto.IssueDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaEmision")) ?? fallbackDate ?? DateTime.Now);
-        // dto.SignatureDateOverride = dto.IssueDate.Date.AddHours(12); // Removed as requested
-
-        var expDate = ParseDgiiDate(GetStr(row, "FechaVencimientoSecuencia"));
-        string typeStr = GetStr(row, "TipoeCF") ?? "";
-        if (!expDate.HasValue && _typeExpirationDates != null && _typeExpirationDates.TryGetValue(typeStr, out DateTime fallback))
-        {
-            expDate = fallback;
-        }
-        dto.SequenceExpirationDate = ApplyDateOffset(expDate);
-
-        dto.DeliveryDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaEntrega")));
-        dto.OrderDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaOrdenCompra")));
-        dto.ReferenceIssueDate = ApplyDateOffset(ParseDgiiDate(GetStr(row, "FechaNCFModificado")));
-
-        var montoNoFacturableStr = GetStr(row, "MontoNoFacturable");
-        if (decimal.TryParse(montoNoFacturableStr,
-            System.Globalization.NumberStyles.Any,
-            System.Globalization.CultureInfo.InvariantCulture, out decimal mnf) && mnf > 0)
-            dto.MontoNoFacturable = mnf;
 
         for (int i = 1; i <= 50; i++)
         {
@@ -621,48 +633,21 @@ public class CertificationService : ICertificationService
             var nombre = GetStr(row, nombreKey);
             if (nombre == null) continue;
 
-            var indicadorStr = GetStr(row, $"IndicadorFacturacion[{i}]");
-            var indicadorFact = int.TryParse(indicadorStr, out int indF) ? (int?)indF : null;
-
-            decimal taxPct = indicadorFact switch
-            {
-                1 => 18m,
-                2 => 16m,
-                3 => 0m,
-                4 => 0m,
-                0 => 0m,
-                _ => 18m
-            };
-
-            var cantStr = GetStr(row, $"CantidadItem[{i}]");
-            var precioStr = GetStr(row, $"PrecioUnitarioItem[{i}]");
-            var bienServStr = GetStr(row, $"IndicadorBienoServicio[{i}]");
-            var unidadStr = GetStr(row, $"UnidadMedida[{i}]");
-
-            decimal cantidad = decimal.TryParse(cantStr,
-                System.Globalization.NumberStyles.Any,
-                System.Globalization.CultureInfo.InvariantCulture, out decimal c) ? c : 1;
-            decimal precio = decimal.TryParse(precioStr,
-                System.Globalization.NumberStyles.Any,
-                System.Globalization.CultureInfo.InvariantCulture, out decimal pr) ? pr : 0;
-            int? itemType = int.TryParse(bienServStr, out int bs) ? (int?)bs : null;
-            int? unitOfMeasure = int.TryParse(unidadStr, out int um) ? (int?)um : null;
-
             var item = new EcfItemRequestDto
             {
-                Name = nombre,
-                Description = GetStr(row, $"DescripcionItem[{i}]"),
-                Quantity = cantidad,
-                UnitPrice = precio,
-                ItemType = itemType,
-                UnitOfMeasure = unitOfMeasure,
-                TaxPercentage = taxPct,
-                BillingIndicator = indicadorFact,
-                ManualMontoItem = GetDec(row, $"MontoItem[{i}]"),
-                ManualDescuentoMonto = GetDec(row, $"DescuentoMonto[{i}]"),
-                ManualRecargoMonto = GetDec(row, $"RecargoMonto[{i}]"),
-                ManualMontoITBISRetenido = GetDec(row, $"MontoITBISRetenido[{i}]"),
-                ManualMontoISRRetenido = GetDec(row, $"MontoISRRetenido[{i}]"),
+                NumeroLinea = i.ToString(),
+                IndicadorFacturacion = GetStr(row, $"IndicadorFacturacion[{i}]"),
+                NombreItem = nombre,
+                DescripcionItem = GetStr(row, $"DescripcionItem[{i}]"),
+                IndicadorBienoServicio = GetStr(row, $"IndicadorBienoServicio[{i}]"),
+                CantidadItem = GetDec(row, $"CantidadItem[{i}]") ?? 1,
+                UnidadMedida = GetStr(row, $"UnidadMedida[{i}]"),
+                PrecioUnitarioItem = GetDec(row, $"PrecioUnitarioItem[{i}]") ?? 0,
+                DescuentoMonto = GetDec(row, $"DescuentoMonto[{i}]"),
+                MontoItem = GetDec(row, $"MontoItem[{i}]") ?? 0,
+                RecargoMonto = GetDec(row, $"RecargoMonto[{i}]"),
+                MontoITBISRetenido = GetDec(row, $"MontoITBISRetenido[{i}]"),
+                MontoISRRetenido = GetDec(row, $"MontoISRRetenido[{i}]"),
                 FechaElaboracion = GetStr(row, $"FechaElaboracion[{i}]"),
                 FechaVencimientoItem = GetStr(row, $"FechaVencimientoItem[{i}]")
             };
@@ -673,7 +658,8 @@ public class CertificationService : ICertificationService
                 var subMonto = GetDec(row, $"MontosubRecargo[{i}][{k}]");
                 if (subTipo != null || subMonto != null)
                 {
-                    item.ManualSubRecargos.Add(new EcfSubRecargoDto
+                    item.TablaSubRecargo ??= new EcfTablaSubRecargoRequest();
+                    item.TablaSubRecargo.SubRecargo.Add(new EcfSubRecargoRequest
                     {
                         TipoSubRecargo = subTipo ?? "$",
                         MontoSubRecargo = subMonto ?? 0,
@@ -682,18 +668,10 @@ public class CertificationService : ICertificationService
                 }
             }
 
-            dto.Items.Add(item);
+            dto.ECF.DetallesItems.Item.Add(item);
 
-            // [NEW] For Credit (33) and Debit (34) Notes, only affect one row as requested
-            if ((dto.EcfType == 33 || dto.EcfType == 34) && dto.Items.Count >= 1)
+            if ((dto.ECF.Encabezado.IdDoc.TipoeCF == "33" || dto.ECF.Encabezado.IdDoc.TipoeCF == "34") && dto.ECF.DetallesItems.Item.Count >= 1)
                 break;
-        }
-
-        // [NEW] Default ReferenceReasonCode to 3 (Correction of amounts) for notes if not provided
-        if ((dto.EcfType == 33 || dto.EcfType == 34) && !dto.ReferenceReasonCode.HasValue)
-        {
-            dto.ReferenceReasonCode = 3;
-            dto.ReferenceReasonDescription ??= "Ajuste parcial de montos";
         }
 
         return dto;
@@ -1224,8 +1202,8 @@ public class CertificationService : ICertificationService
         try
         {
             // 1. Validate Client
-            var client = await _clientService.GetByAsync(c => c.Rnc == dto.IssuerRnc)
-                ?? throw new Exception($"Cliente con RNC {dto.IssuerRnc} no encontrado.");
+            var client = await _clientService.GetByAsync(c => c.Rnc == dto.ECF.Encabezado.Emisor.RNCEmisor)
+                ?? throw new Exception($"Cliente con RNC {dto.ECF.Encabezado.Emisor.RNCEmisor} no encontrado.");
 
             // 2. Manage Certification Process (Reuse if ongoing)
             var step4 = await _context.CertificationSteps.FirstOrDefaultAsync(s => s.Order == 4);
@@ -1288,7 +1266,7 @@ public class CertificationService : ICertificationService
             var certBase64 = Convert.ToBase64String(certificateBytes);
             var certPass = Encoding.UTF8.GetString(passwordBytes);
 
-            string token = await _authService.GetTokenAsync(dto.IssuerRnc, DgiiEnvironment.CerteCF, certBase64, certPass);
+            string token = await _authService.GetTokenAsync(dto.ECF.Encabezado.Emisor.RNCEmisor, DgiiEnvironment.CerteCF, certBase64, certPass);
 
             // 4. Define Simulation Matrix (Full Matrix in DGII Order)
             // IMPORTANT: Type 33/34 must come immediately after Type 31 to ensure the
@@ -1323,7 +1301,7 @@ public class CertificationService : ICertificationService
             var simulationJsons = new Dictionary<string, string>();
 
             // [FIX] Define dtoRows correctly
-            var dtoRows = dto.Items.Select(it => new { Items = new List<EcfItemRequestDto> { it }, Total = it.Quantity * it.UnitPrice }).ToList();
+            var dtoRows = dto.ECF.DetallesItems.Item.Select(it => new { Items = new List<EcfItemRequestDto> { it }, Total = it.CantidadItem * it.PrecioUnitarioItem }).ToList();
 
             foreach (var item in matrix)
             {
@@ -1342,19 +1320,19 @@ public class CertificationService : ICertificationService
                     {
                         var pooled = rfcePool[i % rfcePool.Count]; // Match by index within the count
                         currentDto = CloneDto(pooled.Dto)!;
-                        currentDto.Ncf = pooled.Ncf;
+                        currentDto.ECF.Encabezado.IdDoc.eNCF = pooled.Ncf;
                         currentDto.SecurityCodeOverride = pooled.SecurityCode;
                         skipNcfConsumption = true;
-                        Console.WriteLine($"[SYNC] Reutilizando NCF {currentDto.Ncf} para documento individual Step 4.");
+                        Console.WriteLine($"[SYNC] Reutilizando NCF {currentDto.ECF.Encabezado.IdDoc.eNCF} para documento individual Step 4.");
                     }
                     else
                     {
                         var row = i < dtoRows.Count ? dtoRows[i] : dtoRows.Last();
                         currentDto = CloneDto(dto)!;
                         // Map items from the source JSON row
-                        currentDto.Items = row.Items;
-                        currentDto.ManualMontoTotal = row.Total;
-                        currentDto.EcfType = item.Type;
+                        currentDto.ECF.DetallesItems.Item = row.Items;
+                        currentDto.ECF.Encabezado.Totales.MontoTotal = row.Total;
+                        currentDto.ECF.Encabezado.IdDoc.TipoeCF = item.Type.ToString();
                         currentDto.SequenceExpirationDate = new DateTime(2028, 12, 31);
 
                         bool isNote = item.Type == 33 || item.Type == 34;
@@ -1362,28 +1340,28 @@ public class CertificationService : ICertificationService
                         // ── Step 1: Force exempt ONLY for Type 31 (Standard Invoices) to pass initial DGII steps
                         if (item.Type == 31)
                         {
-                            foreach (var itm in currentDto.Items)
+                            foreach (var itm in currentDto.ECF.DetallesItems.Item)
                             {
-                                itm.BillingIndicator = 4; // Exento
-                                itm.TaxPercentage = 0;
-                                itm.ItbisAmount = 0;
-                                itm.ManualMontoItem = null; // Let generator recalculate
+                                itm.IndicadorFacturacion = "4"; // Exento
+                                // itm.TaxPercentage = 0;
+                                // 0m = 0;
+                                itm.MontoItem = 0; // Let generator recalculate
                             }
                         }
 
                         // ── Step 2: Clear manual totals so the generator calculates from items
-                        currentDto.ManualMontoGravadoTotal = null;
+                        currentDto.ECF.Encabezado.Totales.MontoGravadoTotal = null;
                         currentDto.ManualMontoGravadoI1 = null;
                         currentDto.ManualMontoGravadoI2 = null;
                         currentDto.ManualMontoGravadoI3 = null;
-                        currentDto.ManualMontoExento = null;
-                        currentDto.ManualTotalITBIS = null;
-                        currentDto.ManualTotalITBIS1 = null;
-                        currentDto.ManualTotalITBIS2 = null;
-                        currentDto.ManualTotalITBIS3 = null;
-                        currentDto.ManualTotalISRRetencion = null;
-                        currentDto.ManualTotalITBISRetenido = null;
-                        currentDto.ManualMontoTotal = null;
+                        currentDto.ECF.Encabezado.Totales.MontoExento = null;
+                        currentDto.ECF.Encabezado.Totales.TotalITBIS = null;
+                        currentDto.ECF.Encabezado.Totales.TotalITBIS1 = null;
+                        currentDto.ECF.Encabezado.Totales.TotalITBIS2 = null;
+                        currentDto.ECF.Encabezado.Totales.TotalITBIS3 = null;
+                        currentDto.ECF.Encabezado.Totales.TotalISRRetencion = null;
+                        currentDto.ECF.Encabezado.Totales.TotalITBISRetenido = null;
+                        currentDto.ECF.Encabezado.Totales.MontoTotal = null;
 
                         if (isNote)
                         {
@@ -1409,52 +1387,52 @@ public class CertificationService : ICertificationService
 
                             // [MODIFIED] Take only the FIRST item to avoid total annulment
                             var firstItem = CloneDto(reference.Dto)?.Items.FirstOrDefault();
-                            currentDto.Items = firstItem != null ? new List<EcfItemRequestDto> { firstItem } : new List<EcfItemRequestDto>();
+                            currentDto.ECF.DetallesItems.Item = firstItem != null ? new List<EcfItemRequestDto> { firstItem } : new List<EcfItemRequestDto>();
 
-                            currentDto.CustomerRnc = reference.Dto.CustomerRnc;
-                            currentDto.CustomerName = reference.Dto.CustomerName;
-                            currentDto.CustomerAddress = reference.Dto.CustomerAddress;
+                            currentDto.ECF.Encabezado.Comprador.RNCComprador = reference.Dto.CustomerRnc;
+                            currentDto.ECF.Encabezado.Comprador.RazonSocialComprador = reference.Dto.CustomerName;
+                            currentDto.ECF.Encabezado.Comprador.DireccionComprador = reference.Dto.CustomerAddress;
 
                             // Set reference fields
                             currentDto.ReferenceNcf = reference.Ncf;
                             currentDto.ReferenceIssueDate = reference.IssueDate;
-                            currentDto.ReferenceReasonCode = 3; // [MODIFIED] 3 = Correction of amounts (Partial)
-                            currentDto.ReferenceCustomerRnc = reference.CustomerRnc == currentDto.CustomerRnc ? null : reference.CustomerRnc;
-                            currentDto.ReferenceReasonDescription = "Ajuste parcial de montos";
-                            currentDto.IncomeType = currentDto.IncomeType ?? "01";
+                            currentDto.ECF.InformacionReferencia.CodigoModificacion = "3"; // [MODIFIED] 3 = Correction of amounts (Partial)
+                            currentDto.ECF.InformacionReferencia.RNCOtroContribuyente = reference.CustomerRnc == currentDto.ECF.Encabezado.Comprador.RNCComprador ? null : reference.CustomerRnc;
+                            currentDto.ECF.InformacionReferencia.RazonModificacion = "Ajuste parcial de montos";
+                            currentDto.ECF.Encabezado.IdDoc.TipoIngresos = currentDto.ECF.Encabezado.IdDoc.TipoIngresos ?? "01";
 
                             if (item.Type == 34)
-                                currentDto.ManualIndicadorNotaCredito = 0; // [MODIFIED] 0 = <= 30 days (Correct for simulation)
+                                currentDto.ECF.Encabezado.IdDoc.IndicadorNotaCredito = "0"; // [MODIFIED] 0 = <= 30 days (Correct for simulation)
 
                             // Cash payment for notes
-                            currentDto.PaymentType = 1;
-                            currentDto.PaymentDeadline = null;
-                            currentDto.PaymentTerms = null;
+                            currentDto.ECF.Encabezado.IdDoc.TipoPago = "1";
+                            currentDto.ECF.Encabezado.IdDoc.FechaLimitePago = null;
+                            currentDto.ECF.Encabezado.IdDoc.TerminoPago = null;
                         }
                         else
                         {
                             // ── Step 3: Calculate current total from items (base for adjustments)
-                            decimal itemsTotal = currentDto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) - (itm.ManualDescuentoMonto ?? itm.Discount));
+                            decimal itemsTotal = currentDto.ECF.DetallesItems.Item.Sum(itm => (itm.CantidadItem * itm.PrecioUnitarioItem) - (itm.DescuentoMonto ?? 0));
 
                             // ── Step 4: Scale item prices proportionally if min/max constraints apply
                             if (item.MinAmount.HasValue && itemsTotal < item.MinAmount.Value)
                             {
                                 decimal scaleFactor = item.MinAmount.Value / (itemsTotal > 0 ? itemsTotal : 1);
-                                foreach (var itm in currentDto.Items)
-                                    itm.UnitPrice = Math.Round(itm.UnitPrice * scaleFactor, 2);
+                                foreach (var itm in currentDto.ECF.DetallesItems.Item)
+                                    itm.PrecioUnitarioItem = Math.Round(itm.PrecioUnitarioItem * scaleFactor, 2);
                             }
                             else if (item.MaxAmount.HasValue && itemsTotal > item.MaxAmount.Value)
                             {
                                 decimal scaleFactor = item.MaxAmount.Value / (itemsTotal > 0 ? itemsTotal : 1);
-                                foreach (var itm in currentDto.Items)
-                                    itm.UnitPrice = Math.Round(itm.UnitPrice * scaleFactor, 2);
+                                foreach (var itm in currentDto.ECF.DetallesItems.Item)
+                                    itm.PrecioUnitarioItem = Math.Round(itm.PrecioUnitarioItem * scaleFactor, 2);
                             }
 
                             // ── Step 5: Add variety (small offset per step to avoid duplicate rejection)
-                            if (currentDto.Items.Any())
+                            if (currentDto.ECF.DetallesItems.Item.Any())
                             {
-                                currentDto.Items[0].UnitPrice += status.CurrentStep;
-                                currentDto.Items[0].ManualMontoItem = null;
+                                currentDto.ECF.DetallesItems.Item[0].PrecioUnitarioItem += status.CurrentStep;
+                                currentDto.ECF.DetallesItems.Item[0].MontoItem = 0;
                             }
 
                             // ── Step 6: Type-specific header field adjustments only
@@ -1463,17 +1441,17 @@ public class CertificationService : ICertificationService
                                 case 31: break;
 
                                 case 32:
-                                    currentDto.PaymentType = 1;
-                                    currentDto.PaymentDeadline = null;
-                                    currentDto.PaymentTerms = null;
+                                    currentDto.ECF.Encabezado.IdDoc.TipoPago = "1";
+                                    currentDto.ECF.Encabezado.IdDoc.FechaLimitePago = null;
+                                    currentDto.ECF.Encabezado.IdDoc.TerminoPago = null;
                                     if (item.MinAmount.HasValue && item.MinAmount.Value >= 250000)
                                     {
-                                        currentDto.IncomeType = currentDto.IncomeType ?? "01";
+                                        currentDto.ECF.Encabezado.IdDoc.TipoIngresos = currentDto.ECF.Encabezado.IdDoc.TipoIngresos ?? "01";
                                         // Ensure we have a valid buyer RNC for large Type 32
-                                        if (string.IsNullOrEmpty(currentDto.CustomerRnc))
+                                        if (string.IsNullOrEmpty(currentDto.ECF.Encabezado.Comprador.RNCComprador))
                                         {
-                                            currentDto.CustomerRnc = "131793916";
-                                            currentDto.CustomerName = "CLIENTE PRUEBA CERTIFICACION";
+                                            currentDto.ECF.Encabezado.Comprador.RNCComprador = "131793916";
+                                            currentDto.ECF.Encabezado.Comprador.RazonSocialComprador = "CLIENTE PRUEBA CERTIFICACION";
                                         }
                                     }
                                     break;
@@ -1481,31 +1459,31 @@ public class CertificationService : ICertificationService
                                 case 41:
                                     // Type 41 (Compras): RNCComprador is REQUIRED (minOccurs=1)
                                     // The supplier/seller we're buying from — use a valid company RNC
-                                    currentDto.CustomerRnc = "131793916"; // Valid 9-digit test RNC
-                                    currentDto.CustomerName = "PROVEEDOR DE SERVICIOS SRL";
-                                    currentDto.IncomeType = null; // Not in type 41 XSD
-                                    currentDto.PaymentType = 1;
-                                    currentDto.PaymentDeadline = null;
-                                    currentDto.PaymentTerms = null;
+                                    currentDto.ECF.Encabezado.Comprador.RNCComprador = "131793916"; // Valid 9-digit test RNC
+                                    currentDto.ECF.Encabezado.Comprador.RazonSocialComprador = "PROVEEDOR DE SERVICIOS SRL";
+                                    currentDto.ECF.Encabezado.IdDoc.TipoIngresos = null; // Not in type 41 XSD
+                                    currentDto.ECF.Encabezado.IdDoc.TipoPago = "1";
+                                    currentDto.ECF.Encabezado.IdDoc.FechaLimitePago = null;
+                                    currentDto.ECF.Encabezado.IdDoc.TerminoPago = null;
 
                                     // [NEW] satisfy XSD 41: <Retencion> is MANDATORY
-                                    currentDto.ManualTotalITBISRetenido = 0;
-                                    currentDto.ManualTotalISRRetencion = 0;
-                                    foreach (var itm in currentDto.Items)
+                                    currentDto.ECF.Encabezado.Totales.TotalITBISRetenido = 0;
+                                    currentDto.ECF.Encabezado.Totales.TotalISRRetencion = 0;
+                                    foreach (var itm in currentDto.ECF.DetallesItems.Item)
                                     {
-                                        itm.ManualMontoITBISRetenido = 0;
-                                        itm.ManualMontoISRRetenido = 0;
+                                        itm.MontoITBISRetenido = 0;
+                                        itm.MontoISRRetenido = 0;
                                     }
                                     break;
 
                                 case 43:
                                     // Type 43 (Gastos Menores): Comprador is forbidden in XSD.
-                                    currentDto.CustomerRnc = null;
-                                    currentDto.CustomerName = null;
-                                    currentDto.IncomeType = null;
-                                    currentDto.PaymentType = 1;
-                                    currentDto.PaymentDeadline = null;
-                                    currentDto.PaymentTerms = null;
+                                    currentDto.ECF.Encabezado.Comprador.RNCComprador = null;
+                                    currentDto.ECF.Encabezado.Comprador.RazonSocialComprador = null;
+                                    currentDto.ECF.Encabezado.IdDoc.TipoIngresos = null;
+                                    currentDto.ECF.Encabezado.IdDoc.TipoPago = "1";
+                                    currentDto.ECF.Encabezado.IdDoc.FechaLimitePago = null;
+                                    currentDto.ECF.Encabezado.IdDoc.TerminoPago = null;
                                     break;
 
                                 case 44: break;
@@ -1515,46 +1493,46 @@ public class CertificationService : ICertificationService
                                     // Type 46 (Exportaciones): TipoPago & TipoIngresos are REQUIRED.
                                     // IMPORTANT: MontoExento and ITBIS sub-totals are FORBIDDEN in Type 46 XSD.
                                     // We must ensure items use BillingIndicator 3 (Gravado 0%).
-                                    currentDto.IncomeType = currentDto.IncomeType ?? "01";
-                                    currentDto.PaymentType = currentDto.PaymentType ?? 1;
+                                    currentDto.ECF.Encabezado.IdDoc.TipoIngresos = currentDto.ECF.Encabezado.IdDoc.TipoIngresos ?? "01";
+                                    currentDto.ECF.Encabezado.IdDoc.TipoPago = currentDto.ECF.Encabezado.IdDoc.TipoPago ?? "1";
 
                                     // For exports, use Foreign ID and Country instead of local RNC.
-                                    currentDto.CustomerRnc = null;
-                                    currentDto.CustomerForeignId = currentDto.CustomerForeignId ?? $"EX{i + 1:D6}";
-                                    currentDto.CustomerCountry = currentDto.CustomerCountry ?? "USA";
+                                    currentDto.ECF.Encabezado.Comprador.RNCComprador = null;
+                                    currentDto.ECF.Encabezado.Comprador.IdentificadorExtranjero = currentDto.ECF.Encabezado.Comprador.IdentificadorExtranjero ?? $"EX{i + 1:D6}";
+                                    currentDto.ECF.Encabezado.Comprador.PaisComprador = currentDto.ECF.Encabezado.Comprador.PaisComprador ?? "USA";
 
-                                    foreach (var itm in currentDto.Items)
+                                    foreach (var itm in currentDto.ECF.DetallesItems.Item)
                                     {
-                                        itm.BillingIndicator = 3; // Type 46 MUST use Tasa Cero (3)
-                                        itm.TaxPercentage = 0;
-                                        itm.ItbisAmount = 0;
+                                        itm.IndicadorFacturacion = "3"; // Type 46 MUST use Tasa Cero (3)
+                                        // itm.TaxPercentage = 0;
+                                        // 0m = 0;
                                     }
                                     break;
 
                                 case 47:
                                     // Type 47 (Pagos al Exterior): Comprador is optional (minOccurs=0)
                                     // No RNC, no Dominican fields — just foreign identifier
-                                    currentDto.CustomerRnc = null;
-                                    currentDto.CustomerName = currentDto.CustomerName ?? "FOREIGN SERVICES PROVIDER";
-                                    currentDto.CustomerForeignId = currentDto.CustomerForeignId ?? $"FOREIGN{i + 1:D6}";
-                                    currentDto.CustomerCountry = null; // PaisComprador excluded for 47 in serializer
-                                    currentDto.CustomerAddress = null;
-                                    currentDto.IncomeType = null; // Not in type 47 XSD
-                                    currentDto.PaymentType = 1;
-                                    currentDto.PaymentDeadline = null;
-                                    currentDto.PaymentTerms = null;
+                                    currentDto.ECF.Encabezado.Comprador.RNCComprador = null;
+                                    currentDto.ECF.Encabezado.Comprador.RazonSocialComprador = currentDto.ECF.Encabezado.Comprador.RazonSocialComprador ?? "FOREIGN SERVICES PROVIDER";
+                                    currentDto.ECF.Encabezado.Comprador.IdentificadorExtranjero = currentDto.ECF.Encabezado.Comprador.IdentificadorExtranjero ?? $"FOREIGN{i + 1:D6}";
+                                    currentDto.ECF.Encabezado.Comprador.PaisComprador = null; // PaisComprador excluded for 47 in serializer
+                                    currentDto.ECF.Encabezado.Comprador.DireccionComprador = null;
+                                    currentDto.ECF.Encabezado.IdDoc.TipoIngresos = null; // Not in type 47 XSD
+                                    currentDto.ECF.Encabezado.IdDoc.TipoPago = "1";
+                                    currentDto.ECF.Encabezado.IdDoc.FechaLimitePago = null;
+                                    currentDto.ECF.Encabezado.IdDoc.TerminoPago = null;
 
                                     // [NEW] satisfy XSD 47: <Retencion> is MANDATORY
-                                    currentDto.ManualTotalITBISRetenido = 0;
-                                    currentDto.ManualTotalISRRetencion = 0;
-                                    foreach (var itm in currentDto.Items)
+                                    currentDto.ECF.Encabezado.Totales.TotalITBISRetenido = 0;
+                                    currentDto.ECF.Encabezado.Totales.TotalISRRetencion = 0;
+                                    foreach (var itm in currentDto.ECF.DetallesItems.Item)
                                     {
-                                        itm.BillingIndicator = 4; // Force Exento for 47
-                                        itm.TaxPercentage = 0;
-                                        itm.ItbisAmount = 0;
-                                        itm.ManualMontoITBISRetenido = 0;
-                                        itm.ManualMontoISRRetenido = 0;
-                                        itm.IsrRetentionAmount = 0;
+                                        itm.IndicadorFacturacion = "4"; // Force Exento for 47
+                                        // itm.TaxPercentage = 0;
+                                        // 0m = 0;
+                                        itm.MontoITBISRetenido = 0;
+                                        itm.MontoISRRetenido = 0;
+                                        // itm.IsrRetentionAmount = 0;
                                     }
                                     break;
                             }
@@ -1565,14 +1543,14 @@ public class CertificationService : ICertificationService
                     if (item.IsSummary)
                     {
                         // Calculate totals from the current items before they are ignored by summary generator
-                        currentDto.ManualMontoGravadoTotal = currentDto.Items.Where(it => it.BillingIndicator == 1).Sum(it => it.Quantity * it.UnitPrice);
-                        currentDto.ManualMontoExento = currentDto.Items.Where(it => it.BillingIndicator == 4).Sum(it => it.Quantity * it.UnitPrice);
-                        currentDto.ManualTotalITBIS = currentDto.Items.Sum(it => it.ItbisAmount);
-                        currentDto.ManualMontoTotal = currentDto.Items.Sum(it => (it.Quantity * it.UnitPrice) + it.ItbisAmount);
+                        currentDto.ECF.Encabezado.Totales.MontoGravadoTotal = currentDto.ECF.DetallesItems.Item.Where(it => it.IndicadorFacturacion == "1").Sum(it => it.CantidadItem * it.PrecioUnitarioItem);
+                        currentDto.ECF.Encabezado.Totales.MontoExento = currentDto.ECF.DetallesItems.Item.Where(it => it.IndicadorFacturacion == "4").Sum(it => it.CantidadItem * it.PrecioUnitarioItem);
+                        currentDto.ECF.Encabezado.Totales.TotalITBIS = currentDto.ECF.DetallesItems.Item.Sum(it => 0m);
+                        currentDto.ECF.Encabezado.Totales.MontoTotal = currentDto.ECF.DetallesItems.Item.Sum(it => (it.CantidadItem * it.PrecioUnitarioItem) );
 
                         // [NEW] For RFCE B2C simulation, clear customer to ensure anonymous
-                        currentDto.CustomerRnc = null;
-                        currentDto.CustomerName = "CONSUMIDOR FINAL";
+                        currentDto.ECF.Encabezado.Comprador.RNCComprador = null;
+                        currentDto.ECF.Encabezado.Comprador.RazonSocialComprador = "CONSUMIDOR FINAL";
                                      // [NEW] Synchronize Security Code with the signature of the upcoming individual document
                         try
                         {
@@ -1583,7 +1561,7 @@ public class CertificationService : ICertificationService
                             string realNcfForInd = $"E{item.Type}{seqForInd:D10}";
 
                             var indDto = CloneDto(currentDto)!;
-                            indDto.Ncf = realNcfForInd;
+                            indDto.ECF.Encabezado.IdDoc.eNCF = realNcfForInd;
                             indDto.SignatureDateOverride = signatureDate; // [FIX] Lock signature date for consistency
                             // Ensure the dry-run uses individual mode
                             string indUnsigned = _generatorService.GenerateUnsignedXml(indDto, false);
@@ -1611,12 +1589,12 @@ public class CertificationService : ICertificationService
                     currentDto.SignatureDateOverride = signatureDate;
 
                     // D. Generate with temp NCF for XSD validation BEFORE consuming sequence
-                    string realNcfBeforeValidation = currentDto.Ncf;
-                    currentDto.Ncf = $"E{item.Type}0000000000"; // Temp NCF for validation only
+                    string realNcfBeforeValidation = currentDto.ECF.Encabezado.IdDoc.eNCF;
+                    currentDto.ECF.Encabezado.IdDoc.eNCF = $"E{item.Type}0000000000"; // Temp NCF for validation only
                     string unsignedXmlTemp = _generatorService.GenerateUnsignedXml(currentDto, item.IsSummary);
                     
                     // Restore NCF immediately after generating the temp XML for validation
-                    currentDto.Ncf = realNcfBeforeValidation;
+                    currentDto.ECF.Encabezado.IdDoc.eNCF = realNcfBeforeValidation;
 
                     // XSD Validation BEFORE sequence management (to avoid burning NCFs)
                     var xsdErrors = _generatorService.ValidateXmlAgainstSchema(unsignedXmlTemp, item.Type);
@@ -1627,7 +1605,7 @@ public class CertificationService : ICertificationService
                         status.CompletedSteps.Add(new CertificationStepResultDto
                         {
                             Index = status.CurrentStep,
-                            Ncf = currentDto.Ncf,
+                            Ncf = currentDto.ECF.Encabezado.IdDoc.eNCF,
                             Status = "Error XSD",
                             Message = msg
                         });
@@ -1651,7 +1629,7 @@ public class CertificationService : ICertificationService
                         }
 
                         int seq = encfRecord.Sequence++;
-                        currentDto.Ncf = $"E{item.Type}{seq:D10}";
+                        currentDto.ECF.Encabezado.IdDoc.eNCF = $"E{item.Type}{seq:D10}";
                         _context.Entry(encfRecord).State = EntityState.Modified;
                         await _context.SaveChangesAsync();
 
@@ -1659,7 +1637,7 @@ public class CertificationService : ICertificationService
                         if (item.IsSummary)
                         {
                             // [NEW] Store the individual DTO that was used for the dry-run signature
-                            rfcePool.Add((currentDto.Ncf, currentDto.SecurityCodeOverride ?? "", indDtoForPool ?? CloneDto(currentDto)!));
+                            rfcePool.Add((currentDto.ECF.Encabezado.IdDoc.eNCF, currentDto.SecurityCodeOverride ?? "", indDtoForPool ?? CloneDto(currentDto)!));
                         }
                     }
 
@@ -1670,26 +1648,26 @@ public class CertificationService : ICertificationService
                     string signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
 
                     // [NEW] Collect for final ZIP with differentiation
-                    string zipName = (item.IsManual ? "SUBIR_DGII_" : "") + $"Paso_{status.CurrentStep}_{currentDto.Ncf}.xml";
+                    string zipName = (item.IsManual ? "SUBIR_DGII_" : "") + $"Paso_{status.CurrentStep}_{currentDto.ECF.Encabezado.IdDoc.eNCF}.xml";
                     simulationXmls[zipName] = signedXml;
 
                     // [NEW] Capture the DTO JSON payload for example documentation
-                    string jsonZipName = (item.IsManual ? "SUBIR_DGII_" : "") + $"Paso_{status.CurrentStep}_{currentDto.Ncf}.json";
+                    string jsonZipName = (item.IsManual ? "SUBIR_DGII_" : "") + $"Paso_{status.CurrentStep}_{currentDto.ECF.Encabezado.IdDoc.eNCF}.json";
                     simulationJsons[jsonZipName] = System.Text.Json.JsonSerializer.Serialize(currentDto, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
 
                     // E. Transmission
                     // [NEW] Console Logging [TX]
-                    Console.WriteLine($"[TX] Enviando e-CF {currentDto.Ncf} tipo {item.Type} (Paso {status.CurrentStep}/{status.TotalSteps})...");
+                    Console.WriteLine($"[TX] Enviando e-CF {currentDto.ECF.Encabezado.IdDoc.eNCF} tipo {item.Type} (Paso {status.CurrentStep}/{status.TotalSteps})...");
 
-                    decimal actualTransmissionTotal = currentDto.ManualMontoTotal ?? 0;
-                    if (actualTransmissionTotal == 0 && currentDto.Items.Any())
+                    decimal actualTransmissionTotal = currentDto.ECF.Encabezado.Totales.MontoTotal ?? 0;
+                    if (actualTransmissionTotal == 0 && currentDto.ECF.DetallesItems.Item.Any())
                     {
-                        actualTransmissionTotal = currentDto.Items.Sum(itm => 
-                            (itm.Quantity * itm.UnitPrice) 
-                            - (itm.ManualDescuentoMonto ?? itm.Discount) 
-                            + itm.ItbisAmount 
-                            + (itm.ManualRecargoMonto ?? 0)
-                            + (itm.IscSpecificAmount + itm.IscAdvaloremAmount + itm.OtherAdditionalTaxAmount));
+                        actualTransmissionTotal = currentDto.ECF.DetallesItems.Item.Sum(itm => 
+                            (itm.CantidadItem * itm.PrecioUnitarioItem) 
+                            - (itm.DescuentoMonto ?? 0) 
+                            + 0m 
+                            + (itm.RecargoMonto ?? 0)
+                            + ((itm.IscSpecificAmount ?? 0) + (itm.IscAdvaloremAmount ?? 0) + (itm.OtherAdditionalTaxAmount ?? 0)));
                     }
 
                     bool isAccepted = false;
@@ -1702,7 +1680,7 @@ public class CertificationService : ICertificationService
                         // For manual steps, just mark as generated and save
                         isAccepted = true;
                         trackId = "MANUAL";
-                        Console.WriteLine($"[TX] Paso MANUAL {currentDto.Ncf} tipo {item.Type} - Marcado como generado.");
+                        Console.WriteLine($"[TX] Paso MANUAL {currentDto.ECF.Encabezado.IdDoc.eNCF} tipo {item.Type} - Marcado como generado.");
                     }
                     else
                     {
@@ -1712,8 +1690,8 @@ public class CertificationService : ICertificationService
                             signedXml,
                             item.Type,
                             actualTransmissionTotal,
-                            dto.IssuerRnc,
-                            currentDto.Ncf,
+                            dto.ECF.Encabezado.Emisor.RNCEmisor,
+                            currentDto.ECF.Encabezado.IdDoc.eNCF,
                             item.IsSummary);
 
                         if (result.Success)
@@ -1724,12 +1702,12 @@ public class CertificationService : ICertificationService
                                 await Task.Delay(2000);
 
                                 // Poll DGII to get actual acceptance/rejection
-                                var finalStatus = await PollDgiiStatusAsync(result.TrackId, dto.IssuerRnc);
+                                var finalStatus = await PollDgiiStatusAsync(result.TrackId, dto.ECF.Encabezado.Emisor.RNCEmisor);
                                 isAccepted = finalStatus.Estado == "Aceptado" || (item.IsSummary && finalStatus.Estado == "Generado");
                                 trackId = result.TrackId;
 
                                 // [NEW] Console Logging [RX]
-                                Console.WriteLine($"[RX] Resultado e-CF {currentDto.Ncf}: {finalStatus.Estado}");
+                                Console.WriteLine($"[RX] Resultado e-CF {currentDto.ECF.Encabezado.IdDoc.eNCF}: {finalStatus.Estado}");
 
                                 if (!isAccepted)
                                     error = $"DGII: {finalStatus.Estado} - {string.Join(" | ", finalStatus.Mensajes?.Select(m => m.Valor) ?? new[] { "Sin mensaje" })}";
@@ -1739,7 +1717,7 @@ public class CertificationService : ICertificationService
                                 // Immediate acceptance for RFCE (no TrackId)
                                 isAccepted = true;
                                 trackId = "INMEDIATO";
-                                Console.WriteLine($"[RX] Resultado e-CF {currentDto.Ncf}: Aceptado (Inmediato)");
+                                Console.WriteLine($"[RX] Resultado e-CF {currentDto.ECF.Encabezado.IdDoc.eNCF}: Aceptado (Inmediato)");
                             }
                             else
                             {
@@ -1751,14 +1729,14 @@ public class CertificationService : ICertificationService
                         {
                             isAccepted = false;
                             error = string.IsNullOrEmpty(result.Error) ? $"DGII {result.Estado}: {result.Mensaje}" : result.Error;
-                            Console.WriteLine($"[RX] Error en envío e-CF {currentDto.Ncf}: {error}");
+                            Console.WriteLine($"[RX] Error en envío e-CF {currentDto.ECF.Encabezado.IdDoc.eNCF}: {error}");
                         }
                     }
 
                     if (item.IsManual)
                     {
                         // Manual documents for Step 4 download
-                        string fileName = $"cert_test_{status.CurrentStep}_{currentDto.Ncf}.xml";
+                        string fileName = $"cert_test_{status.CurrentStep}_{currentDto.ECF.Encabezado.IdDoc.eNCF}.xml";
                         string fullPath = Path.Combine(webRootPath, "certification_files", fileName);
                         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
                         await File.WriteAllTextAsync(fullPath, signedXml);
@@ -1769,7 +1747,7 @@ public class CertificationService : ICertificationService
                     var doc = new CertificationDocument
                     {
                         CertificationProcessId = process.CertificationProcessId,
-                        ENcfSecuence = currentDto.Ncf,
+                        ENcfSecuence = currentDto.ECF.Encabezado.IdDoc.eNCF,
                         ENcfId = encfRecord?.ENcfId ?? (await _context.ENcfs.FirstOrDefaultAsync(e => e.NcfTypeId == ecfTypeRecord.EcfTypeId && e.ClientId == client.ClientId))?.ENcfId ?? 0,
                         EcfTypeId = ecfTypeRecord.EcfTypeId,
                         XmlSent = signedXml,
@@ -1788,14 +1766,14 @@ public class CertificationService : ICertificationService
                         var cloned = CloneDto(currentDto);
                         if (cloned != null)
                         {
-                            accepted31Pool.Add((currentDto.Ncf, currentDto.IssueDate, currentDto.CustomerRnc, cloned));
+                            accepted31Pool.Add((currentDto.ECF.Encabezado.IdDoc.eNCF, DateTime.Parse(currentDto.ECF.Encabezado.Emisor.FechaEmision), currentDto.ECF.Encabezado.Comprador.RNCComprador, cloned));
                         }
                     }
 
                     status.CompletedSteps.Add(new CertificationStepResultDto
                     {
                         Index = status.CurrentStep,
-                        Ncf = currentDto.Ncf,
+                        Ncf = currentDto.ECF.Encabezado.IdDoc.eNCF,
                         Status = isAccepted ? "Aceptado" : "Rechazado",
                         Message = isAccepted ? (item.IsManual ? $"Manual: {downloadUrl}" : $"TrackId: {trackId}") : error
                     });
@@ -1804,7 +1782,7 @@ public class CertificationService : ICertificationService
                     if (!isAccepted)
                     {
                         status.Status = "Failed";
-                        status.ErrorMessage = $"Error en NCF {currentDto.Ncf}: {error}";
+                        status.ErrorMessage = $"Error en NCF {currentDto.ECF.Encabezado.IdDoc.eNCF}: {error}";
                         goto EndOfJob;
                     }
                 }
@@ -1816,13 +1794,13 @@ public class CertificationService : ICertificationService
                 process.Status = CertificationStatus.Approved;
                 process.EndDate = DateTime.Now;
                 status.Status = "Completed";
-                Console.WriteLine($"[INFO] Simulación finalizada exitosamente para {dto.IssuerRnc}.");
+                Console.WriteLine($"[INFO] Simulación finalizada exitosamente para {dto.ECF.Encabezado.Emisor.RNCEmisor}.");
             }
             else
             {
                 process.Status = CertificationStatus.Rejected;
                 process.EndDate = DateTime.Now;
-                Console.WriteLine($"[ERROR] Simulación detenida por error en {dto.IssuerRnc}.");
+                Console.WriteLine($"[ERROR] Simulación detenida por error en {dto.ECF.Encabezado.Emisor.RNCEmisor}.");
             }
 
             await _context.SaveChangesAsync();
@@ -1896,7 +1874,7 @@ public class CertificationService : ICertificationService
 
             try
             {
-                var client = await _clientService.GetByAsync(c => c.Rnc == dto.IssuerRnc);
+                var client = await _clientService.GetByAsync(c => c.Rnc == dto.ECF.Encabezado.Emisor.RNCEmisor);
                 if (client != null)
                 {
                     var process = await _context.CertificationProcesses
@@ -1922,8 +1900,8 @@ public class CertificationService : ICertificationService
         try
         {
             // 1. Validate Client
-            var client = await _clientService.GetByAsync(c => c.Rnc == dto.IssuerRnc)
-                ?? throw new Exception($"Cliente con RNC {dto.IssuerRnc} no encontrado.");
+            var client = await _clientService.GetByAsync(c => c.Rnc == dto.ECF.Encabezado.Emisor.RNCEmisor)
+                ?? throw new Exception($"Cliente con RNC {dto.ECF.Encabezado.Emisor.RNCEmisor} no encontrado.");
 
             // 2. Prepare Credentials
             var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)
@@ -1936,42 +1914,42 @@ public class CertificationService : ICertificationService
             var certBase64 = Convert.ToBase64String(certificateBytes);
             var certPass = Encoding.UTF8.GetString(passwordBytes);
 
-            string token = await _authService.GetTokenAsync(dto.IssuerRnc, DgiiEnvironment.CerteCF, certBase64, certPass);
+            string token = await _authService.GetTokenAsync(dto.ECF.Encabezado.Emisor.RNCEmisor, DgiiEnvironment.CerteCF, certBase64, certPass);
 
             var signatureDate = DateTime.Now;
             var currentDto = dto;
             currentDto.SignatureDateOverride = signatureDate;
             
-            int ecfType = currentDto.EcfType ?? (string.IsNullOrEmpty(currentDto.Ncf) ? 31 : int.Parse(currentDto.Ncf.Substring(1, 2)));
+            int ecfType = int.TryParse(currentDto.ECF.Encabezado.IdDoc.TipoeCF, out var t) ? t : (string.IsNullOrEmpty(currentDto.ECF.Encabezado.IdDoc.eNCF) ? 31 : int.Parse(currentDto.ECF.Encabezado.IdDoc.eNCF.Substring(1, 2)));
 
             if (ecfType == 32) // RFCE Summary
             {
                 // Validate totals from the current items before processing
-                decimal calculatedGravado = currentDto.Items.Where(it => it.BillingIndicator == 1).Sum(it => it.Quantity * it.UnitPrice);
-                decimal calculatedExento = currentDto.Items.Where(it => it.BillingIndicator == 4).Sum(it => it.Quantity * it.UnitPrice);
-                decimal calculatedITBIS = currentDto.Items.Sum(it => it.ItbisAmount);
-                decimal calculatedTotal = currentDto.Items.Sum(it => (it.Quantity * it.UnitPrice) + it.ItbisAmount);
+                decimal calculatedGravado = currentDto.ECF.DetallesItems.Item.Where(it => it.IndicadorFacturacion == "1").Sum(it => it.CantidadItem * it.PrecioUnitarioItem);
+                decimal calculatedExento = currentDto.ECF.DetallesItems.Item.Where(it => it.IndicadorFacturacion == "4").Sum(it => it.CantidadItem * it.PrecioUnitarioItem);
+                decimal calculatedITBIS = currentDto.ECF.DetallesItems.Item.Sum(it => 0m);
+                decimal calculatedTotal = currentDto.ECF.DetallesItems.Item.Sum(it => (it.CantidadItem * it.PrecioUnitarioItem) );
 
-                if (Math.Abs((currentDto.ManualMontoGravadoTotal ?? 0) - calculatedGravado) > 0.01m)
+                if (Math.Abs((currentDto.ECF.Encabezado.Totales.MontoGravadoTotal ?? 0) - calculatedGravado) > 0.01m)
                 {
-                    throw new Exception($"Discrepancia en Monto Gravado. Enviado: {currentDto.ManualMontoGravadoTotal}, Calculado: {calculatedGravado}");
+                    throw new Exception($"Discrepancia en Monto Gravado. Enviado: {currentDto.ECF.Encabezado.Totales.MontoGravadoTotal}, Calculado: {calculatedGravado}");
                 }
-                if (Math.Abs((currentDto.ManualMontoExento ?? 0) - calculatedExento) > 0.01m)
+                if (Math.Abs((currentDto.ECF.Encabezado.Totales.MontoExento ?? 0) - calculatedExento) > 0.01m)
                 {
-                    throw new Exception($"Discrepancia en Monto Exento. Enviado: {currentDto.ManualMontoExento}, Calculado: {calculatedExento}");
+                    throw new Exception($"Discrepancia en Monto Exento. Enviado: {currentDto.ECF.Encabezado.Totales.MontoExento}, Calculado: {calculatedExento}");
                 }
-                if (Math.Abs((currentDto.ManualTotalITBIS ?? 0) - calculatedITBIS) > 0.01m)
+                if (Math.Abs((currentDto.ECF.Encabezado.Totales.TotalITBIS ?? 0) - calculatedITBIS) > 0.01m)
                 {
-                    throw new Exception($"Discrepancia en Total ITBIS. Enviado: {currentDto.ManualTotalITBIS}, Calculado: {calculatedITBIS}");
+                    throw new Exception($"Discrepancia en Total ITBIS. Enviado: {currentDto.ECF.Encabezado.Totales.TotalITBIS}, Calculado: {calculatedITBIS}");
                 }
-                if (Math.Abs((currentDto.ManualMontoTotal ?? 0) - calculatedTotal) > 0.01m)
+                if (Math.Abs((currentDto.ECF.Encabezado.Totales.MontoTotal ?? 0) - calculatedTotal) > 0.01m)
                 {
-                    throw new Exception($"Discrepancia en Monto Total. Enviado: {currentDto.ManualMontoTotal}, Calculado: {calculatedTotal}");
+                    throw new Exception($"Discrepancia en Monto Total. Enviado: {currentDto.ECF.Encabezado.Totales.MontoTotal}, Calculado: {calculatedTotal}");
                 }
 
                 // For RFCE B2C simulation, clear customer to ensure anonymous
-                currentDto.CustomerRnc = null;
-                currentDto.CustomerName = "CONSUMIDOR FINAL";
+                currentDto.ECF.Encabezado.Comprador.RNCComprador = null;
+                currentDto.ECF.Encabezado.Comprador.RazonSocialComprador = "CONSUMIDOR FINAL";
 
                 // 1. Dry-run Individual signature to get Security Code
                 var indDto = CloneDto(currentDto)!;
@@ -1998,27 +1976,27 @@ public class CertificationService : ICertificationService
                 string indUnsignedFinal = _generatorService.GenerateUnsignedXml(indDto, false);
                 string indSignedFinal = _signerService.SignXml(indUnsignedFinal, certBase64, certPass);
 
-                string fileName = $"cert_test_manual_{indDto.Ncf}.xml";
+                string fileName = $"cert_test_manual_{indDto.ECF.Encabezado.IdDoc.eNCF}.xml";
                 string fullPath = Path.Combine(webRootPath, "certification_files", fileName);
                 Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
                 await File.WriteAllTextAsync(fullPath, indSignedFinal);
 
                 // 4. Send Summary via API
-                decimal summaryTotal = currentDto.ManualMontoTotal ?? currentDto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) + itm.ItbisAmount);
+                decimal summaryTotal = currentDto.ECF.Encabezado.Totales.MontoTotal ?? currentDto.ECF.DetallesItems.Item.Sum(itm => (itm.CantidadItem * itm.PrecioUnitarioItem) + 0m);
                 var result = await _transmissionService.SendEcfAsync(
                     DgiiEnvironment.CerteCF,
                     token,
                     signedSummaryXml,
                     ecfType,
                     summaryTotal,
-                    currentDto.IssuerRnc,
-                    currentDto.Ncf,
+                    currentDto.ECF.Encabezado.Emisor.RNCEmisor,
+                    currentDto.ECF.Encabezado.IdDoc.eNCF,
                     true);
                 
                 if (result.Success && !string.IsNullOrEmpty(result.TrackId))
                 {
                     await Task.Delay(2000);
-                    var finalStatus = await PollDgiiStatusAsync(result.TrackId, currentDto.IssuerRnc);
+                    var finalStatus = await PollDgiiStatusAsync(result.TrackId, currentDto.ECF.Encabezado.Emisor.RNCEmisor);
                     result.Estado = finalStatus.Estado;
                     result.Mensaje = string.Join(" | ", finalStatus.Mensajes?.Select(m => m.Valor) ?? new[] { "Sin mensaje" });
                 }
@@ -2030,15 +2008,15 @@ public class CertificationService : ICertificationService
                 string unsignedXml = _generatorService.GenerateUnsignedXml(currentDto, false);
                 string signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
 
-                decimal actualTransmissionTotal = currentDto.ManualMontoTotal ?? 0;
-                if (actualTransmissionTotal == 0 && currentDto.Items.Any())
+                decimal actualTransmissionTotal = currentDto.ECF.Encabezado.Totales.MontoTotal ?? 0;
+                if (actualTransmissionTotal == 0 && currentDto.ECF.DetallesItems.Item.Any())
                 {
-                    actualTransmissionTotal = currentDto.Items.Sum(itm => 
-                        (itm.Quantity * itm.UnitPrice) 
-                        - (itm.ManualDescuentoMonto ?? itm.Discount) 
-                        + itm.ItbisAmount 
-                        + (itm.ManualRecargoMonto ?? 0)
-                        + (itm.IscSpecificAmount + itm.IscAdvaloremAmount + itm.OtherAdditionalTaxAmount));
+                    actualTransmissionTotal = currentDto.ECF.DetallesItems.Item.Sum(itm => 
+                        (itm.CantidadItem * itm.PrecioUnitarioItem) 
+                        - (itm.DescuentoMonto ?? 0) 
+                        + 0m 
+                        + (itm.RecargoMonto ?? 0)
+                        + ((itm.IscSpecificAmount ?? 0) + (itm.IscAdvaloremAmount ?? 0) + (itm.OtherAdditionalTaxAmount ?? 0)));
                 }
 
                 var result = await _transmissionService.SendEcfAsync(
@@ -2047,14 +2025,14 @@ public class CertificationService : ICertificationService
                     signedXml,
                     ecfType,
                     actualTransmissionTotal,
-                    currentDto.IssuerRnc,
-                    currentDto.Ncf,
+                    currentDto.ECF.Encabezado.Emisor.RNCEmisor,
+                    currentDto.ECF.Encabezado.IdDoc.eNCF,
                     false);
                 
                 if (result.Success && !string.IsNullOrEmpty(result.TrackId))
                 {
                     await Task.Delay(2000);
-                    var finalStatus = await PollDgiiStatusAsync(result.TrackId, currentDto.IssuerRnc);
+                    var finalStatus = await PollDgiiStatusAsync(result.TrackId, currentDto.ECF.Encabezado.Emisor.RNCEmisor);
                     result.Estado = finalStatus.Estado;
                     result.Mensaje = string.Join(" | ", finalStatus.Mensajes?.Select(m => m.Valor) ?? new[] { "Sin mensaje" });
                 }
@@ -2070,16 +2048,11 @@ public class CertificationService : ICertificationService
 
     private EcfInvoiceRequestDto? CloneDto(EcfInvoiceRequestDto source)
     {
-        if (source == null) return null;
-        var json = System.Text.Json.JsonSerializer.Serialize(source);
-        return System.Text.Json.JsonSerializer.Deserialize<EcfInvoiceRequestDto>(json);
+        return Tools.DeepClone(source);
     }
 
     private string GenerateRandomCode(int length)
     {
-        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        var random = new Random();
-        return new string(Enumerable.Repeat(chars, length)
-            .Select(s => s[random.Next(s.Length)]).ToArray());
+        return Tools.GenerateRandomCode(length);
     }
 }

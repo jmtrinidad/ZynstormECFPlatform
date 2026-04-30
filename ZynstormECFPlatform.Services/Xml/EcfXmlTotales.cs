@@ -1,4 +1,5 @@
 using System.Xml.Serialization;
+using ZynstormECFPlatform.Common.Utilities;
 
 namespace ZynstormECFPlatform.Services.Xml;
 
@@ -19,8 +20,8 @@ public class EcfXmlTotales
     [XmlElement("MontoGravadoTotal", Order = 1)]
     public string? MontoGravadoTotalString
     {
-        get => MontoGravadoTotal?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => MontoGravadoTotal = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(MontoGravadoTotal);
+        set => MontoGravadoTotal = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoGravadoTotalString() => (EcfType == 46 || (EcfType != 46 && EcfType != 47)) && MontoGravadoTotal.HasValue;
 
@@ -29,8 +30,8 @@ public class EcfXmlTotales
     [XmlElement("MontoGravadoI1", Order = 2)]
     public string? MontoGravadoI1String
     {
-        get => (EcfType == 46 || EcfType == 47) ? null : MontoGravadoI1?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => MontoGravadoI1 = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => (EcfType == 46 || EcfType == 47) ? null : Tools.FormatDecimal(MontoGravadoI1);
+        set => MontoGravadoI1 = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoGravadoI1String() => EcfType != 46 && EcfType != 47 && MontoGravadoI1.HasValue;
 
@@ -39,8 +40,8 @@ public class EcfXmlTotales
     [XmlElement("MontoGravadoI2", Order = 3)]
     public string? MontoGravadoI2String
     {
-        get => (EcfType == 46 || EcfType == 47) ? null : MontoGravadoI2?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => MontoGravadoI2 = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => (EcfType == 46 || EcfType == 47) ? null : Tools.FormatDecimal(MontoGravadoI2);
+        set => MontoGravadoI2 = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoGravadoI2String() => EcfType != 46 && EcfType != 47 && MontoGravadoI2.HasValue;
 
@@ -49,8 +50,8 @@ public class EcfXmlTotales
     [XmlElement("MontoGravadoI3", Order = 4)]
     public string? MontoGravadoI3String
     {
-        get => (EcfType == 47) ? null : MontoGravadoI3?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => MontoGravadoI3 = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => (EcfType == 47) ? null : Tools.FormatDecimal(MontoGravadoI3);
+        set => MontoGravadoI3 = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoGravadoI3String() => (EcfType == 46 || (EcfType != 46 && EcfType != 47)) && MontoGravadoI3.HasValue;
 
@@ -59,8 +60,8 @@ public class EcfXmlTotales
     [XmlElement("MontoExento", Order = 5)]
     public string? MontoExentoString
     {
-        get => MontoExento?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => MontoExento = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(MontoExento);
+        set => MontoExento = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoExentoString() => EcfType != 46 && MontoExento.HasValue && MontoExento > 0;
 
@@ -103,8 +104,8 @@ public class EcfXmlTotales
     [XmlElement("TotalITBIS", Order = 9)]
     public string? TotalITBISString
     {
-        get => (EcfType == 47) ? null : TotalITBIS?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => TotalITBIS = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => (EcfType == 47) ? null : Tools.FormatDecimal(TotalITBIS);
+        set => TotalITBIS = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalITBISString() => EcfType != 47 && TotalITBIS.HasValue;
 
@@ -113,8 +114,8 @@ public class EcfXmlTotales
     [XmlElement("TotalITBIS1", Order = 10)]
     public string? TotalITBIS1String
     {
-        get => (EcfType == 46 || EcfType == 47) ? null : TotalITBIS1?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => TotalITBIS1 = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => (EcfType == 46 || EcfType == 47) ? null : Tools.FormatDecimal(TotalITBIS1);
+        set => TotalITBIS1 = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalITBIS1String() => EcfType != 46 && EcfType != 47 && TotalITBIS1.HasValue;
 
@@ -123,8 +124,8 @@ public class EcfXmlTotales
     [XmlElement("TotalITBIS2", Order = 11)]
     public string? TotalITBIS2String
     {
-        get => (EcfType == 46 || EcfType == 47) ? null : TotalITBIS2?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => TotalITBIS2 = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => (EcfType == 46 || EcfType == 47) ? null : Tools.FormatDecimal(TotalITBIS2);
+        set => TotalITBIS2 = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalITBIS2String() => EcfType != 46 && EcfType != 47 && TotalITBIS2.HasValue;
 
@@ -133,8 +134,8 @@ public class EcfXmlTotales
     [XmlElement("TotalITBIS3", Order = 12)]
     public string? TotalITBIS3String
     {
-        get => (EcfType == 47) ? null : TotalITBIS3?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => TotalITBIS3 = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => (EcfType == 47) ? null : Tools.FormatDecimal(TotalITBIS3);
+        set => TotalITBIS3 = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalITBIS3String() => EcfType != 47 && TotalITBIS3.HasValue;
 
@@ -145,8 +146,8 @@ public class EcfXmlTotales
     [XmlElement("MontoImpuestoAdicional", Order = 13)]
     public string? MontoImpuestoAdicionalString
     {
-        get => MontoImpuestoAdicional?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => MontoImpuestoAdicional = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(MontoImpuestoAdicional);
+        set => MontoImpuestoAdicional = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoImpuestoAdicionalString() => EcfType != 46 && EcfType != 47 && MontoImpuestoAdicional.HasValue && MontoImpuestoAdicional > 0;
 
@@ -161,8 +162,8 @@ public class EcfXmlTotales
     [XmlElement("MontoTotal", Order = 15)]
     public string MontoTotalString
     {
-        get => MontoTotal.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => MontoTotal = decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(MontoTotal) ?? "0.00";
+        set => MontoTotal = Tools.ParseDecimal(value) ?? 0m;
     }
 
     // ── Post-Total Sequence (Order is critical for XSD) ───────────────────
@@ -172,8 +173,8 @@ public class EcfXmlTotales
     [XmlElement("MontoNoFacturable", Order = 16)]
     public string? MontoNoFacturableString
     {
-        get => MontoNoFacturable?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => MontoNoFacturable = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(MontoNoFacturable);
+        set => MontoNoFacturable = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoNoFacturableString() => MontoNoFacturable.HasValue;
 
@@ -182,8 +183,8 @@ public class EcfXmlTotales
     [XmlElement("MontoPeriodo", Order = 17)]
     public string? MontoPeriodoString
     {
-        get => MontoPeriodo?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => MontoPeriodo = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(MontoPeriodo);
+        set => MontoPeriodo = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoPeriodoString() => MontoPeriodo.HasValue;
 
@@ -192,8 +193,8 @@ public class EcfXmlTotales
     [XmlElement("SaldoAnterior", Order = 18)]
     public string? SaldoAnteriorString
     {
-        get => SaldoAnterior?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => SaldoAnterior = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(SaldoAnterior);
+        set => SaldoAnterior = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeSaldoAnteriorString() => SaldoAnterior.HasValue;
 
@@ -202,8 +203,8 @@ public class EcfXmlTotales
     [XmlElement("MontoAvancePago", Order = 19)]
     public string? MontoAvancePagoString
     {
-        get => MontoAvancePago?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => MontoAvancePago = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(MontoAvancePago);
+        set => MontoAvancePago = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoAvancePagoString() => MontoAvancePago.HasValue;
 
@@ -212,8 +213,8 @@ public class EcfXmlTotales
     [XmlElement("ValorPagar", Order = 20)]
     public string? ValorPagarString
     {
-        get => ValorPagar?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => ValorPagar = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(ValorPagar);
+        set => ValorPagar = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeValorPagarString() => ValorPagar.HasValue;
 
@@ -224,8 +225,8 @@ public class EcfXmlTotales
     [XmlElement("TotalITBISRetenido", Order = 21)]
     public string? TotalITBISRetenidoString
     {
-        get => (EcfType == 32 || EcfType == 43 || EcfType == 47) ? null : TotalITBISRetenido?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => TotalITBISRetenido = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => (EcfType == 32 || EcfType == 43 || EcfType == 47) ? null : Tools.FormatDecimal(TotalITBISRetenido);
+        set => TotalITBISRetenido = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalITBISRetenidoString() => TotalITBISRetenido.HasValue && TotalITBISRetenido >= 0 && EcfType != 32 && EcfType != 43 && EcfType != 47;
 
@@ -234,8 +235,8 @@ public class EcfXmlTotales
     [XmlElement("TotalISRRetencion", Order = 22)]
     public string? TotalISRRetencionString
     {
-        get => TotalISRRetencion?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => TotalISRRetencion = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(TotalISRRetencion);
+        set => TotalISRRetencion = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalISRRetencionString() => TotalISRRetencion.HasValue && TotalISRRetencion >= 0 && EcfType != 32 && EcfType != 43;
 
@@ -244,8 +245,8 @@ public class EcfXmlTotales
     [XmlElement("TotalITBISPercepcion", Order = 23)]
     public string? TotalITBISPercepcionString
     {
-        get => TotalITBISPercepcion?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => TotalITBISPercepcion = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(TotalITBISPercepcion);
+        set => TotalITBISPercepcion = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalITBISPercepcionString() => TotalITBISPercepcion.HasValue && EcfType != 32 && EcfType != 43;
 
@@ -254,8 +255,8 @@ public class EcfXmlTotales
     [XmlElement("TotalISRPercepcion", Order = 24)]
     public string? TotalISRPercepcionString
     {
-        get => TotalISRPercepcion?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => TotalISRPercepcion = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(TotalISRPercepcion);
+        set => TotalISRPercepcion = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalISRPercepcionString() => TotalISRPercepcion.HasValue && EcfType != 32 && EcfType != 43;
 }

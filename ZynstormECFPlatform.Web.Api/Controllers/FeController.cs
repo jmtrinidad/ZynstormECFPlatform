@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 using System.Text;
 using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Abstractions.Services;
@@ -7,9 +8,10 @@ using ZynstormECFPlatform.Core.Enums;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers;
 
-[ApiController]
-[Route("fe")]
+[ApiVersion("1.0")]
+[Route("v{version:apiVersion}/[controller]")]
 [AllowAnonymous]
+[ApiController]
 public class FeController : ControllerBase
 {
     private readonly ICacheService _cacheService;

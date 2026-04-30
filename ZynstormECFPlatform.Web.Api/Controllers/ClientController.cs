@@ -42,8 +42,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                     if (model != null && !string.IsNullOrEmpty(model.Email))
                     {
-                        var apiKey = KeyGenerator.GenerateApiKey();
-                        var secretKey = KeyGenerator.GenerateSecretKey();
+                        var apiKey = Tools.GenerateSecureRandomString(32);
+                        var secretKey = Tools.GenerateSecureRandomString(64);
 
                         var apiKeyEntity = new ApiKey
                         {

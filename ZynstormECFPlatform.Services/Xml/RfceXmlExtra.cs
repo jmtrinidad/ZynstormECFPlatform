@@ -1,4 +1,5 @@
 using System.Xml.Serialization;
+using ZynstormECFPlatform.Common.Utilities;
 
 namespace ZynstormECFPlatform.Services.Xml;
 
@@ -50,8 +51,8 @@ public class RfceXmlTotales
     [XmlElement("MontoExento", Order = 5)]
     public string? MontoExentoString
     {
-        get => MontoExento?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => MontoExento = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(MontoExento);
+        set => MontoExento = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoExentoString() => MontoExento.HasValue;
 
@@ -61,8 +62,8 @@ public class RfceXmlTotales
     [XmlElement("TotalITBIS", Order = 6)]
     public string? TotalITBISString
     {
-        get => TotalITBIS?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => TotalITBIS = string.IsNullOrEmpty(value) ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(TotalITBIS);
+        set => TotalITBIS = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalITBISString() => TotalITBIS.HasValue;
 
@@ -92,8 +93,8 @@ public class RfceXmlTotales
     [XmlElement("MontoTotal", Order = 12)]
     public string MontoTotalString
     {
-        get => MontoTotal.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => MontoTotal = decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(MontoTotal) ?? "0.00";
+        set => MontoTotal = Tools.ParseDecimal(value) ?? 0m;
     }
 
     [XmlElement("MontoNoFacturable", Order = 13)]

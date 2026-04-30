@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Common.Utilities;
 using ZynstormECFPlatform.Dtos;
@@ -6,8 +7,9 @@ using ZynstormECFPlatform.Web.Api.Filters;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers
 {
+    [ApiVersion("1.0")]
+    [Route("v{version:apiVersion}/[controller]")]
     [ApiController]
-    [Route("[controller]")]
     [ApiKeyAuth]
     public class EcfController(IEcfGeneratorService ecfGeneratorService) : ControllerBase
     {
@@ -38,7 +40,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             try
             {
                 // 2. Extraer TipoeCF para validación posterior
-                var ecfType = NcfHelper.ExtractEcfType(dto.Ncf);
+                var ecfType = NcfHelper.ExtractEcfType(dto.ECF.Encabezado.IdDoc.eNCF);
 
                 // 3. Generar XML
                 var xml = _ecfGeneratorService.GenerateUnsignedXml(dto);
@@ -78,24 +80,42 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         {
             return Ok(new EcfInvoiceRequestDto
             {
-                Ncf = "E310000000001",
                 ExternalReference = "INV-001",
-                IssueDate = DateTime.UtcNow,
-                SequenceExpirationDate = DateTime.UtcNow.AddYears(1),
-                IssuerRnc = "101000001",
-                IssuerName = "EMPRESA DE PRUEBA SAS",
-                IssuerAddress = "AV. PRINCIPAL 123",
-                CustomerRnc = "101000002",
-                CustomerName = "CLIENTE DE PRUEBA",
-                IncomeType = "01",
-                Items = new List<EcfItemRequestDto>
+                ECF = new EcfRequest
                 {
-                    new EcfItemRequestDto
+                    Encabezado = new EcfEncabezadoRequest
                     {
-                        Name = "PRODUCTO DE PRUEBA",
-                        Quantity = 1,
-                        UnitPrice = 100,
-                        TaxPercentage = 18
+                        IdDoc = new EcfIdDocRequest
+                        {
+                            eNCF = "E310000000001",
+                            FechaVencimientoSecuencia = DateTime.UtcNow.AddYears(1).ToString("dd-MM-yyyy"),
+                            TipoIngresos = "01"
+                        },
+                        Emisor = new EcfEmisorRequest
+                        {
+                            RNCEmisor = "101000001",
+                            RazonSocialEmisor = "EMPRESA DE PRUEBA SAS",
+                            DireccionEmisor = "AV. PRINCIPAL 123",
+                            FechaEmision = DateTime.UtcNow.ToString("dd-MM-yyyy")
+                        },
+                        Comprador = new EcfCompradorRequest
+                        {
+                            RNCComprador = "101000002",
+                            RazonSocialComprador = "CLIENTE DE PRUEBA"
+                        }
+                    },
+                    DetallesItems = new EcfDetallesItemsRequest
+                    {
+                        Item = new List<EcfItemRequestDto>
+                        {
+                            new EcfItemRequestDto
+                            {
+                                NombreItem = "PRODUCTO DE PRUEBA",
+                                CantidadItem = 1,
+                                PrecioUnitarioItem = 100,
+                                MontoItem = 100
+                            }
+                        }
                     }
                 }
             });

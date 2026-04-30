@@ -1,0 +1,42 @@
+Method: ExecuteAsync
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\Repository.cs:196 -> public Task<int> ExecuteAsync(string sql, object parameters, IDbTransaction transaction = null!)
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\Repository.cs:201 -> public Task<int> ExecuteAsync(string sql, CancellationToken cancellationToken)
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\Repository.cs:207 -> public Task<int> ExecuteAsync(string sql, object parameters, CancellationToken cancellationToken)
+
+Method: GenerateRandomCode
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\CertificationService.cs:2054 -> private string GenerateRandomCode(int length)
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\EcfGeneratorService.cs:515 -> private static string GenerateRandomCode(int length)
+
+Method: Insert
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\Repository.cs:246 -> public long Insert(TModel model)
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\Repository.cs:262 -> public void Insert(IEnumerable<TModel> models)
+
+Method: QueryAsync
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\Repository.cs:49 -> public Task<IEnumerable<TModel>> QueryAsync(string sql, object parameters)
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\Repository.cs:54 -> public Task<IEnumerable<TModel>> QueryAsync(string sql, CancellationToken cancellationToken)
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\Repository.cs:60 -> public Task<IEnumerable<TModel>> QueryAsync(string sql, object parameters, CancellationToken cancellationToken)
+
+Method: QueryPagedAsync
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\Repository.cs:66 -> public Task<IEnumerable<TModel>> QueryPagedAsync(string sql, string orderby, int page, int resultsPerPage,
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\Repository.cs:73 -> public Task<IEnumerable<TModel>> QueryPagedAsync(string sql, string orderby, int page, int resultsPerPage,
+
+Method: SaveChangesAsync
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\Repository.cs:500 -> public Task<int> SaveChangesAsync()
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\UnitOfWork.cs:71 -> public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+
+Method: ShouldSerializeImpuestosAdicionales
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\Xml\EcfXmlTotales.cs:155 -> public bool ShouldSerializeImpuestosAdicionales() => ImpuestosAdicionales != null && ImpuestosAdicionales.Items.Count > 0;
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\Xml\RfceXmlExtra.cs:87 -> public bool ShouldSerializeImpuestosAdicionales() => ImpuestosAdicionales != null && ImpuestosAdicionales.Items.Count > 0;
+
+Method: ShouldSerializeMontoExentoString
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\Xml\EcfXmlTotales.cs:65 -> public bool ShouldSerializeMontoExentoString() => EcfType != 46 && MontoExento.HasValue && MontoExento > 0;
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\Xml\RfceXmlExtra.cs:56 -> public bool ShouldSerializeMontoExentoString() => MontoExento.HasValue;
+
+Method: ShouldSerializeTotalITBISString
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\Xml\EcfXmlTotales.cs:109 -> public bool ShouldSerializeTotalITBISString() => EcfType != 47 && TotalITBIS.HasValue;
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Services\Xml\RfceXmlExtra.cs:67 -> public bool ShouldSerializeTotalITBISString() => TotalITBIS.HasValue;
+
+Method: UpdateNoSave
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\Repository.cs:389 -> public void UpdateNoSave(IEnumerable<TModel> models)
+  c:\Projects\ZynstormECFPlatform\ZynstormECFPlatform.Data\Repository.cs:394 -> public void UpdateNoSave(TModel model)
+

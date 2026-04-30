@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Xml.Serialization;
+using ZynstormECFPlatform.Common.Utilities;
 
 namespace ZynstormECFPlatform.Services.Xml;
 
@@ -56,8 +57,8 @@ public class EcfXmlItem
     [XmlElement("CantidadItem", Order = 7)]
     public string CantidadItemString
     {
-        get => CantidadItem.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => CantidadItem = decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(CantidadItem) ?? "0.00";
+        set => CantidadItem = Tools.ParseDecimal(value) ?? 0m;
     }
 
     [XmlElement("UnidadMedida", Order = 8)]
@@ -78,8 +79,8 @@ public class EcfXmlItem
     [XmlElement("PrecioUnitarioItem", Order = 11)]
     public string PrecioUnitarioItemString
     {
-        get => PrecioUnitarioItem.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => PrecioUnitarioItem = decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(PrecioUnitarioItem) ?? "0.00";
+        set => PrecioUnitarioItem = Tools.ParseDecimal(value) ?? 0m;
     }
 
     [XmlElement("DescuentoMonto", Order = 12)]
@@ -108,8 +109,8 @@ public class EcfXmlItem
     [XmlElement("MontoItem", Order = 17)]
     public string MontoItemString
     {
-        get => MontoItem.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-        set => MontoItem = decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        get => Tools.FormatDecimal(MontoItem) ?? "0.00";
+        set => MontoItem = Tools.ParseDecimal(value) ?? 0m;
     }
 
 }
