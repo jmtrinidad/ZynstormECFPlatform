@@ -2055,4 +2055,45 @@ public class CertificationService : ICertificationService
     {
         return Tools.GenerateRandomCode(length);
     }
+
+    public async Task<(byte[] content, string fileName)> SignXmlAsync(Stream xmlStream, string rnc)
+    {
+        using var reader = new StreamReader(xmlStream, Encoding.UTF8);
+        string xmlContent = await reader.ReadToEndAsync();
+
+        if (string.IsNullOrWhiteSpace(rnc))
+            throw new ArgumentException("El RNC es requerido para firmar el XML.");
+
+        rnc = rnc.Trim().Replace("-", "");
+
+        // Get Client
+        var client = await _clientService.GetByAsync(x => x.Rnc == rnc)
+            ?? throw new InvalidOperationException($"No se encontró ningún cliente registrado con el RNC '{rnc}'.");
+
+        // Get ApiKey/SecretKey
+        var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)
+            ?? throw new InvalidOperationException($"El cliente RNC '{rnc}' no tiene una ApiKey activa.");
+
+        var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
+        if (string.IsNullOrEmpty(decryptedSecretKey))
+            throw new InvalidOperationException("No se pudo desencriptar la SecretKey del cliente.");
+
+        // Get Certificate
+        var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId)
+            ?? throw new InvalidOperationException($"El cliente RNC '{rnc}' no tiene un certificado digital registrado.");
+
+        var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
+        var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
+
+        if (certificateBytes.Length == 0 || passwordBytes.Length == 0)
+            throw new InvalidOperationException("No se pudo desencriptar el certificado del cliente.");
+
+        var certBase64 = Convert.ToBase64String(certificateBytes);
+        var certPass = Encoding.UTF8.GetString(passwordBytes);
+
+        // Sign
+        string signedXml = _signerService.SignXml(xmlContent, certBase64, certPass);
+
+        return (Encoding.UTF8.GetBytes(signedXml), $"{rnc}_signed.xml");
+    }
 }

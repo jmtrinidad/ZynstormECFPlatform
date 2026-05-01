@@ -249,4 +249,24 @@ public class CertificationController(ICertificationService certificationService,
         var bytes = await System.IO.File.ReadAllBytesAsync(fullPath);
         return File(bytes, "application/zip", $"simulacion_json_{jobId}.zip");
     }
+
+    [HttpPost("sign-xml")]
+    public async Task<ActionResult> SignXml([FromForm] IFormFile xmlFile, [FromForm] string rnc)
+    {
+        if (xmlFile == null || xmlFile.Length == 0)
+            return BadRequest("Debe proporcionar un archivo XML.");
+
+        if (string.IsNullOrEmpty(rnc))
+            return BadRequest("Debe proporcionar el RNC para firmar el XML.");
+
+        try
+        {
+            var (content, fileName) = await certificationService.SignXmlAsync(xmlFile.OpenReadStream(), rnc);
+            return File(content, "application/xml", fileName);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
 }

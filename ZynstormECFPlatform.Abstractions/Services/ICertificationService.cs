@@ -25,4 +25,7 @@ public interface ICertificationService
 
     // Simulation Uno a Uno
     Task<string> ProcessSimulacionUnoAUnoAsync(EcfInvoiceRequestDto dto, string webRootPath);
+
+    // XML Signing
+    Task<(byte[] content, string fileName)> SignXmlAsync(Stream xmlStream, string rnc);
 }
