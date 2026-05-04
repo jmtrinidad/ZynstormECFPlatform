@@ -16,7 +16,8 @@ public class MappingProfiles : Profile
         CreateMap<ClientCreateDto, Client>()
             .ForMember(dest => dest.StatusId, opt => opt.MapFrom(src => (int)Enums.StatusEnum.Active));
 
-        CreateMap<ClientUpdateDto, Client>();
+        CreateMap<ClientUpdateDto, Client>()
+            .ForMember(dest => dest.ClientId, opt => opt.Ignore());
         CreateMap<Client, ClientViewDto>();
 
         // ClientCallBack

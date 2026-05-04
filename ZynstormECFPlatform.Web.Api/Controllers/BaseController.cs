@@ -76,78 +76,71 @@ public abstract class BaseController<TController, TModel, TCreateDto, TUpdateDto
     //    }
     //}
 
-    [Route("all", Order = 1)]
+    [Route("", Order = 1)]
     [HttpGet]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(422)]
     [ProducesResponseType(499)]
     [ProducesResponseType(503)]
-    public virtual async Task<ActionResult<IEnumerable<TViewDto>>> Get(CancellationToken cancellationToken = default)
+    public virtual async Task<ActionResult> Get([FromQuery] string? guidId, [FromQuery] string? id, CancellationToken cancellationToken = default)
     {
         try
         {
-            var results = await Repository.GetAllAsync(cancellationToken);
+            // Si se proporciona 'id', se busca un único registro (compatibilidad con GetById pero usando GUID)
+            if (!string.IsNullOrEmpty(id))
+            {
+                var result = await Repository.GetByAsync(x => x.GuidId == id, cancellationToken);
+                if (result == null) return NotFound();
+                return Ok(Mapper.Map<TModel, TViewDto>(result));
+            }
+
+            // Si se proporciona 'guidId', se filtra la lista. Si no, se devuelven todos.
+            IEnumerable<TModel> results;
+            if (!string.IsNullOrEmpty(guidId))
+            {
+                results = await Repository.GetManyByAsync(x => x.GuidId == guidId, cancellationToken);
+            }
+            else
+            {
+                results = await Repository.GetAllAsync(cancellationToken);
+            }
 
             return Ok(Mapper.Map<IEnumerable<TModel>, IEnumerable<TViewDto>>(results));
         }
         catch (AutoMapperMappingException exception)
         {
             Logger.LogError(exception, exception.Message);
-
-            return StatusCode(422,
-                exception.InnerException != null ?
-                    exception.InnerException.Message
-                    : "Error validando campos"
-            );
+            return StatusCode(422, exception.InnerException != null ? exception.InnerException.Message : "Error validando campos");
         }
         catch (OperationCanceledException)
         {
             Logger.LogWarning("La solicitud fue cancelada por el cliente.");
-
             return StatusCode(StatusCodes.Status499ClientClosedRequest);
         }
         catch (Exception exception)
         {
             Logger.LogError(exception, exception.Message);
-
             return StatusCode(StatusCodes.Status503ServiceUnavailable);
         }
     }
 
     [HttpGet]
-    [Route("", Order = 1)]
+    [Route("guid/{guid}", Order = 1)]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
-    [ProducesResponseType(422)]
-    [ProducesResponseType(499)]
     [ProducesResponseType(503)]
-    public virtual async Task<ActionResult<TViewDto>> GetById([FromQuery] int id, CancellationToken cancellationToken = default)
+    public virtual async Task<ActionResult<TViewDto>> GetByGuid(string guid, CancellationToken cancellationToken = default)
     {
         try
         {
-            var result = await Repository.GetAsync(id, cancellationToken);
+            var result = await Repository.GetByAsync(x => x.GuidId == guid, cancellationToken);
 
             if (result == null)
                 return NotFound();
 
             return Ok(Mapper.Map<TModel, TViewDto>(result));
-        }
-        catch (AutoMapperMappingException exception)
-        {
-            Logger.LogError(exception, exception.Message);
-            return StatusCode(422,
-                exception.InnerException != null ?
-                    exception.InnerException.Message
-                    : "Error validando campos"
-            );
-        }
-        catch (OperationCanceledException)
-        {
-            Logger.LogWarning("La solicitud fue cancelada por el cliente.");
-
-            return StatusCode(StatusCodes.Status499ClientClosedRequest);
         }
         catch (Exception exception)
         {
@@ -163,16 +156,42 @@ public abstract class BaseController<TController, TModel, TCreateDto, TUpdateDto
     [ProducesResponseType(404)]
     [ProducesResponseType(422)]
     [ProducesResponseType(503)]
-    public virtual async Task<IActionResult> Delete([FromQuery] int id)
+    public virtual async Task<IActionResult> Delete([FromQuery] string id)
     {
         try
         {
-            var result = await Repository.GetAsync(id);
+            var result = await Repository.GetByAsync(x => x.GuidId == id);
 
             if (result == null)
                 return NotFound();
 
-            await Repository.SoftDeleteAsync(id);
+            await Repository.SoftDeleteAsync(result);
+
+            return NoContent();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, exception.Message);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
+    }
+
+    [HttpDelete]
+    [Route("guid/{guid}", Order = 1)]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(503)]
+    public virtual async Task<IActionResult> DeleteByGuid(string guid)
+    {
+        try
+        {
+            var result = await Repository.GetByAsync(x => x.GuidId == guid);
+
+            if (result == null)
+                return NotFound();
+
+            await Repository.SoftDeleteAsync(result);
 
             return NoContent();
         }
@@ -243,11 +262,22 @@ public abstract class BaseController<TController, TModel, TCreateDto, TUpdateDto
     {
         try
         {
-            var prop = typeof(TUpdateDto).GetProperty(typeof(TModel).Name + "Id");
+            var guidProp = typeof(TUpdateDto).GetProperty("GuidId", System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            var guid = guidProp?.GetValue(dto) as string;
 
-            var id = prop?.GetValue(dto) as int?;
+            TModel? model = null;
 
-            var model = await Repository.GetAsync(id ?? 0);
+            if (!string.IsNullOrEmpty(guid))
+            {
+                model = await Repository.GetByAsync(x => x.GuidId == guid);
+            }
+            else
+            {
+                var idPropName = typeof(TModel).Name + "Id";
+                var prop = typeof(TUpdateDto).GetProperty(idPropName, System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                var id = prop?.GetValue(dto) as int?;
+                model = await Repository.GetAsync(id ?? 0);
+            }
 
             if (model == null)
                 return NotFound();

@@ -20,6 +20,49 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         IMapper mapper,
         ILoggerFactory loggerFactory) : BaseController<ClientCertificateController, ClientCertificate, ClientCertificateCreateDto, ClientCertificateCreateDto, ClientCertificateViewDto>(certificateService, mapper, loggerFactory)
     {
+        [HttpGet]
+        [Route("", Order = 1)]
+        [ProducesResponseType(200)]
+        public override async Task<ActionResult> Get([FromQuery] string? guidId, [FromQuery] string? id, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                // Si se proporciona 'id', se busca un único registro de certificado por su propio GUID
+                if (!string.IsNullOrEmpty(id))
+                {
+                    var result = await certificateService.GetByAsync(x => x.GuidId == id, cancellationToken);
+
+                    if (result == null) return NotFound();
+
+                    return Ok(Mapper.Map<ClientCertificate, ClientCertificateViewDto>(result));
+                }
+
+                IEnumerable<ClientCertificate> results;
+                if (!string.IsNullOrEmpty(guidId))
+                {
+                    // Buscamos primero al cliente por su GuidId
+                    var client = await clientService.GetByAsync(x => x.GuidId == guidId, cancellationToken);
+
+                    if (client == null)
+                        return NotFound("No se encontró un cliente con el GuidId proporcionado.");
+
+                    // Usamos el ClientId interno para filtrar los certificados
+                    results = await certificateService.GetManyByAsync(x => x.ClientId == client.ClientId, cancellationToken);
+                }
+                else
+                {
+                    results = await certificateService.GetAllAsync(cancellationToken);
+                }
+
+                return Ok(Mapper.Map<IEnumerable<ClientCertificate>, IEnumerable<ClientCertificateViewDto>>(results));
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
         [HttpPost]
         [Route("", Order = 1)]
         [ProducesResponseType(200)]

@@ -26,50 +26,41 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         private bool IsSA => User.IsInRole("SA");
 
         [HttpGet]
-        [Route("all", Order = 1)]
-        public override async Task<ActionResult<IEnumerable<ClientViewDto>>> Get(CancellationToken cancellationToken = default)
-        {
-            try
-            {
-                var query = Repository.Table.AsNoTracking();
-
-                if (!IsSA)
-                {
-                    var userId = CurrentUserId;
-                    query = query.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
-                }
-
-                var results = await query.ToListAsync(cancellationToken);
-
-                return Ok(Mapper.Map<IEnumerable<Client>, IEnumerable<ClientViewDto>>(results));
-            }
-            catch (Exception exception)
-            {
-                Logger.LogError(exception, exception.Message);
-                return StatusCode(StatusCodes.Status503ServiceUnavailable);
-            }
-        }
-
-        [HttpGet]
         [Route("", Order = 1)]
-        public override async Task<ActionResult<ClientViewDto>> GetById([FromQuery] int id, CancellationToken cancellationToken = default)
+        public override async Task<ActionResult> Get([FromQuery] string? guidId, [FromQuery] string? id, CancellationToken cancellationToken = default)
         {
             try
             {
-                var query = Repository.Table.AsNoTracking().Where(c => c.ClientId == id);
+                // Si se proporciona 'id', buscamos un único cliente por su GUID
+                if (!string.IsNullOrEmpty(id))
+                {
+                    var query = Repository.Table.AsNoTracking().Where(c => c.GuidId == id);
+                    if (!IsSA)
+                    {
+                        var userId = CurrentUserId;
+                        query = query.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
+                    }
+
+                    var result = await query.FirstOrDefaultAsync(cancellationToken);
+                    if (result == null) return NotFound();
+                    return Ok(Mapper.Map<Client, ClientViewDto>(result));
+                }
+
+                // Si no hay 'id', devolvemos una lista (opcionalmente filtrada por guidId)
+                var listQuery = Repository.Table.AsNoTracking();
+                if (!string.IsNullOrEmpty(guidId))
+                {
+                    listQuery = listQuery.Where(x => x.GuidId == guidId);
+                }
 
                 if (!IsSA)
                 {
                     var userId = CurrentUserId;
-                    query = query.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
+                    listQuery = listQuery.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
                 }
 
-                var result = await query.FirstOrDefaultAsync(cancellationToken);
-
-                if (result == null)
-                    return NotFound();
-
-                return Ok(Mapper.Map<Client, ClientViewDto>(result));
+                var results = await listQuery.ToListAsync(cancellationToken);
+                return Ok(Mapper.Map<IEnumerable<Client>, IEnumerable<ClientViewDto>>(results));
             }
             catch (Exception exception)
             {
@@ -161,6 +152,41 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     message,
                     code = 409
                 });
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+        [HttpPut]
+        [Route("", Order = 1)]
+        public override async Task<ActionResult<ClientViewDto>> Put([FromBody] ClientUpdateDto dto)
+        {
+            try
+            {
+                var guid = dto.GuidId;
+                if (string.IsNullOrEmpty(guid))
+                    return BadRequest("El GuidId es obligatorio para la actualización.");
+
+                var query = Repository.Table.Where(c => c.GuidId == guid);
+
+                if (!IsSA)
+                {
+                    var userId = CurrentUserId;
+                    query = query.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
+                }
+
+                var model = await query.FirstOrDefaultAsync();
+
+                if (model == null)
+                    return NotFound("No se encontró el cliente o no tiene permisos para actualizarlo.");
+
+                Mapper.Map(dto, model);
+
+                await Repository.UpdateAsync(model);
+
+                return Ok(Mapper.Map<Client, ClientViewDto>(model));
             }
             catch (Exception exception)
             {

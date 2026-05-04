@@ -24,6 +24,8 @@ public class ClientCreateDto
 public class ClientUpdateDto : ClientCreateDto
 {
     [Required]
+    public string GuidId { get; set; } = string.Empty;
+
     public int ClientId { get; set; }
 }
 
