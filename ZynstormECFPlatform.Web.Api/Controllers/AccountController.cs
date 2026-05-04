@@ -6,6 +6,7 @@ using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Web.Api.Helpers;
+using ZynstormECFPlatform.Core.Entities;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers
 {
@@ -121,6 +122,86 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 var tokenDto = _jwtTokenService.CreateToken(user, role!);
 
                 return Ok(tokenDto);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, message: exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpPost("register")]
+        [ProducesResponseType(200)]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(503)]
+        public async Task<IActionResult> Register([FromBody] UserRegisterDto dto)
+        {
+            try
+            {
+                var user = new User
+                {
+                    UserName = dto.UserName,
+                    Email = dto.Email,
+                    FirstName = dto.FirstName,
+                    LastName = dto.LastName,
+                    PhoneNumber = dto.PhoneNumber,
+                    RegisteredAt = DateTime.Now,
+                    IsActive = false
+                };
+
+                var result = await _accountService.AddUserAsync(user, dto.Password).ConfigureAwait(false);
+
+                if (!result.Succeeded)
+                {
+                    return BadRequest(result.Errors);
+                }
+
+                await _accountService.AddUserToRoleAsync(user, Common.Enums.UserType.Admin.ToString()).ConfigureAwait(false);
+
+                // Generar link de activación
+                var token = await _accountService.GenerateEmailConfirmationTokenAsync(user).ConfigureAwait(false);
+                var encodedToken = Convert.ToBase64String(Encoding.UTF8.GetBytes(token));
+
+                var callbackUrl = Url.Action(
+                    action: "Activate",
+                    controller: "Account",
+                    values: new { userId = user.Id, token = encodedToken },
+                    protocol: Request.Scheme);
+
+                var message = AccountActivationEmailBuilder.Build(callbackUrl!, user.UserName);
+
+                await _emailService.SendEmailAsync("Zynstorm@hotmail.com", "Nueva Solicitud de Registro - Zynstorm ECF", message).ConfigureAwait(false);
+
+                return Ok("Registro exitoso. Su cuenta está pendiente de activación por un administrador.");
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, message: exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpGet("activate")]
+        public async Task<IActionResult> Activate(string userId, string token)
+        {
+            try
+            {
+                var user = await _accountService.GetUserByIdAsync(userId).ConfigureAwait(false);
+                if (user == null) return NotFound("Usuario no encontrado.");
+
+                var decodedToken = Encoding.UTF8.GetString(Convert.FromBase64String(token));
+                var result = await _accountService.ConfirmEmailAsync(user, decodedToken).ConfigureAwait(false);
+
+                if (result.Succeeded)
+                {
+                    user.IsActive = true;
+                    await _accountService.UpdateUserAsync(user).ConfigureAwait(false);
+                    return Ok("Usuario activado correctamente. Ya puede iniciar sesión.");
+                }
+
+                return BadRequest("No se pudo activar el usuario. El token puede haber expirado.");
             }
             catch (Exception exception)
             {

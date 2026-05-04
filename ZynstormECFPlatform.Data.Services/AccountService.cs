@@ -33,7 +33,7 @@ public class AccountService : IAccountService
             PhoneNumber = model.PhoneNumber,
             UserName = model.UserName,
             RegisteredAt = DateTime.Now,
-            IsActive = true
+            IsActive = false
         };
 
         IdentityResult result = await _userManager.CreateAsync(user, model.PasswordHash!).ConfigureAwait(false);

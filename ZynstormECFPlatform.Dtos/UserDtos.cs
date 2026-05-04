@@ -61,3 +61,9 @@ public class UserViewDto : UserUpdateDto
 
     public DateTime RegisteredAt { get; set; }
 }
+
+public class UserRegisterDto : UserCreateDto
+{
+    [Required]
+    public string Password { get; set; } = null!;
+}
