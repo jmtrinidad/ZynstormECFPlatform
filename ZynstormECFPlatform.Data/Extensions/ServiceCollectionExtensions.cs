@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ZynstormECFPlatform.Abstractions.Data;
 using ZynstormECFPlatform.Core.Entities;
+using ZynstormECFPlatform.Data.Seeds;
 
 namespace ZynstormECFPlatform.Data.Extensions;
 
@@ -46,6 +47,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddSingleton<ISqlGenerator, SqlGenerator>();
+        services.AddScoped<UserAndRols>();//New Way for inject Default Data
         //services.AddScoped<SeedDb>();//New Way for inject Default Data
 
         return services;

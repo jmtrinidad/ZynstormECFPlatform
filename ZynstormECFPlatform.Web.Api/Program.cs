@@ -16,6 +16,7 @@ using ZynstormECFPlatform.Web.Api.Converters;
 using Hangfire;
 using Hangfire.PostgreSql;
 using ZynstormECFPlatform.Data;
+using ZynstormECFPlatform.Data.Seeds;
 
 // Program.cs
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -167,18 +168,20 @@ await SeedData(app);
 // Temporalmente expuesto en producción para pruebas
 // if (app.Environment.IsDevelopment())
 // {
-    app.UseSwagger();
+app.UseSwagger();
 
-    app.UseSwaggerUI(options =>
-    {
-        // Se utiliza ruta relativa './v1/swagger.json' para evitar problemas con reverse proxies (como Dokploy/Nginx)
-        options.SwaggerEndpoint("./v1/swagger.json", "Zynstorm ECF API v1");
-        options.EnablePersistAuthorization();
-    });
+app.UseSwaggerUI(options =>
+{
+    // Se utiliza ruta relativa './v1/swagger.json' para evitar problemas con reverse proxies (como Dokploy/Nginx)
+    options.SwaggerEndpoint("./v1/swagger.json", "Zynstorm ECF API v1");
+    options.EnablePersistAuthorization();
+});
 // }
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+app.UseCors("corsGlobalPolicy");
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -196,8 +199,8 @@ static async Task SeedData(WebApplication app)
     var db = scope.ServiceProvider.GetRequiredService<StorageContext>();
     db.Database.Migrate();
 
-    //var service = scope.ServiceProvider.GetService<SeedDb>();
+    var service = scope.ServiceProvider.GetService<UserAndRols>();
 
-    //if (service is not null)
-    //    await service.SeedAsync();
+    if (service is not null)
+        await service.SeedAsync();
 }

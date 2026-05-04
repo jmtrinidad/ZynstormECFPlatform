@@ -25,6 +25,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
     public DbSet<CertificationStep> CertificationSteps { get; set; } = null!;
     public DbSet<CertificationDocument> CertificationDocuments { get; set; } = null!;
     public DbSet<ENcf> ENcfs { get; set; } = null!;
+    public DbSet<UserClient> UserClient { get; set; } = null!;
 
     protected StorageContext()
     {
@@ -966,7 +967,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasConstraintName("FK_SystemLog_EcfDocument");
         });
 
-        modelBuilder.Entity<UseClient>(entity =>
+        modelBuilder.Entity<UserClient>(entity =>
         {
             entity.HasKey(c => new { c.UserId, c.ClientId });
 
@@ -994,16 +995,16 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.HasQueryFilter(c => !c.IsDeleted);
 
             entity.HasOne(d => d.Client)
-                  .WithMany(p => p.UseClients)
+                  .WithMany(p => p.UserClients)
                   .HasForeignKey(d => d.ClientId)
                   .OnDelete(DeleteBehavior.ClientSetNull)
-                  .HasConstraintName("FK_UseClient_Client");
+                  .HasConstraintName("FK_UserClient_Client");
 
             entity.HasOne(d => d.User)
-                  .WithMany(p => p.UseClients)
+                  .WithMany(p => p.UserClients)
                   .HasForeignKey(d => d.UserId)
                   .OnDelete(DeleteBehavior.ClientSetNull)
-                  .HasConstraintName("FK_UseClient_User");
+                  .HasConstraintName("FK_UserClient_User");
         });
 
         modelBuilder.Entity<DgiiMunicipality>(entity =>
@@ -1157,7 +1158,6 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
         modelBuilder.Entity<CertificationDocument>(entity =>
         {
-            entity.ToTable("CertificationDocument");
             entity.HasKey(c => c.CertificationDocumentId);
 
             entity.Property(e => e.ENcfSecuence)
@@ -1292,7 +1292,6 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
         modelBuilder.Entity<ENcf>(entity =>
         {
-            entity.ToTable("ENcf");
             entity.HasKey(c => c.ENcfId);
 
             entity.Property(e => e.Sequence)

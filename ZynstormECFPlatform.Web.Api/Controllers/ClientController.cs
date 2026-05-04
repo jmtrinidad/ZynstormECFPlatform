@@ -9,6 +9,7 @@ using ZynstormECFPlatform.Common.Utilities;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
+using System.Security.Claims;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers
 {
@@ -21,6 +22,62 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         IMapper mapper,
         ILoggerFactory loggerFactory) : BaseController<ClientController, Client, ClientCreateDto, ClientUpdateDto, ClientViewDto>(clientService, mapper, loggerFactory)
     {
+        private string? CurrentUserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        private bool IsSA => User.IsInRole("SA");
+
+        [HttpGet]
+        [Route("all", Order = 1)]
+        public override async Task<ActionResult<IEnumerable<ClientViewDto>>> Get(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var query = Repository.Table.AsNoTracking();
+
+                if (!IsSA)
+                {
+                    var userId = CurrentUserId;
+                    query = query.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
+                }
+
+                var results = await query.ToListAsync(cancellationToken);
+
+                return Ok(Mapper.Map<IEnumerable<Client>, IEnumerable<ClientViewDto>>(results));
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [HttpGet]
+        [Route("", Order = 1)]
+        public override async Task<ActionResult<ClientViewDto>> GetById([FromQuery] int id, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var query = Repository.Table.AsNoTracking().Where(c => c.ClientId == id);
+
+                if (!IsSA)
+                {
+                    var userId = CurrentUserId;
+                    query = query.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
+                }
+
+                var result = await query.FirstOrDefaultAsync(cancellationToken);
+
+                if (result == null)
+                    return NotFound();
+
+                return Ok(Mapper.Map<Client, ClientViewDto>(result));
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
         [HttpPost]
         [Route("", Order = 1)]
         [ProducesResponseType(200)]
@@ -57,6 +114,20 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                         // Enviamos el correo. Si falla, el UnitOfWork se encarga de revertir los cambios.
                         await emailService.SendApiKeyEmailAsync(model.Email, apiKey, secretKey);
+                    }
+
+                    // Asignamos el cliente al usuario que lo creó
+                    var userId = CurrentUserId;
+
+                    if (model != null && !string.IsNullOrEmpty(userId))
+                    {
+                        model.UserClients.Add(new UserClient
+                        {
+                            UserId = userId,
+                            ClientId = model.ClientId
+                        });
+
+                        await Repository.UpdateAsync(model);
                     }
                 });
 

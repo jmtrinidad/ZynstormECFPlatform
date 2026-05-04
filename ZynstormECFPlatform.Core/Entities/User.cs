@@ -27,5 +27,5 @@ public class User : IdentityUser, IEntityMarker
 
     public string FullName => $"{FirstName} {LastName}";
 
-    public virtual ICollection<UseClient> UseClients { get; set; } = [];
+    public virtual ICollection<UserClient> UserClients { get; set; } = [];
 }
