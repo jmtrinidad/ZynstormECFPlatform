@@ -91,6 +91,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 Client? model = null;
 
+                string? apiKey = null;
+                string? secretKey = null;
+
                 await unitOfWork.ExecuteInTransactionAsync(async ct =>
                 {
                     model = Mapper.Map<ClientCreateDto, Client>(dto);
@@ -99,8 +102,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                     if (model != null && !string.IsNullOrEmpty(model.Email))
                     {
-                        var apiKey = Tools.GenerateSecureRandomString(32);
-                        var secretKey = Tools.GenerateSecureRandomString(64);
+                        apiKey = Tools.GenerateSecureRandomString(32);
+                        secretKey = Tools.GenerateSecureRandomString(64);
 
                         var apiKeyEntity = new ApiKey
                         {
@@ -111,9 +114,6 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                         };
 
                         await apiKeyService.InsertAsync(apiKeyEntity);
-
-                        // Enviamos el correo. Si falla, el UnitOfWork se encarga de revertir los cambios.
-                        await emailService.SendApiKeyEmailAsync(model.Email, apiKey, secretKey);
                     }
 
                     // Asignamos el cliente al usuario que lo creó
@@ -130,6 +130,11 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                         await Repository.UpdateAsync(model);
                     }
                 });
+
+                if (model != null && !string.IsNullOrEmpty(model.Email) && !string.IsNullOrEmpty(apiKey) && !string.IsNullOrEmpty(secretKey))
+                {
+                    await emailService.SendApiKeyEmailAsync(model.Email, apiKey, secretKey);
+                }
 
                 return Ok(Mapper.Map<Client, ClientViewDto>(model!));
             }

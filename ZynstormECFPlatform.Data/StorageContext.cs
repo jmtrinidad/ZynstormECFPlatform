@@ -21,11 +21,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
     {
     }
 
-    public DbSet<CertificationProcess> CertificationProcesses { get; set; } = null!;
-    public DbSet<CertificationStep> CertificationSteps { get; set; } = null!;
-    public DbSet<CertificationDocument> CertificationDocuments { get; set; } = null!;
-    public DbSet<ENcf> ENcfs { get; set; } = null!;
-    public DbSet<UserClient> UserClient { get; set; } = null!;
+
 
     protected StorageContext()
     {

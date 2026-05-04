@@ -35,6 +35,10 @@ public class CertificationService : ICertificationService
     private readonly IApiKeyService _apiKeyService;
     private readonly IClientCertificateService _clientCertificateService;
     private readonly IEncryptedService _encryptedService;
+    private readonly ICertificationProcessService _processService;
+    private readonly ICertificationStepService _stepService;
+    private readonly ICertificationDocumentService _documentService;
+    private readonly IENcfService _encfService;
     private readonly StorageContext _context;
 
     // In-memory store for certification state
@@ -56,6 +60,10 @@ public class CertificationService : ICertificationService
         IApiKeyService apiKeyService,
         IClientCertificateService clientCertificateService,
         IEncryptedService encryptedService,
+        ICertificationProcessService processService,
+        ICertificationStepService stepService,
+        ICertificationDocumentService documentService,
+        IENcfService encfService,
         StorageContext context)
     {
         _configuration = configuration;
@@ -67,6 +75,10 @@ public class CertificationService : ICertificationService
         _apiKeyService = apiKeyService;
         _clientCertificateService = clientCertificateService;
         _encryptedService = encryptedService;
+        _processService = processService;
+        _stepService = stepService;
+        _documentService = documentService;
+        _encfService = encfService;
         _context = context;
     }
 
@@ -220,8 +232,8 @@ public class CertificationService : ICertificationService
             }
 
             test.ENcf = GetStr(row, "ENCF");
-            if(string.IsNullOrEmpty(test.ENcf)) test.ENcf = test.CaseNumber;
-             GetStr(row, "ENCF");
+            if (string.IsNullOrEmpty(test.ENcf)) test.ENcf = test.CaseNumber;
+            GetStr(row, "ENCF");
 
             var requestDto = MapRowToRequest(row, test.Step);
 
@@ -1206,7 +1218,7 @@ public class CertificationService : ICertificationService
                 ?? throw new Exception($"Cliente con RNC {dto.ECF.Encabezado.Emisor.RNCEmisor} no encontrado.");
 
             // 2. Manage Certification Process (Reuse if ongoing)
-            var step4 = await _context.CertificationSteps.FirstOrDefaultAsync(s => s.Order == 4);
+            var step4 = await _stepService.Table.FirstOrDefaultAsync(s => s.Order == 4);
             if (step4 == null)
             {
                 step4 = new CertificationStep
@@ -1216,11 +1228,10 @@ public class CertificationService : ICertificationService
                     IsRequired = true,
                     RegisteredAt = DateTime.Now
                 };
-                _context.CertificationSteps.Add(step4);
-                await _context.SaveChangesAsync();
+                await _stepService.InsertAsync(step4);
             }
 
-            var process = await _context.CertificationProcesses
+            var process = await _processService.Table
                 .OrderByDescending(p => p.RegisteredAt)
                 .FirstOrDefaultAsync(p => p.ClientId == client.ClientId &&
                                           (p.Status == CertificationStatus.Pending || p.Status == CertificationStatus.InProgress));
@@ -1229,14 +1240,13 @@ public class CertificationService : ICertificationService
             {
                 // When the simulation restarts, delete all previously sent documents for this process
                 // to start from a clean slate as requested.
-                var docsToDelete = await _context.CertificationDocuments
+                var docsToDelete = await _documentService.Table
                     .Where(d => d.CertificationProcessId == process.CertificationProcessId)
                     .ToListAsync();
 
                 if (docsToDelete.Any())
                 {
-                    _context.CertificationDocuments.RemoveRange(docsToDelete);
-                    await _context.SaveChangesAsync();
+                    await _documentService.HardDeleteAsync(docsToDelete);
                     Console.WriteLine($"[INFO] Limpieza de base de datos: {docsToDelete.Count} documentos eliminados para reiniciar simulación.");
                 }
             }
@@ -1251,8 +1261,7 @@ public class CertificationService : ICertificationService
                     CurrentStepId = step4.CertificationStepId,
                     RegisteredAt = DateTime.Now
                 };
-                _context.CertificationProcesses.Add(process);
-                await _context.SaveChangesAsync();
+                await _processService.InsertAsync(process);
             }
 
             // 3. Prepare Credentials
@@ -1546,17 +1555,17 @@ public class CertificationService : ICertificationService
                         currentDto.ECF.Encabezado.Totales.MontoGravadoTotal = currentDto.ECF.DetallesItems.Item.Where(it => it.IndicadorFacturacion == "1").Sum(it => it.CantidadItem * it.PrecioUnitarioItem);
                         currentDto.ECF.Encabezado.Totales.MontoExento = currentDto.ECF.DetallesItems.Item.Where(it => it.IndicadorFacturacion == "4").Sum(it => it.CantidadItem * it.PrecioUnitarioItem);
                         currentDto.ECF.Encabezado.Totales.TotalITBIS = currentDto.ECF.DetallesItems.Item.Sum(it => 0m);
-                        currentDto.ECF.Encabezado.Totales.MontoTotal = currentDto.ECF.DetallesItems.Item.Sum(it => (it.CantidadItem * it.PrecioUnitarioItem) );
+                        currentDto.ECF.Encabezado.Totales.MontoTotal = currentDto.ECF.DetallesItems.Item.Sum(it => (it.CantidadItem * it.PrecioUnitarioItem));
 
                         // [NEW] For RFCE B2C simulation, clear customer to ensure anonymous
                         currentDto.ECF.Encabezado.Comprador.RNCComprador = null;
                         currentDto.ECF.Encabezado.Comprador.RazonSocialComprador = "CONSUMIDOR FINAL";
-                                     // [NEW] Synchronize Security Code with the signature of the upcoming individual document
+                        // [NEW] Synchronize Security Code with the signature of the upcoming individual document
                         try
                         {
                             // Peek at the sequence to know the NCF the individual will use
                             var ecfTypeRecordForInd = await _context.Set<Core.Entities.EcfType>().FirstOrDefaultAsync(t => t.Code == item.Type.ToString());
-                            var encfRecordForInd = await _context.ENcfs.FirstOrDefaultAsync(e => e.NcfTypeId == ecfTypeRecordForInd!.EcfTypeId && e.ClientId == client.ClientId);
+                            var encfRecordForInd = await _encfService.Table.FirstOrDefaultAsync(e => e.NcfTypeId == ecfTypeRecordForInd!.EcfTypeId && e.ClientId == client.ClientId);
                             int seqForInd = encfRecordForInd?.Sequence ?? 1;
                             string realNcfForInd = $"E{item.Type}{seqForInd:D10}";
 
@@ -1592,7 +1601,7 @@ public class CertificationService : ICertificationService
                     string realNcfBeforeValidation = currentDto.ECF.Encabezado.IdDoc.eNCF;
                     currentDto.ECF.Encabezado.IdDoc.eNCF = $"E{item.Type}0000000000"; // Temp NCF for validation only
                     string unsignedXmlTemp = _generatorService.GenerateUnsignedXml(currentDto, item.IsSummary);
-                    
+
                     // Restore NCF immediately after generating the temp XML for validation
                     currentDto.ECF.Encabezado.IdDoc.eNCF = realNcfBeforeValidation;
 
@@ -1620,18 +1629,16 @@ public class CertificationService : ICertificationService
                     ENcf? encfRecord = null;
                     if (!skipNcfConsumption)
                     {
-                        encfRecord = await _context.ENcfs.FirstOrDefaultAsync(e => e.NcfTypeId == ecfTypeRecord.EcfTypeId && e.ClientId == client.ClientId);
+                        encfRecord = await _encfService.Table.FirstOrDefaultAsync(e => e.NcfTypeId == ecfTypeRecord.EcfTypeId && e.ClientId == client.ClientId);
                         if (encfRecord == null)
                         {
                             encfRecord = new ENcf { NcfTypeId = ecfTypeRecord.EcfTypeId, ClientId = client.ClientId, Sequence = 1, RegisteredAt = DateTime.Now };
-                            _context.ENcfs.Add(encfRecord);
-                            await _context.SaveChangesAsync();
+                            await _encfService.InsertAsync(encfRecord);
                         }
 
                         int seq = encfRecord.Sequence++;
                         currentDto.ECF.Encabezado.IdDoc.eNCF = $"E{item.Type}{seq:D10}";
-                        _context.Entry(encfRecord).State = EntityState.Modified;
-                        await _context.SaveChangesAsync();
+                        await _encfService.UpdateAsync(encfRecord);
 
                         // [NEW] If this is a summary, store it in the pool AFTER we have the real NCF
                         if (item.IsSummary)
@@ -1643,7 +1650,6 @@ public class CertificationService : ICertificationService
 
                     // Re-generate with the real NCF
                     string unsignedXml = _generatorService.GenerateUnsignedXml(currentDto, item.IsSummary);
-
 
                     string signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
 
@@ -1662,10 +1668,10 @@ public class CertificationService : ICertificationService
                     decimal actualTransmissionTotal = currentDto.ECF.Encabezado.Totales.MontoTotal ?? 0;
                     if (actualTransmissionTotal == 0 && currentDto.ECF.DetallesItems.Item.Any())
                     {
-                        actualTransmissionTotal = currentDto.ECF.DetallesItems.Item.Sum(itm => 
-                            (itm.CantidadItem * itm.PrecioUnitarioItem) 
-                            - (itm.DescuentoMonto ?? 0) 
-                            + 0m 
+                        actualTransmissionTotal = currentDto.ECF.DetallesItems.Item.Sum(itm =>
+                            (itm.CantidadItem * itm.PrecioUnitarioItem)
+                            - (itm.DescuentoMonto ?? 0)
+                            + 0m
                             + (itm.RecargoMonto ?? 0)
                             + ((itm.IscSpecificAmount ?? 0) + (itm.IscAdvaloremAmount ?? 0) + (itm.OtherAdditionalTaxAmount ?? 0)));
                     }
@@ -1748,7 +1754,7 @@ public class CertificationService : ICertificationService
                     {
                         CertificationProcessId = process.CertificationProcessId,
                         ENcfSecuence = currentDto.ECF.Encabezado.IdDoc.eNCF,
-                        ENcfId = encfRecord?.ENcfId ?? (await _context.ENcfs.FirstOrDefaultAsync(e => e.NcfTypeId == ecfTypeRecord.EcfTypeId && e.ClientId == client.ClientId))?.ENcfId ?? 0,
+                        ENcfId = encfRecord?.ENcfId ?? (await _encfService.Table.FirstOrDefaultAsync(e => e.NcfTypeId == ecfTypeRecord.EcfTypeId && e.ClientId == client.ClientId))?.ENcfId ?? 0,
                         EcfTypeId = ecfTypeRecord.EcfTypeId,
                         XmlSent = signedXml,
                         TrackId = trackId,
@@ -1756,9 +1762,8 @@ public class CertificationService : ICertificationService
                         SentAt = DateTime.Now,
                         RegisteredAt = DateTime.Now
                     };
-                    _context.CertificationDocuments.Add(doc);
+                    await _documentService.InsertAsync(doc);
                     sentDocsThisRun.Add(doc);
-                    await _context.SaveChangesAsync();
 
                     // Track Type 31 references for notes (33/34)
                     if (item.Type == 31 && isAccepted && currentDto != null && accepted31Pool != null)
@@ -1803,7 +1808,7 @@ public class CertificationService : ICertificationService
                 Console.WriteLine($"[ERROR] Simulación detenida por error en {dto.ECF.Encabezado.Emisor.RNCEmisor}.");
             }
 
-            await _context.SaveChangesAsync();
+            await _processService.UpdateAsync(process);
 
             // [NEW] Generate ZIP results for the simulation
             if (simulationXmls.Any())
@@ -1877,14 +1882,14 @@ public class CertificationService : ICertificationService
                 var client = await _clientService.GetByAsync(c => c.Rnc == dto.ECF.Encabezado.Emisor.RNCEmisor);
                 if (client != null)
                 {
-                    var process = await _context.CertificationProcesses
+                    var process = await _processService.Table
                         .OrderByDescending(p => p.RegisteredAt)
                         .FirstOrDefaultAsync(p => p.ClientId == client.ClientId && p.Status == CertificationStatus.InProgress);
                     if (process != null)
                     {
                         process.Status = CertificationStatus.Rejected;
                         process.EndDate = DateTime.Now;
-                        await _context.SaveChangesAsync();
+                        await _processService.UpdateAsync(process);
                     }
                 }
             }
@@ -1919,7 +1924,7 @@ public class CertificationService : ICertificationService
             var signatureDate = DateTime.Now;
             var currentDto = dto;
             currentDto.SignatureDateOverride = signatureDate;
-            
+
             int ecfType = int.TryParse(currentDto.ECF.Encabezado.IdDoc.TipoeCF, out var t) ? t : (string.IsNullOrEmpty(currentDto.ECF.Encabezado.IdDoc.eNCF) ? 31 : int.Parse(currentDto.ECF.Encabezado.IdDoc.eNCF.Substring(1, 2)));
 
             if (ecfType == 32) // RFCE Summary
@@ -1928,7 +1933,7 @@ public class CertificationService : ICertificationService
                 decimal calculatedGravado = currentDto.ECF.DetallesItems.Item.Where(it => it.IndicadorFacturacion == "1").Sum(it => it.CantidadItem * it.PrecioUnitarioItem);
                 decimal calculatedExento = currentDto.ECF.DetallesItems.Item.Where(it => it.IndicadorFacturacion == "4").Sum(it => it.CantidadItem * it.PrecioUnitarioItem);
                 decimal calculatedITBIS = currentDto.ECF.DetallesItems.Item.Sum(it => 0m);
-                decimal calculatedTotal = currentDto.ECF.DetallesItems.Item.Sum(it => (it.CantidadItem * it.PrecioUnitarioItem) );
+                decimal calculatedTotal = currentDto.ECF.DetallesItems.Item.Sum(it => (it.CantidadItem * it.PrecioUnitarioItem));
 
                 if (Math.Abs((currentDto.ECF.Encabezado.Totales.MontoGravadoTotal ?? 0) - calculatedGravado) > 0.01m)
                 {
@@ -1954,7 +1959,7 @@ public class CertificationService : ICertificationService
                 // 1. Dry-run Individual signature to get Security Code
                 var indDto = CloneDto(currentDto)!;
                 indDto.SignatureDateOverride = signatureDate;
-                
+
                 string indUnsigned = _generatorService.GenerateUnsignedXml(indDto, false);
                 string indSigned = _signerService.SignXml(indUnsigned, certBase64, certPass);
 
@@ -1992,7 +1997,7 @@ public class CertificationService : ICertificationService
                     currentDto.ECF.Encabezado.Emisor.RNCEmisor,
                     currentDto.ECF.Encabezado.IdDoc.eNCF,
                     true);
-                
+
                 if (result.Success && !string.IsNullOrEmpty(result.TrackId))
                 {
                     await Task.Delay(2000);
@@ -2000,7 +2005,7 @@ public class CertificationService : ICertificationService
                     result.Estado = finalStatus.Estado;
                     result.Mensaje = string.Join(" | ", finalStatus.Mensajes?.Select(m => m.Valor) ?? new[] { "Sin mensaje" });
                 }
-                
+
                 return indSignedFinal;
             }
             else // Non-RFCE document
@@ -2011,10 +2016,10 @@ public class CertificationService : ICertificationService
                 decimal actualTransmissionTotal = currentDto.ECF.Encabezado.Totales.MontoTotal ?? 0;
                 if (actualTransmissionTotal == 0 && currentDto.ECF.DetallesItems.Item.Any())
                 {
-                    actualTransmissionTotal = currentDto.ECF.DetallesItems.Item.Sum(itm => 
-                        (itm.CantidadItem * itm.PrecioUnitarioItem) 
-                        - (itm.DescuentoMonto ?? 0) 
-                        + 0m 
+                    actualTransmissionTotal = currentDto.ECF.DetallesItems.Item.Sum(itm =>
+                        (itm.CantidadItem * itm.PrecioUnitarioItem)
+                        - (itm.DescuentoMonto ?? 0)
+                        + 0m
                         + (itm.RecargoMonto ?? 0)
                         + ((itm.IscSpecificAmount ?? 0) + (itm.IscAdvaloremAmount ?? 0) + (itm.OtherAdditionalTaxAmount ?? 0)));
                 }
@@ -2028,7 +2033,7 @@ public class CertificationService : ICertificationService
                     currentDto.ECF.Encabezado.Emisor.RNCEmisor,
                     currentDto.ECF.Encabezado.IdDoc.eNCF,
                     false);
-                
+
                 if (result.Success && !string.IsNullOrEmpty(result.TrackId))
                 {
                     await Task.Delay(2000);
