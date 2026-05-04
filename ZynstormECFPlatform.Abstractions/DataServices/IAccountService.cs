@@ -44,4 +44,6 @@ public interface IAccountService
     Task LogoutAsync();
 
     Task<SignInResult> ValidatePasswordAsync(User user, string password);
+
+    Task RegisterAccessAsync(string userId, string? ipAddress, string? userAgent);
 }

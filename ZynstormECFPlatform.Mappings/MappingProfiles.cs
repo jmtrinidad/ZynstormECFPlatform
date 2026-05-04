@@ -55,5 +55,14 @@ public class MappingProfiles : Profile
 
         // SystemLog
         CreateMap<SystemLog, SystemLogViewDto>();
+
+        // User
+        CreateMap<UserCreateDto, User>();
+        CreateMap<UserUpdateDto, User>();
+        CreateMap<User, UserViewDto>()
+            .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => src.Id));
+
+        CreateMap<NotificationType, NotificationTypeDto>();
+        CreateMap<UserNotificationConfiguration, UserNotificationConfigDto>().ReverseMap();
     }
-}
+}

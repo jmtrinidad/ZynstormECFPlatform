@@ -121,6 +121,11 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                 var tokenDto = _jwtTokenService.CreateToken(user, role!);
 
+                // Register access
+                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+                var userAgent = Request.Headers["User-Agent"].ToString();
+                await _accountService.RegisterAccessAsync(user.Id, ipAddress, userAgent).ConfigureAwait(false);
+
                 return Ok(tokenDto);
             }
             catch (Exception exception)

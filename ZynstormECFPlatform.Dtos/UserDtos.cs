@@ -46,6 +46,11 @@ public class UserCreateDto
     public string PhoneNumber { get; set; } = null!;
 
     public int RoleId { get; set; }
+
+    public List<int> ClientIds { get; set; } = [];
+
+    public string? Password { get; set; }
+    public bool IsActive { get; set; }
 }
 
 public class UserUpdateDto : UserCreateDto

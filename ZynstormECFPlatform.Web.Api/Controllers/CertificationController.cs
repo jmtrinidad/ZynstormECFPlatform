@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
 using ZynstormECFPlatform.Abstractions.Services;
+using ZynstormECFPlatform.Abstractions.DataServices;
+using ZynstormECFPlatform.Core.Entities;
+using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Web.Api.Filters;
 
@@ -9,14 +12,109 @@ namespace ZynstormECFPlatform.Web.Api.Controllers;
 [ApiVersion("1.0")]
 [Route("v{version:apiVersion}/[controller]")]
 [ApiController]
-public class CertificationController(ICertificationService certificationService, ICacheService cacheService, IWebHostEnvironment env) : ControllerBase
+public class CertificationController(
+    ICertificationService certificationService,
+    ICacheService cacheService,
+    IWebHostEnvironment env,
+    IClientService clientService,
+    ICertificationProcessService certificationProcessService) : ControllerBase
 {
-    //TODO: AGREGAR UNA CONFIGURACION PARA CONFIGURAR UN ENVIO DEL LISTADO DE FACTURAS ENVIADAS A LA DGII EN UN LAPSO DE TIEMPO CON SU ESTATUS Y TODO LO DE LA FACTURA
+    [HttpGet("clients/{clientGuidId}/progress")]
+    public async Task<ActionResult<ClientCertificationProgressDto>> GetClientProgress(string clientGuidId, CancellationToken cancellationToken)
+    {
+        var client = await clientService.GetByAsync(x => x.GuidId == clientGuidId, cancellationToken);
+
+        if (client == null)
+            return NotFound("Cliente no encontrado.");
+
+        var process = await certificationProcessService.GetByAsync(
+            x => x.ClientId == client.ClientId && x.Status == CertificationStatus.InProgress,
+            cancellationToken
+        );
+
+        if (process == null)
+        {
+            return Ok(new ClientCertificationProgressDto
+            {
+                ClientGuidId = clientGuidId,
+                CurrentStep = client.IsCertified ? 15 : 1,
+                CompletedSteps = client.IsCertified ? [15] : [],
+                IsCertified = client.IsCertified,
+            });
+        }
+
+        var currentStep = process.CurrentStepId ?? 1;
+
+        return Ok(new ClientCertificationProgressDto
+        {
+            ClientGuidId = clientGuidId,
+            CurrentStep = currentStep,
+            CompletedSteps = Enumerable.Range(1, currentStep).ToList(),
+            IsCertified = client.IsCertified || currentStep >= 15,
+        });
+    }
+
+    [HttpPost("clients/{clientGuidId}/steps")]
+    public async Task<ActionResult<ClientCertificationProgressDto>> RegisterClientStep(string clientGuidId, [FromBody] RegisterCertificationStepDto dto, CancellationToken cancellationToken)
+    {
+        if (dto.Step < 1 || dto.Step > 15)
+            return BadRequest("El paso debe estar entre 1 y 15.");
+
+        var client = await clientService.GetByAsync(x => x.GuidId == clientGuidId, cancellationToken);
+        if (client == null)
+            return NotFound("Cliente no encontrado.");
+
+        var process = await certificationProcessService.GetByAsync(
+            x => x.ClientId == client.ClientId && x.Status == CertificationStatus.InProgress,
+            cancellationToken
+        );
+
+        if (process == null)
+        {
+            process = new CertificationProcess
+            {
+                ClientId = client.ClientId,
+                Environment = DgiiEnvironment.CerteCF,
+                Status = CertificationStatus.InProgress,
+                CurrentStepId = dto.Step,
+                StartDate = DateTime.UtcNow,
+            };
+            await certificationProcessService.InsertAsync(process);
+        }
+        else
+        {
+            process.CurrentStepId = Math.Max(process.CurrentStepId ?? 1, dto.Step);
+            process.LastUpdateUtc = DateTime.UtcNow;
+            await certificationProcessService.UpdateAsync(process);
+        }
+
+        if ((process.CurrentStepId ?? dto.Step) >= 15)
+        {
+            process.CurrentStepId = 15;
+            process.Status = CertificationStatus.Approved;
+            process.EndDate = DateTime.UtcNow;
+            await certificationProcessService.UpdateAsync(process);
+
+            client.IsCertified = true;
+            client.LastUpdateUtc = DateTime.UtcNow;
+            await clientService.UpdateAsync(client);
+        }
+
+        var currentStep = process.CurrentStepId ?? dto.Step;
+
+        return Ok(new ClientCertificationProgressDto
+        {
+            ClientGuidId = clientGuidId,
+            CurrentStep = currentStep,
+            CompletedSteps = Enumerable.Range(1, currentStep).ToList(),
+            IsCertified = client.IsCertified || currentStep >= 15,
+        });
+    }
+
     [HttpGet("tests")]
     public async Task<ActionResult<List<CertificationTestDto>>> GetTests()
     {
         var tests = await certificationService.GetTestsAsync();
-
         return Ok(tests);
     }
 
@@ -24,10 +122,8 @@ public class CertificationController(ICertificationService certificationService,
     public async Task<ActionResult<DgiiTransmissionResult>> RunTest(int index)
     {
         var result = await certificationService.RunTestAsync(index, env.WebRootPath);
-
         if (result.Success)
             return Ok(result);
-
         return BadRequest(result);
     }
 
@@ -37,10 +133,8 @@ public class CertificationController(ICertificationService certificationService,
     {
         string cacheKey = $"EcfStatus_{trackId}";
         var status = cacheService.Get<DgiiStatusResponse>(cacheKey);
-
         if (status == null)
             return NotFound("Status no encontrado o expirado.");
-
         return Ok(status);
     }
 
@@ -55,13 +149,13 @@ public class CertificationController(ICertificationService certificationService,
     public async Task<ActionResult<string>> AutomateCertification([FromForm] IFormFile excelFile)
     {
         if (excelFile == null || excelFile.Length == 0)
-            return BadRequest("Debe proporcionar un archivo Excel de certificación.");
+            return BadRequest("Debe proporcionar un archivo Excel de certificaci�n.");
 
         using var ms = new MemoryStream();
         await excelFile.CopyToAsync(ms);
         var jobId = await certificationService.EnqueueCertificationJobAsync(ms.ToArray(), excelFile.FileName, env.WebRootPath);
 
-        return Ok(new { JobId = jobId, Message = "Proceso de certificación iniciado en segundo plano." });
+        return Ok(new { JobId = jobId, Message = "Proceso de certificaci�n iniciado en segundo plano." });
     }
 
     [HttpGet("job-status/{jobId}")]
@@ -77,10 +171,10 @@ public class CertificationController(ICertificationService certificationService,
         var status = await certificationService.GetJobStatusAsync(jobId);
 
         if (status.HighestCompletedStep < 3)
-            return BadRequest("La descarga solo está permitida una vez que el Paso 3 (Resúmenes B2C) haya sido completado exitosamente.");
+            return BadRequest("La descarga solo est� permitida una vez que el Paso 3 (Res�menes B2C) haya sido completado exitosamente.");
 
         if (string.IsNullOrEmpty(status.DownloadUrl))
-            return BadRequest("El archivo aún no ha sido generado.");
+            return BadRequest("El archivo a�n no ha sido generado.");
 
         var bytes = await System.IO.File.ReadAllBytesAsync(status.DownloadUrl);
         return File(bytes, "application/zip", $"cert_step4_{jobId}.zip");
@@ -115,7 +209,7 @@ public class CertificationController(ICertificationService certificationService,
         try
         {
             var jobId = await certificationService.EnqueueSimulacionEcfJobAsync(dto, env.WebRootPath);
-            return Ok(new { JobId = jobId, Message = "Simulación de e-CF iniciada en segundo plano." });
+            return Ok(new { JobId = jobId, Message = "Simulaci�n de e-CF iniciada en segundo plano." });
         }
         catch (Exception ex)
         {
@@ -132,122 +226,12 @@ public class CertificationController(ICertificationService certificationService,
         try
         {
             var result = await certificationService.ProcessSimulacionUnoAUnoAsync(dto, env.WebRootPath);
-
             return Ok(result);
         }
         catch (Exception ex)
         {
             return BadRequest(ex.Message);
         }
-    }
-
-    [HttpGet("ejemplos-json")]
-    public ActionResult<List<object>> GetEjemplosJson()
-    {
-        try
-        {
-            string folder = Path.Combine(env.ContentRootPath, "..", "SamplePayloads");
-            if (!Directory.Exists(folder))
-            {
-                folder = Path.Combine(env.ContentRootPath, "SamplePayloads");
-            }
-
-            if (!Directory.Exists(folder))
-                return NotFound("Carpeta de ejemplos no encontrada.");
-
-            var files = Directory.GetFiles(folder, "*.json")
-                .OrderBy(f => Path.GetFileName(f))
-                .ToList();
-
-            var result = new List<object>();
-
-            foreach (var file in files)
-            {
-                var jsonContent = System.IO.File.ReadAllText(file);
-                var obj = System.Text.Json.JsonSerializer.Deserialize<object>(jsonContent);
-                if (obj != null)
-                    result.Add(obj);
-            }
-
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(ex.Message);
-        }
-    }
-
-    [HttpGet("files")]
-    public ActionResult<List<string>> ListCertificationFiles()
-    {
-        string folder = Path.Combine(env.WebRootPath, "certification_files");
-        if (!Directory.Exists(folder)) return Ok(new List<string>());
-
-        var files = Directory.GetFiles(folder)
-            .Select(Path.GetFileName)
-            .Where(f => !string.IsNullOrEmpty(f))
-            .Cast<string>()
-            .ToList();
-        return Ok(files);
-    }
-
-    [HttpGet("files/{fileName}")]
-    public ActionResult DownloadFile(string fileName)
-    {
-        // Sanitize fileName to prevent path traversal
-        string safeFileName = Path.GetFileName(fileName);
-        string folder = Path.Combine(env.WebRootPath, "certification_files");
-        string filePath = Path.Combine(folder, safeFileName);
-
-        if (!System.IO.File.Exists(filePath)) return NotFound("Archivo no encontrado.");
-
-        var bytes = System.IO.File.ReadAllBytes(filePath);
-        string contentType = safeFileName.EndsWith(".zip") ? "application/zip" : "text/xml";
-        return File(bytes, contentType, safeFileName);
-    }
-
-    [HttpGet("simulacion/download/{jobId}")]
-    public async Task<ActionResult> DownloadSimulacionZip(string jobId)
-    {
-        var status = await certificationService.GetJobStatusAsync(jobId);
-
-        if (string.IsNullOrEmpty(status.DownloadUrl))
-            return BadRequest("El archivo ZIP de simulación aún no ha sido generado o el JobId es inválido.");
-
-        // The URL is relative like /certification_files/simulacion_xxx.zip
-        string relativePath = status.DownloadUrl.TrimStart('/');
-        string fullPath = Path.Combine(env.WebRootPath, relativePath);
-
-        if (!System.IO.File.Exists(fullPath))
-            return NotFound("El archivo ZIP de simulación no se encontró en el servidor.");
-
-        var bytes = await System.IO.File.ReadAllBytesAsync(fullPath);
-        return File(bytes, "application/zip", $"simulacion_{jobId}.zip");
-    }
-
-    /// <summary>
-    /// Endpoint para descargar todos los archivos .json generados para la simulación para tenerlos de ejemplo para
-    /// enviarlos.
-    /// </summary>
-    /// <param name="jobId">Identificador del trabajo de simulación</param>
-    /// <returns>Archivo ZIP con los payloads JSON</returns>
-    [HttpGet("simulacion/download-json/{jobId}")]
-    public async Task<ActionResult> DownloadSimulacionJsonZip(string jobId)
-    {
-        var status = await certificationService.GetJobStatusAsync(jobId);
-
-        if (string.IsNullOrEmpty(status.JsonDownloadUrl))
-            return BadRequest("El archivo ZIP de JSONs de simulación aún no ha sido generado o el JobId es inválido.");
-
-        // El URL es relativo como /certification_files/simulacion_json_xxx.zip
-        string relativePath = status.JsonDownloadUrl.TrimStart('/');
-        string fullPath = Path.Combine(env.WebRootPath, relativePath);
-
-        if (!System.IO.File.Exists(fullPath))
-            return NotFound("El archivo ZIP de JSONs de simulación no se encontró en el servidor.");
-
-        var bytes = await System.IO.File.ReadAllBytesAsync(fullPath);
-        return File(bytes, "application/zip", $"simulacion_json_{jobId}.zip");
     }
 
     [HttpPost("sign-xml")]
@@ -269,4 +253,17 @@ public class CertificationController(ICertificationService certificationService,
             return BadRequest(ex.Message);
         }
     }
+}
+
+public class RegisterCertificationStepDto
+{
+    public int Step { get; set; }
+}
+
+public class ClientCertificationProgressDto
+{
+    public string ClientGuidId { get; set; } = string.Empty;
+    public int CurrentStep { get; set; }
+    public List<int> CompletedSteps { get; set; } = [];
+    public bool IsCertified { get; set; }
 }

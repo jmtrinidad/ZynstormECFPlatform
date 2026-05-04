@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ZynstormECFPlatform.Data;
@@ -11,9 +12,11 @@ using ZynstormECFPlatform.Data;
 namespace ZynstormECFPlatform.Data.Migrations
 {
     [DbContext(typeof(StorageContext))]
-    partial class StorageContextModelSnapshot : ModelSnapshot
+    [Migration("20260504174424_UserAuditingAndLogging")]
+    partial class UserAuditingAndLogging
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -627,9 +630,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .IsUnicode(false)
                         .HasColumnType("character varying(450)")
                         .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<bool>("IsCertified")
-                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -3356,91 +3356,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.ToTable("IncomingEcfDocument");
                 });
 
-            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.NotificationType", b =>
-                {
-                    b.Property<int>("NotificationTypeId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("NotificationTypeId"));
-
-                    b.Property<DateTime?>("DeletedTimeUtc")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
-
-                    b.Property<string>("GuidId")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(450)
-                        .IsUnicode(false)
-                        .HasColumnType("character varying(450)")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<DateTime?>("LastUpdateUtc")
-                        .IsConcurrencyToken()
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime>("RegisteredAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp without time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.HasKey("NotificationTypeId");
-
-                    b.ToTable("NotificationType");
-
-                    b.HasData(
-                        new
-                        {
-                            NotificationTypeId = 1,
-                            Description = "Recibir email cuando una factura es aceptada por la DGII",
-                            GuidId = "ed5cf289-a470-4a0b-bc41-fea04b8f1d32",
-                            IsDeleted = false,
-                            Name = "Factura Aceptada (Email)",
-                            RegisteredAt = new DateTime(2026, 5, 4, 22, 59, 6, 71, DateTimeKind.Utc).AddTicks(9929)
-                        },
-                        new
-                        {
-                            NotificationTypeId = 2,
-                            Description = "Recibir email cuando una factura es rechazada por la DGII",
-                            GuidId = "dc39f2cd-a6d2-4aa9-b210-daf55fbd157a",
-                            IsDeleted = false,
-                            Name = "Factura Rechazada (Email)",
-                            RegisteredAt = new DateTime(2026, 5, 4, 22, 59, 6, 73, DateTimeKind.Utc).AddTicks(1446)
-                        },
-                        new
-                        {
-                            NotificationTypeId = 3,
-                            Description = "Recibir resumen diario de facturas procesadas",
-                            GuidId = "70e4b4d0-a8bb-475c-952c-3a2a66ba5962",
-                            IsDeleted = false,
-                            Name = "Reporte Diario",
-                            RegisteredAt = new DateTime(2026, 5, 4, 22, 59, 6, 73, DateTimeKind.Utc).AddTicks(1572)
-                        },
-                        new
-                        {
-                            NotificationTypeId = 4,
-                            Description = "Recibir resumen semanal con estadísticas detalladas",
-                            GuidId = "61843d6d-5c11-431c-bad1-059f54b5f289",
-                            IsDeleted = false,
-                            Name = "Reporte Semanal",
-                            RegisteredAt = new DateTime(2026, 5, 4, 22, 59, 6, 73, DateTimeKind.Utc).AddTicks(1577)
-                        });
-                });
-
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.Role", b =>
                 {
                     b.Property<string>("Id")
@@ -3679,9 +3594,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<DateTime>("RegisteredAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp without time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
@@ -3762,7 +3675,7 @@ namespace ZynstormECFPlatform.Data.Migrations
 
                     b.HasIndex("UserId1");
 
-                    b.ToTable("UserAccessLog");
+                    b.ToTable("UserAccessLogs");
                 });
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.UserAuditLog", b =>
@@ -3835,7 +3748,7 @@ namespace ZynstormECFPlatform.Data.Migrations
 
                     b.HasIndex("UserId1");
 
-                    b.ToTable("UserAuditLog");
+                    b.ToTable("UserAuditLogs");
                 });
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.UserClient", b =>
@@ -3876,60 +3789,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.HasIndex("ClientId");
 
                     b.ToTable("UserClient");
-                });
-
-            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.UserNotificationConfiguration", b =>
-                {
-                    b.Property<int>("UserNotificationConfigurationId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("UserNotificationConfigurationId"));
-
-                    b.Property<DateTime?>("DeletedTimeUtc")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("GuidId")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(450)
-                        .IsUnicode(false)
-                        .HasColumnType("character varying(450)")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<DateTime?>("LastUpdateUtc")
-                        .IsConcurrencyToken()
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<int>("NotificationTypeId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("RegisteredAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp without time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("UserNotificationConfigurationId");
-
-                    b.HasIndex("NotificationTypeId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UserNotificationConfiguration");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -4373,25 +4232,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.UserNotificationConfiguration", b =>
-                {
-                    b.HasOne("ZynstormECFPlatform.Core.Entities.NotificationType", "NotificationType")
-                        .WithMany("UserConfigurations")
-                        .HasForeignKey("NotificationTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ZynstormECFPlatform.Core.Entities.User", "User")
-                        .WithMany("UserNotificationConfigurations")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("NotificationType");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ApiKey", b =>
                 {
                     b.Navigation("ClientCallBacks");
@@ -4488,11 +4328,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Navigation("EcfDocuments");
                 });
 
-            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.NotificationType", b =>
-                {
-                    b.Navigation("UserConfigurations");
-                });
-
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.Status", b =>
                 {
                     b.Navigation("ApiKeys");
@@ -4511,8 +4346,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Navigation("UserAuditLogs");
 
                     b.Navigation("UserClients");
-
-                    b.Navigation("UserNotificationConfigurations");
                 });
 #pragma warning restore 612, 618
         }

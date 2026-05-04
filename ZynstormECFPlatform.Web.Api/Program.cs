@@ -52,6 +52,9 @@ builder.Services.AddDbContextData(builder.Configuration.GetConnectionString("Def
 builder.Services.AddDataServices();
 builder.Services.AddServices();
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ZynstormECFPlatform.Abstractions.Services.ICurrentUserService, ZynstormECFPlatform.Web.Api.Services.CurrentUserService>();
+
 // Hangfire configuration
 builder.Services.AddHangfire(config => config
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)

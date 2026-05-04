@@ -12,15 +12,41 @@ public class AccountService : IAccountService
     private readonly UserManager<User> _userManager;
     private readonly RoleManager<Role> _roleManager;
     private readonly SignInManager<User> _signInManager;
+    private readonly IUserAccessLogService _userAccessLogService;
 
     public AccountService(
         UserManager<User> userManager,
         RoleManager<Role> roleManager,
-        SignInManager<User> signInManager)
+        SignInManager<User> signInManager,
+        IUserAccessLogService userAccessLogService)
     {
         _userManager = userManager;
         _roleManager = roleManager;
         _signInManager = signInManager;
+        _userAccessLogService = userAccessLogService;
+    }
+
+    public async Task RegisterAccessAsync(string userId, string? ipAddress, string? userAgent)
+    {
+        var user = await _userManager.FindByIdAsync(userId).ConfigureAwait(false);
+
+        if (user != null)
+        {
+            user.LastAccessUtc = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user).ConfigureAwait(false);
+
+            var accessLog = new UserAccessLog
+            {
+                UserId = userId,
+                AccessTimeUtc = DateTime.UtcNow,
+                IpAddress = ipAddress,
+                UserAgent = userAgent
+            };
+
+            _userAccessLogService.Add(accessLog);
+
+            await _userAccessLogService.SaveChangesAsync().ConfigureAwait(false);
+        }
     }
 
     public async Task<User?> AddUserAsync(User model, UserType userType)

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 using ZynstormECFPlatform.Abstractions.Data;
 using ZynstormECFPlatform.Abstractions.DataServices;
@@ -19,6 +19,7 @@ public static class ServiceCollectionExtensions
         }
 
         services.AddScoped<IAccountService, AccountService>();
+        services.AddScoped<INotificationService, NotificationService>();
 
         return services;
     }

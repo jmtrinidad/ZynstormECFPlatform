@@ -25,7 +25,17 @@ public class User : IdentityUser, IEntityMarker
 
     public DateTime RegisteredAt { get; set; }
 
+    public string? CreatedByUserId { get; set; }
+
+    public DateTime? LastAccessUtc { get; set; }
+
     public string FullName => $"{FirstName} {LastName}";
 
     public virtual ICollection<UserClient> UserClients { get; set; } = [];
-}
+
+    public virtual ICollection<UserAccessLog> UserAccessLogs { get; set; } = [];
+
+    public virtual ICollection<UserAuditLog> UserAuditLogs { get; set; } = [];
+
+    public virtual ICollection<UserNotificationConfiguration> UserNotificationConfigurations { get; set; } = [];
+}

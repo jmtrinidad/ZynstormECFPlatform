@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using ZynstormECFPlatform.Abstractions.Data;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Data.Seeds;
+using ZynstormECFPlatform.Abstractions.Services;
+using System.Text.Json;
 
 namespace ZynstormECFPlatform.Data;
 
@@ -21,10 +23,142 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
     {
     }
 
+    private readonly ICurrentUserService? _currentUserService;
+
+    public StorageContext(
+        DbContextOptions<StorageContext> options,
+        ICurrentUserService currentUserService) : base(options)
+    {
+        _currentUserService = currentUserService;
+    }
 
 
     protected StorageContext()
     {
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        var auditEntries = OnBeforeSaveChanges();
+        var result = await base.SaveChangesAsync(cancellationToken);
+        await OnAfterSaveChanges(auditEntries);
+        return result;
+    }
+
+    private List<AuditEntry> OnBeforeSaveChanges()
+    {
+        ChangeTracker.DetectChanges();
+        var auditEntries = new List<AuditEntry>();
+        var userId = _currentUserService?.UserId;
+
+        if (string.IsNullOrEmpty(userId)) return auditEntries;
+
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.Entity is UserAuditLog || entry.Entity is UserAccessLog || entry.State == EntityState.Detached || entry.State == EntityState.Unchanged)
+                continue;
+
+            var auditEntry = new AuditEntry(entry);
+            auditEntry.EntityName = entry.Entity.GetType().Name;
+            auditEntry.UserId = userId;
+            auditEntries.Add(auditEntry);
+
+            foreach (var property in entry.Properties)
+            {
+                string propertyName = property.Metadata.Name;
+                if (property.Metadata.IsPrimaryKey())
+                {
+                    auditEntry.KeyValues[propertyName] = property.CurrentValue;
+                    continue;
+                }
+
+                switch (entry.State)
+                {
+                    case EntityState.Added:
+                        auditEntry.AuditType = "Create";
+                        auditEntry.NewValues[propertyName] = property.CurrentValue;
+                        break;
+
+                    case EntityState.Deleted:
+                        auditEntry.AuditType = "Delete";
+                        auditEntry.OldValues[propertyName] = property.OriginalValue;
+                        break;
+
+                    case EntityState.Modified:
+                        if (property.IsModified)
+                        {
+                            auditEntry.AuditType = "Update";
+                            auditEntry.OldValues[propertyName] = property.OriginalValue;
+                            auditEntry.NewValues[propertyName] = property.CurrentValue;
+                        }
+                        break;
+                }
+            }
+        }
+
+        foreach (var auditEntry in auditEntries.Where(_ => !_.HasTemporaryProperties))
+        {
+            Set<UserAuditLog>().Add(auditEntry.ToAudit());
+        }
+
+        return auditEntries.Where(_ => _.HasTemporaryProperties).ToList();
+    }
+
+    private Task OnAfterSaveChanges(List<AuditEntry> auditEntries)
+    {
+        if (auditEntries == null || auditEntries.Count == 0)
+            return Task.CompletedTask;
+
+        foreach (var auditEntry in auditEntries)
+        {
+            foreach (var prop in auditEntry.TemporaryProperties)
+            {
+                if (prop.Metadata.IsPrimaryKey())
+                {
+                    auditEntry.KeyValues[prop.Metadata.Name] = prop.CurrentValue;
+                }
+                else
+                {
+                    auditEntry.NewValues[prop.Metadata.Name] = prop.CurrentValue;
+                }
+            }
+
+            Set<UserAuditLog>().Add(auditEntry.ToAudit());
+        }
+
+        return base.SaveChangesAsync();
+    }
+
+    private class AuditEntry
+    {
+        public AuditEntry(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry)
+        {
+            Entry = entry;
+        }
+
+        public Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry Entry { get; }
+        public string UserId { get; set; } = null!;
+        public string EntityName { get; set; } = null!;
+        public Dictionary<string, object?> KeyValues { get; } = new();
+        public Dictionary<string, object?> OldValues { get; } = new();
+        public Dictionary<string, object?> NewValues { get; } = new();
+        public string AuditType { get; set; } = null!;
+        public List<Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry> TemporaryProperties { get; } = new();
+
+        public bool HasTemporaryProperties => TemporaryProperties.Any();
+
+        public UserAuditLog ToAudit()
+        {
+            var audit = new UserAuditLog();
+            audit.UserId = UserId;
+            audit.Action = AuditType;
+            audit.EntityName = EntityName;
+            audit.TimestampUtc = DateTime.UtcNow;
+            audit.EntityId = JsonSerializer.Serialize(KeyValues);
+            audit.PreviousState = OldValues.Count == 0 ? null : JsonSerializer.Serialize(OldValues);
+            audit.NewState = NewValues.Count == 0 ? null : JsonSerializer.Serialize(NewValues);
+            return audit;
+        }
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
@@ -36,6 +170,89 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+        });
+
+        modelBuilder.Entity<UserNotificationConfiguration>(entity =>
+        {
+            entity.HasKey(e => e.UserNotificationConfigurationId);
+            entity.Property(e => e.IsEnabled).HasDefaultValue(true);
+            entity.Property(e => e.UserId).IsRequired();
+            entity.Property(e => e.NotificationTypeId).IsRequired();
+
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.User)
+                  .WithMany(p => p.UserNotificationConfigurations)
+                  .HasForeignKey(d => d.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(d => d.NotificationType)
+                  .WithMany(p => p.UserConfigurations)
+                  .HasForeignKey(d => d.NotificationTypeId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NotificationType>(entity =>
+        {
+            entity.HasKey(e => e.NotificationTypeId);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Description).HasMaxLength(255);
+
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasData(
+                new NotificationType { NotificationTypeId = 1, Name = "Factura Aceptada (Email)", Description = "Recibir email cuando una factura es aceptada por la DGII", RegisteredAt = DateTime.UtcNow, GuidId = Guid.NewGuid().ToString() },
+                new NotificationType { NotificationTypeId = 2, Name = "Factura Rechazada (Email)", Description = "Recibir email cuando una factura es rechazada por la DGII", RegisteredAt = DateTime.UtcNow, GuidId = Guid.NewGuid().ToString() },
+                new NotificationType { NotificationTypeId = 3, Name = "Reporte Diario", Description = "Recibir resumen diario de facturas procesadas", RegisteredAt = DateTime.UtcNow, GuidId = Guid.NewGuid().ToString() },
+                new NotificationType { NotificationTypeId = 4, Name = "Reporte Semanal", Description = "Recibir resumen semanal con estadísticas detalladas", RegisteredAt = DateTime.UtcNow, GuidId = Guid.NewGuid().ToString() }
+            );
+        });
 
         // Apply global PostgreSQL DateTime column type configuration
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
@@ -1326,6 +1543,38 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasForeignKey(d => d.ClientId)
                   .OnDelete(DeleteBehavior.ClientSetNull)
                   .HasConstraintName("FK_ENcf_Client");
+        });
+
+        modelBuilder.Entity<UserAccessLog>(entity =>
+        {
+            entity.HasKey(c => c.UserAccessLogId);
+            entity.Property(e => e.RegisteredAt).HasColumnType(DateTimeColumnType).HasDefaultValueSql(DefaultDateTimeSqlValue);
+            entity.Property(e => e.AccessTimeUtc).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.GuidId).IsRequired().HasMaxLength(450).IsUnicode(false).HasDefaultValueSql(DefaultGUIDSqlValue);
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false).IsRequired();
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.User)
+                  .WithMany()
+                  .HasForeignKey(d => d.UserId)
+                  .OnDelete(DeleteBehavior.Cascade)
+                  .HasConstraintName("FK_UserAccessLog_User");
+        });
+
+        modelBuilder.Entity<UserAuditLog>(entity =>
+        {
+            entity.HasKey(c => c.UserAuditLogId);
+            entity.Property(e => e.RegisteredAt).HasColumnType(DateTimeColumnType).HasDefaultValueSql(DefaultDateTimeSqlValue);
+            entity.Property(e => e.TimestampUtc).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.GuidId).IsRequired().HasMaxLength(450).IsUnicode(false).HasDefaultValueSql(DefaultGUIDSqlValue);
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false).IsRequired();
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.User)
+                  .WithMany()
+                  .HasForeignKey(d => d.UserId)
+                  .OnDelete(DeleteBehavior.Cascade)
+                  .HasConstraintName("FK_UserAuditLog_User");
         });
     }
 }
