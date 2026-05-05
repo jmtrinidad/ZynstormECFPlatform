@@ -3,18 +3,42 @@ using System.Xml.Serialization;
 namespace ZynstormECFPlatform.Services.Xml;
 
 /// <summary>
-/// Maps to XSD &lt;Comprador&gt; — buyer data block.
-/// The sequence of elements below is critical for XSD validation.
+/// Specific Comprador structure for ECF Type 46 (Exportación) 
+/// because DGII expects a completely different element sequence than the standard e-CF.
 /// </summary>
-public class EcfXmlComprador
+public class EcfXmlCompradorExportacion
 {
+    public EcfXmlCompradorExportacion() { }
+
+    public EcfXmlCompradorExportacion(EcfXmlComprador baseCmp)
+    {
+        EcfType = baseCmp.EcfType;
+        RncComprador = baseCmp.RncComprador;
+        IdentificadorExtranjero = baseCmp.IdentificadorExtranjero;
+        RazonSocial = baseCmp.RazonSocial;
+        ContactoComprador = baseCmp.ContactoComprador;
+        CorreoComprador = baseCmp.CorreoComprador;
+        DireccionComprador = baseCmp.DireccionComprador;
+        MunicipioComprador = baseCmp.MunicipioComprador;
+        ProvinciaComprador = baseCmp.ProvinciaComprador;
+        PaisComprador = baseCmp.PaisComprador;
+        TelefonoAdicional = baseCmp.TelefonoAdicional;
+        FechaOrdenCompra = baseCmp.FechaOrdenCompra;
+        NumeroOrdenCompra = baseCmp.NumeroOrdenCompra;
+        CodigoInternoComprador = baseCmp.CodigoInternoComprador;
+        ResponsablePago = baseCmp.ResponsablePago;
+        InformacionAdicionalComprador = baseCmp.InformacionAdicionalComprador;
+        FechaEntrega = baseCmp.FechaEntrega;
+        ContactoEntrega = baseCmp.ContactoEntrega;
+        DireccionEntrega = baseCmp.DireccionEntrega;
+    }
+
     [XmlIgnore]
     public int EcfType { get; set; }
 
     [XmlElement("RNCComprador")]
     public string? RncComprador { get; set; }
-    // Required for type 41 (minOccurs=1), optional for 31-34,44,45,46; excluded for 47
-    public bool ShouldSerializeRncComprador() => !string.IsNullOrWhiteSpace(RncComprador) && EcfType != 47;
+    public bool ShouldSerializeRncComprador() => !string.IsNullOrWhiteSpace(RncComprador);
 
     [XmlElement("IdentificadorExtranjero")]
     public string? IdentificadorExtranjero { get; set; }
@@ -26,27 +50,27 @@ public class EcfXmlComprador
 
     [XmlElement("ContactoComprador")]
     public string? ContactoComprador { get; set; }
-    public bool ShouldSerializeContactoComprador() => !string.IsNullOrWhiteSpace(ContactoComprador) && EcfType != 47;
+    public bool ShouldSerializeContactoComprador() => !string.IsNullOrWhiteSpace(ContactoComprador);
 
     [XmlElement("CorreoComprador")]
     public string? CorreoComprador { get; set; }
-    public bool ShouldSerializeCorreoComprador() => !string.IsNullOrWhiteSpace(CorreoComprador) && EcfType != 47;
+    public bool ShouldSerializeCorreoComprador() => !string.IsNullOrWhiteSpace(CorreoComprador);
 
     [XmlElement("DireccionComprador")]
     public string? DireccionComprador { get; set; }
-    public bool ShouldSerializeDireccionComprador() => !string.IsNullOrWhiteSpace(DireccionComprador) && EcfType != 47;
+    public bool ShouldSerializeDireccionComprador() => !string.IsNullOrWhiteSpace(DireccionComprador);
 
     [XmlElement("MunicipioComprador")]
     public string? MunicipioComprador { get; set; }
-    public bool ShouldSerializeMunicipioComprador() => !string.IsNullOrWhiteSpace(MunicipioComprador) && EcfType != 47;
+    public bool ShouldSerializeMunicipioComprador() => !string.IsNullOrWhiteSpace(MunicipioComprador);
 
     [XmlElement("ProvinciaComprador")]
     public string? ProvinciaComprador { get; set; }
-    public bool ShouldSerializeProvinciaComprador() => !string.IsNullOrWhiteSpace(ProvinciaComprador) && EcfType != 47;
+    public bool ShouldSerializeProvinciaComprador() => !string.IsNullOrWhiteSpace(ProvinciaComprador);
 
     [XmlElement("PaisComprador")]
     public string? PaisComprador { get; set; }
-    public bool ShouldSerializePaisComprador() => !string.IsNullOrWhiteSpace(PaisComprador) && EcfType != 47;
+    public bool ShouldSerializePaisComprador() => !string.IsNullOrWhiteSpace(PaisComprador);
 
     [XmlElement("FechaEntrega")]
     public string? FechaEntrega { get; set; }
@@ -62,7 +86,7 @@ public class EcfXmlComprador
 
     [XmlElement("TelefonoAdicional")]
     public string? TelefonoAdicional { get; set; }
-    public bool ShouldSerializeTelefonoAdicional() => !string.IsNullOrWhiteSpace(TelefonoAdicional) && EcfType != 47 && EcfType != 41;
+    public bool ShouldSerializeTelefonoAdicional() => !string.IsNullOrWhiteSpace(TelefonoAdicional);
 
     [XmlElement("FechaOrdenCompra")]
     public string? FechaOrdenCompra { get; set; }
@@ -76,13 +100,11 @@ public class EcfXmlComprador
     public string? CodigoInternoComprador { get; set; }
     public bool ShouldSerializeCodigoInternoComprador() => !string.IsNullOrWhiteSpace(CodigoInternoComprador);
 
-    [XmlIgnore]
+    [XmlElement("ResponsablePago")]
     public string? ResponsablePago { get; set; }
+    public bool ShouldSerializeResponsablePago() => !string.IsNullOrWhiteSpace(ResponsablePago);
 
-    [XmlIgnore]
+    [XmlElement("InformacionAdicionalComprador")]
     public string? InformacionAdicionalComprador { get; set; }
-
-    [XmlIgnore]
-    public string? PaisCompradorIgnore { get; set; } // Renamed to avoid confusion if needed, but it's fine
+    public bool ShouldSerializeInformacionAdicionalComprador() => !string.IsNullOrWhiteSpace(InformacionAdicionalComprador);
 }
-

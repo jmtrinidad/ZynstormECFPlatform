@@ -83,9 +83,13 @@ public class CertificationXmlMappingService : ICertificationXmlMappingService
                         MunicipioComprador = GetStr(row, "MunicipioComprador"),
                         ProvinciaComprador = GetStr(row, "ProvinciaComprador"),
                         FechaEntrega = GetStr(row, "FechaEntrega"),
+                        ContactoEntrega = GetStr(row, "ContactoEntrega"),
+                        DireccionEntrega = GetStr(row, "DireccionEntrega"),
                         FechaOrdenCompra = GetStr(row, "FechaOrdenCompra"),
                         NumeroOrdenCompra = GetStr(row, "NumeroOrdenCompra"),
-                        CodigoInternoComprador = GetStr(row, "CodigoInternoComprador")
+                        CodigoInternoComprador = GetStr(row, "CodigoInternoComprador"),
+                        ResponsablePago = GetStr(row, "ResponsablePago"),
+                        InformacionAdicionalComprador = GetStr(row, "InformacionAdicionalComprador")
                     },
                     Totales = new EcfTotalesRequest
                     {

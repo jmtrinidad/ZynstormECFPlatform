@@ -8,6 +8,8 @@ public class CertificationJobStatusDto
     public string JobId { get; set; } = string.Empty;
     public string Status { get; set; } = "Pending"; // Pending, Processing, Completed, Failed
     public int TotalSteps { get; set; }
+    public int TotalComprobantes { get; set; }
+    public int TotalResumenes { get; set; }
     public int CurrentStep { get; set; }
     public string CurrentNcf { get; set; } = string.Empty;
     public string ErrorMessage { get; set; } = string.Empty;

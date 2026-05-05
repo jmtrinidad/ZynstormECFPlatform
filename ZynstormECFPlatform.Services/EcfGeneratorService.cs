@@ -159,6 +159,9 @@ public class EcfGeneratorService : IEcfGeneratorService
         }
 
 
+        xml = xml.Replace("<CompradorExp>", "<Comprador>")
+                 .Replace("</CompradorExp>", "</Comprador>");
+
         return xml;
     }
 
@@ -355,11 +358,51 @@ public class EcfGeneratorService : IEcfGeneratorService
             });
         }
 
+        // Build ImpuestosAdicionales in Totales from items that have TablaImpuestoAdicional
         EcfXmlImpuestosAdicionales? impuestosAdicionales = null;
-        if (e.Totales.MontoImpuestoAdicional > 0)
+        var itemsWithTax = xmlItems.Where(i => i.TablaImpuestoAdicional?.ImpuestoAdicional?.Count > 0).ToList();
+        if (itemsWithTax.Count > 0)
         {
-            // Just map if we have details, but DGII schema requires items. 
-            // In the real XML generator we calculated them from items. We'll simplify.
+            var taxGroups = itemsWithTax
+                .SelectMany(i => i.TablaImpuestoAdicional!.ImpuestoAdicional.Select(ia => new { ia.TipoImpuesto }))
+                .GroupBy(x => x.TipoImpuesto)
+                .Select(g =>
+                {
+                    var dtoItems = dto.ECF.DetallesItems.Item
+                        .Where(d => !string.IsNullOrWhiteSpace(d.IscType) && d.IscType == g.Key)
+                        .ToList();
+                    var rate = dtoItems.FirstOrDefault()?.AdditionalTaxRate;
+                    var specificAmt = dtoItems.Sum(d => d.IscSpecificAmount ?? 0m);
+                    var advaloremAmt = dtoItems.Sum(d => d.IscAdvaloremAmount ?? 0m);
+                    var otherAmt = dtoItems.Sum(d => d.OtherAdditionalTaxAmount ?? 0m);
+                    // Valid if we have a rate or any positive amount
+                    bool isValid = rate.HasValue || specificAmt > 0 || advaloremAmt > 0 || otherAmt > 0;
+                    return isValid ? new EcfXmlImpuestoAdicional
+                    {
+                        TipoImpuesto = g.Key,
+                        TasaImpuestoAdicional = rate,
+                        MontoImpuestoSelectivoConsumoEspecifico = specificAmt,
+                        MontoImpuestoSelectivoConsumoAdvalorem = advaloremAmt,
+                        OtrosImpuestosAdicionales = otherAmt
+                    } : null;
+                })
+                .Where(x => x != null)
+                .Cast<EcfXmlImpuestoAdicional>()
+                .ToList();
+            if (taxGroups.Count > 0)
+                impuestosAdicionales = new EcfXmlImpuestosAdicionales { Items = taxGroups };
+
+            // Remove TablaImpuestoAdicional from items whose TipoImpuesto is not registered in Totales
+            var registeredTypes = taxGroups.Select(t => t.TipoImpuesto).ToHashSet();
+            foreach (var item in xmlItems)
+            {
+                if (item.TablaImpuestoAdicional?.ImpuestoAdicional != null)
+                {
+                    item.TablaImpuestoAdicional.ImpuestoAdicional.RemoveAll(ia => !registeredTypes.Contains(ia.TipoImpuesto));
+                    if (item.TablaImpuestoAdicional.ImpuestoAdicional.Count == 0)
+                        item.TablaImpuestoAdicional = null;
+                }
+            }
         }
 
         var totales = new EcfXmlTotales
@@ -383,7 +426,8 @@ public class EcfGeneratorService : IEcfGeneratorService
             TotalISRRetencion = e.Totales.TotalISRRetencion,
             MontoImpuestoAdicional = e.Totales.MontoImpuestoAdicional,
             MontoNoFacturable = e.Totales.MontoNoFacturable,
-            MontoTotal = e.Totales.MontoTotal ?? 0
+            MontoTotal = e.Totales.MontoTotal ?? 0,
+            ImpuestosAdicionales = impuestosAdicionales
         };
 
         var root = new EcfXmlRoot
@@ -436,9 +480,13 @@ public class EcfGeneratorService : IEcfGeneratorService
                     MunicipioComprador = e.Comprador.MunicipioComprador,
                     ProvinciaComprador = e.Comprador.ProvinciaComprador,
                     FechaEntrega = e.Comprador.FechaEntrega,
+                    ContactoEntrega = e.Comprador.ContactoEntrega,
+                    DireccionEntrega = e.Comprador.DireccionEntrega,
                     FechaOrdenCompra = e.Comprador.FechaOrdenCompra,
                     NumeroOrdenCompra = e.Comprador.NumeroOrdenCompra,
-                    CodigoInternoComprador = e.Comprador.CodigoInternoComprador
+                    CodigoInternoComprador = e.Comprador.CodigoInternoComprador,
+                    ResponsablePago = e.Comprador.ResponsablePago,
+                    InformacionAdicionalComprador = e.Comprador.InformacionAdicionalComprador
                 },
                 Totales = totales
             },

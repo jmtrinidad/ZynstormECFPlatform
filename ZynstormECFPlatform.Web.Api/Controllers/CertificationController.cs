@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Abstractions.DataServices;
@@ -184,6 +184,10 @@ public class CertificationController(
         while (!cancellationToken.IsCancellationRequested && webSocket.State == WebSocketState.Open)
         {
             var status = await certificationService.GetJobStatusAsync(jobId);
+            var completedSteps = status.CompletedSteps;
+            var comprobantesSteps = completedSteps.Where(s => s.Step is "1" or "2").ToList();
+            var resumenesSteps = completedSteps.Where(s => s.Step == "3").ToList();
+            var generatedSteps = completedSteps.Where(s => s.Step == "4").ToList();
             var payload = JsonSerializer.Serialize(new
             {
                 jobId,
@@ -191,14 +195,19 @@ public class CertificationController(
                 step = status.CurrentStep,
                 totalSteps = status.TotalSteps,
                 currentNcf = status.CurrentNcf,
-                logs = status.CompletedSteps.TakeLast(5),
+                logs = completedSteps,
+                // Progress counters for real-time panel
+                comprobantesApproved = comprobantesSteps.Count(s => s.Status == "Aceptado"),
+                comprobantesTotal = status.TotalComprobantes,
+                resumenesApproved = resumenesSteps.Count(s => s.Status == "Aceptado" || s.Status == "Generado"),
+                resumenesTotal = status.TotalResumenes,
                 generatedFiles = string.IsNullOrWhiteSpace(status.DownloadUrl)
                     ? Array.Empty<object>()
                     : new[] { new { name = $"cert_step4_{jobId}.zip", url = $"/v1/Certification/download/{jobId}" } }
             });
             var buffer = Encoding.UTF8.GetBytes(payload);
             await webSocket.SendAsync(buffer, WebSocketMessageType.Text, true, cancellationToken);
-            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
             if (status.Status is "Completed" or "Failed")
                 break;
         }

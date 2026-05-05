@@ -36,7 +36,8 @@ public class EcfXmlImpuestoAdicional
     /// Tax rate percentage (TasaImpuestoAdicional). Required.
     /// </summary>
     [XmlElement("TasaImpuestoAdicional")]
-    public decimal TasaImpuestoAdicional { get; set; }
+    public decimal? TasaImpuestoAdicional { get; set; }
+    public bool ShouldSerializeTasaImpuestoAdicional() => TasaImpuestoAdicional.HasValue;
 
     /// <summary>
     /// ISC Específico — fixed amount per unit (optional).

@@ -170,6 +170,10 @@ public class EcfCompradorRequest
     public string? FechaOrdenCompra { get; set; }
     public string? NumeroOrdenCompra { get; set; }
     public string? CodigoInternoComprador { get; set; }
+    public string? ContactoEntrega { get; set; }
+    public string? DireccionEntrega { get; set; }
+    public string? ResponsablePago { get; set; }
+    public string? InformacionAdicionalComprador { get; set; }
 }
 
 public class EcfTotalesRequest

@@ -673,6 +673,8 @@ public class CertificationService : ICertificationService
 
             var tests = await GetTestsFromExcelAsync(tempFilePath);
             status.TotalSteps = tests.Count;
+            status.TotalComprobantes = tests.Count(t => t.Step == 1 || t.Step == 2);
+            status.TotalResumenes = tests.Count(t => t.Step == 3);
             status.CurrentStep = 0;
 
             var jobStartTime = DateTime.Now; // Stabilize all signatures in this job
