@@ -132,6 +132,11 @@ public class EcfIdDocRequest
     public int? TotalPaginas { get; set; }
     public string? IndicadorNotaCredito { get; set; }
     public string? TerminoPago { get; set; }
+    public string? TipoCuentaPago { get; set; }
+    public string? NumeroCuentaPago { get; set; }
+    public string? BancoPago { get; set; }
+    public string? FechaDesde { get; set; }
+    public string? FechaHasta { get; set; }
 }
 
 public class EcfEmisorRequest

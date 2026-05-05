@@ -14,7 +14,7 @@ namespace ZynstormECFPlatform.Services.Xml
         public string FechaNCFModificado { get; set; }
 
         [XmlElement("CodigoModificacion")]
-        public int CodigoModificacion { get; set; }
+        public int? CodigoModificacion { get; set; }
 
         [XmlElement("RazonModificacion")]
         public string? RazonModificacion { get; set; }

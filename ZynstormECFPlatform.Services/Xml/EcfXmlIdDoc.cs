@@ -72,7 +72,27 @@ public class EcfXmlIdDoc
     public string? TerminoPago { get; set; }
     public bool ShouldSerializeTerminoPago() => !string.IsNullOrWhiteSpace(TerminoPago);
 
-    [XmlElement("TotalPaginas", Order = 12)]
+    [XmlElement("TipoCuentaPago", Order = 12)]
+    public string? TipoCuentaPago { get; set; }
+    public bool ShouldSerializeTipoCuentaPago() => !string.IsNullOrWhiteSpace(TipoCuentaPago);
+
+    [XmlElement("NumeroCuentaPago", Order = 13)]
+    public string? NumeroCuentaPago { get; set; }
+    public bool ShouldSerializeNumeroCuentaPago() => !string.IsNullOrWhiteSpace(NumeroCuentaPago);
+
+    [XmlElement("BancoPago", Order = 14)]
+    public string? BancoPago { get; set; }
+    public bool ShouldSerializeBancoPago() => !string.IsNullOrWhiteSpace(BancoPago);
+
+    [XmlElement("FechaDesde", Order = 15)]
+    public string? FechaDesde { get; set; }
+    public bool ShouldSerializeFechaDesde() => !string.IsNullOrWhiteSpace(FechaDesde);
+
+    [XmlElement("FechaHasta", Order = 16)]
+    public string? FechaHasta { get; set; }
+    public bool ShouldSerializeFechaHasta() => !string.IsNullOrWhiteSpace(FechaHasta);
+
+    [XmlElement("TotalPaginas", Order = 17)]
     public int? TotalPaginas { get; set; }
     public bool ShouldSerializeTotalPaginas() => TotalPaginas.HasValue;
 }

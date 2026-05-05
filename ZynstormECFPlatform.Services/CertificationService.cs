@@ -1318,19 +1318,38 @@ public class CertificationService : ICertificationService
                             var reference = accepted31Pool[poolIndex];
 
                             // [MODIFIED] Take only the FIRST item to avoid total annulment
-                            var firstItem = CloneDto(reference.Dto)?.Items.FirstOrDefault();
-                            currentDto.ECF.DetallesItems.Item = firstItem != null ? new List<EcfItemRequestDto> { firstItem } : new List<EcfItemRequestDto>();
+                            var referenceItems = reference.Dto?.ECF?.DetallesItems?.Item ?? new List<EcfItemRequestDto>();
+                            var firstItem = referenceItems.FirstOrDefault();
+                            currentDto.ECF.DetallesItems.Item = firstItem != null ? new List<EcfItemRequestDto> { CloneItem(firstItem)! } : new List<EcfItemRequestDto>();
 
-                            currentDto.ECF.Encabezado.Comprador.RNCComprador = reference.Dto.CustomerRnc;
-                            currentDto.ECF.Encabezado.Comprador.RazonSocialComprador = reference.Dto.CustomerName;
-                            currentDto.ECF.Encabezado.Comprador.DireccionComprador = reference.Dto.CustomerAddress;
+                            // [NEW] Recalculate Totales to match the modified items list
+                            var simItems = currentDto.ECF.DetallesItems.Item;
+                            decimal gravadoI1 = simItems.Where(i => i.IndicadorFacturacion == "1").Sum(i => (i.CantidadItem * i.PrecioUnitarioItem) - (i.DescuentoMonto ?? 0));
+                            decimal gravadoI2 = simItems.Where(i => i.IndicadorFacturacion == "2").Sum(i => (i.CantidadItem * i.PrecioUnitarioItem) - (i.DescuentoMonto ?? 0));
+                            decimal gravadoI3 = simItems.Where(i => i.IndicadorFacturacion == "3").Sum(i => (i.CantidadItem * i.PrecioUnitarioItem) - (i.DescuentoMonto ?? 0));
+                            decimal exento = simItems.Where(i => i.IndicadorFacturacion == "4").Sum(i => (i.CantidadItem * i.PrecioUnitarioItem) - (i.DescuentoMonto ?? 0));
+                            
+                            decimal itbis1 = Math.Round(gravadoI1 * 0.18m, 2);
+                            decimal itbis2 = Math.Round(gravadoI2 * 0.16m, 2);
+                            
+                            currentDto.ECF.Encabezado.Totales.MontoGravadoI1 = gravadoI1 > 0 ? gravadoI1 : null;
+                            currentDto.ECF.Encabezado.Totales.MontoGravadoI2 = gravadoI2 > 0 ? gravadoI2 : null;
+                            currentDto.ECF.Encabezado.Totales.MontoGravadoI3 = gravadoI3 > 0 ? gravadoI3 : null;
+                            currentDto.ECF.Encabezado.Totales.MontoExento = exento > 0 ? exento : null;
+                            currentDto.ECF.Encabezado.Totales.MontoGravadoTotal = gravadoI1 + gravadoI2 + gravadoI3;
+                            currentDto.ECF.Encabezado.Totales.TotalITBIS1 = itbis1 > 0 ? itbis1 : null;
+                            currentDto.ECF.Encabezado.Totales.TotalITBIS2 = itbis2 > 0 ? itbis2 : null;
+                            currentDto.ECF.Encabezado.Totales.TotalITBIS = itbis1 + itbis2;
+                            currentDto.ECF.Encabezado.Totales.MontoTotal = currentDto.ECF.Encabezado.Totales.MontoGravadoTotal + currentDto.ECF.Encabezado.Totales.TotalITBIS + exento;
+
+                            currentDto.ECF.Encabezado.Comprador.RNCComprador = reference.CustomerRnc;
+                            currentDto.ECF.Encabezado.Comprador.RazonSocialComprador = reference.CustomerName;
+                            currentDto.ECF.Encabezado.Comprador.DireccionComprador = reference.CustomerAddress;
 
                             // Set reference fields
                             currentDto.ReferenceNcf = reference.Ncf;
                             currentDto.ReferenceIssueDate = reference.IssueDate;
-                            currentDto.ECF.InformacionReferencia.CodigoModificacion = "3"; // [MODIFIED] 3 = Correction of amounts (Partial)
                             currentDto.ECF.InformacionReferencia.RNCOtroContribuyente = reference.CustomerRnc == currentDto.ECF.Encabezado.Comprador.RNCComprador ? null : reference.CustomerRnc;
-                            currentDto.ECF.InformacionReferencia.RazonModificacion = "Ajuste parcial de montos";
                             currentDto.ECF.Encabezado.IdDoc.TipoIngresos = currentDto.ECF.Encabezado.IdDoc.TipoIngresos ?? "01";
 
                             if (item.Type == 34)

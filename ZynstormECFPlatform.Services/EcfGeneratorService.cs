@@ -445,7 +445,12 @@ public class EcfGeneratorService : IEcfGeneratorService
                     IncomeType = e.IdDoc.TipoIngresos,
                     PaymentType = int.TryParse(e.IdDoc.TipoPago, out int tp) ? tp : null,
                     FechaLimitePago = e.IdDoc.FechaLimitePago,
-                    TerminoPago = e.IdDoc.TerminoPago
+                    TerminoPago = e.IdDoc.TerminoPago,
+                    TipoCuentaPago = e.IdDoc.TipoCuentaPago,
+                    NumeroCuentaPago = e.IdDoc.NumeroCuentaPago,
+                    BancoPago = e.IdDoc.BancoPago,
+                    FechaDesde = e.IdDoc.FechaDesde,
+                    FechaHasta = e.IdDoc.FechaHasta
                 },
                 Emisor = new EcfXmlEmisor
                 {
@@ -494,10 +499,10 @@ public class EcfGeneratorService : IEcfGeneratorService
             
             InformacionReferencia = dto.ECF.InformacionReferencia != null ? new EcfXmlInformacionReferencia
             {
-                NCFModificado = dto.ECF.InformacionReferencia.NCFModificado,
+                NCFModificado = dto.ECF.InformacionReferencia.NCFModificado!,
                 RNCOtroContribuyente = dto.ECF.InformacionReferencia.RNCOtroContribuyente,
-                FechaNCFModificado = dto.ECF.InformacionReferencia.FechaNCFModificado,
-                CodigoModificacion = int.TryParse(dto.ECF.InformacionReferencia.CodigoModificacion, out int cm) ? cm : 3,
+                FechaNCFModificado = dto.ECF.InformacionReferencia.FechaNCFModificado!,
+                CodigoModificacion = int.TryParse(dto.ECF.InformacionReferencia.CodigoModificacion, out int cm) ? cm : null,
                 RazonModificacion = dto.ECF.InformacionReferencia.RazonModificacion
             } : null,
             FechaHoraFirma = signatureDateTime

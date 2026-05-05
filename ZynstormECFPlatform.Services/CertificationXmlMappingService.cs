@@ -49,7 +49,12 @@ public class CertificationXmlMappingService : ICertificationXmlMappingService
                         TipoPago = GetStr(row, "TipoPago"),
                         FechaLimitePago = GetStr(row, "FechaLimitePago"),
                         IndicadorNotaCredito = GetStr(row, "IndicadorNotaCredito"),
-                        TerminoPago = GetStr(row, "TerminoPago")
+                        TerminoPago = GetStr(row, "TerminoPago"),
+                        TipoCuentaPago = GetStr(row, "TipoCuentaPago"),
+                        NumeroCuentaPago = GetStr(row, "NumeroCuentaPago"),
+                        BancoPago = GetStr(row, "BancoPago"),
+                        FechaDesde = GetStr(row, "FechaDesde"),
+                        FechaHasta = GetStr(row, "FechaHasta")
                     },
                     Emisor = new EcfEmisorRequest
                     {
@@ -119,8 +124,8 @@ public class CertificationXmlMappingService : ICertificationXmlMappingService
                     NCFModificado = CleanNcf(GetStr(row, "NCFModificado")),
                     RNCOtroContribuyente = GetStr(row, "RNCOtroContribuyente"),
                     FechaNCFModificado = GetStr(row, "FechaNCFModificado"),
-                    CodigoModificacion = GetStr(row, "CodigoModificacion") ?? "3",
-                    RazonModificacion = GetStr(row, "RazonModificacion") ?? "Ajuste parcial de montos"
+                    CodigoModificacion = GetStr(row, "CodigoModificacion"),
+                    RazonModificacion = GetStr(row, "RazonModificacion")
                 } : null
             }
         };
