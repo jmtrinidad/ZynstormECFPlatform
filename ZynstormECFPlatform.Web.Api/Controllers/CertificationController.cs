@@ -1,14 +1,14 @@
-using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
-using ZynstormECFPlatform.Abstractions.Services;
+using Microsoft.AspNetCore.Mvc;
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
 using ZynstormECFPlatform.Abstractions.DataServices;
+using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Web.Api.Filters;
-using System.Net.WebSockets;
-using System.Text;
-using System.Text.Json;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers;
 
@@ -16,7 +16,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers;
 [Route("v{version:apiVersion}/[controller]")]
 [ApiController]
 public class CertificationController(
-    ICertificationService certificationService,
+    ICertificationExcelService excelService,
+    ICertificationSimulationService simulationService,
     ICacheService cacheService,
     IWebHostEnvironment env,
     IClientService clientService,
@@ -117,14 +118,14 @@ public class CertificationController(
     [HttpGet("tests")]
     public async Task<ActionResult<List<CertificationTestDto>>> GetTests()
     {
-        var tests = await certificationService.GetTestsAsync();
+        var tests = await excelService.GetTestsAsync();
         return Ok(tests);
     }
 
     [HttpPost("run/{index}")]
     public async Task<ActionResult<DgiiTransmissionResult>> RunTest(int index)
     {
-        var result = await certificationService.RunTestAsync(index, env.WebRootPath);
+        var result = await excelService.RunTestAsync(index, env.WebRootPath);
         if (result.Success)
             return Ok(result);
         return BadRequest(result);
@@ -144,7 +145,7 @@ public class CertificationController(
     [HttpGet("summary")]
     public async Task<ActionResult<CertificationSummaryDto>> GetSummary()
     {
-        var summary = await certificationService.GetSummaryAsync();
+        var summary = await excelService.GetSummaryAsync();
         return Ok(summary);
     }
 
@@ -159,7 +160,8 @@ public class CertificationController(
 
         using var ms = new MemoryStream();
         await excelFile.CopyToAsync(ms);
-        var jobId = await certificationService.EnqueueCertificationJobAsync(ms.ToArray(), excelFile.FileName, env.WebRootPath);
+
+        var jobId = await excelService.EnqueueCertificationJobAsync(ms.ToArray(), excelFile.FileName, env.WebRootPath);
 
         return Ok(new { jobId, clientGuidId, step = 2, tests = Array.Empty<object>(), generatedFiles = Array.Empty<object>(), message = "Proceso de pruebas de datos e-CF iniciado en segundo plano." });
     }
@@ -183,7 +185,7 @@ public class CertificationController(
         using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
         while (!cancellationToken.IsCancellationRequested && webSocket.State == WebSocketState.Open)
         {
-            var status = await certificationService.GetJobStatusAsync(jobId);
+            var status = await excelService.GetJobStatusAsync(jobId);
             var completedSteps = status.CompletedSteps;
             var comprobantesSteps = completedSteps.Where(s => s.Step is "1" or "2").ToList();
             var resumenesSteps = completedSteps.Where(s => s.Step == "3").ToList();
@@ -216,14 +218,14 @@ public class CertificationController(
     [HttpGet("job-status/{jobId}")]
     public async Task<ActionResult<CertificationJobStatusDto>> GetJobStatus(string jobId)
     {
-        var status = await certificationService.GetJobStatusAsync(jobId);
+        var status = await excelService.GetJobStatusAsync(jobId);
         return Ok(status);
     }
 
     [HttpGet("download/{jobId}")]
     public async Task<ActionResult> DownloadStep4Results(string jobId)
     {
-        var status = await certificationService.GetJobStatusAsync(jobId);
+        var status = await excelService.GetJobStatusAsync(jobId);
 
         if (status.HighestCompletedStep < 3)
             return BadRequest("La descarga solo está permitida una vez que el Paso 3 (Resúmenes B2C) haya sido completado exitosamente.");
@@ -238,7 +240,7 @@ public class CertificationController(
     [HttpGet("job-status/{jobId}/logs")]
     public async Task<ActionResult<List<CertificationStepResultDto>>> GetJobLogs(string jobId)
     {
-        var logs = await certificationService.GetJobLogsAsync(jobId);
+        var logs = await excelService.GetJobLogsAsync(jobId);
         return Ok(logs);
     }
 
@@ -250,7 +252,7 @@ public class CertificationController(
 
         using var ms = new MemoryStream();
         await excelFile.CopyToAsync(ms);
-        var results = await certificationService.ProcessAprobacionComercialAsync(ms.ToArray());
+        var results = await excelService.ProcessAprobacionComercialAsync(ms.ToArray());
 
         return Ok(results);
     }
@@ -263,7 +265,7 @@ public class CertificationController(
 
         try
         {
-            var jobId = await certificationService.EnqueueSimulacionEcfJobAsync(dto, env.WebRootPath);
+            var jobId = await simulationService.EnqueueSimulacionEcfJobAsync(dto, env.WebRootPath);
             return Ok(new { JobId = jobId, Message = "Simulación de e-CF iniciada en segundo plano." });
         }
         catch (Exception ex)
@@ -280,7 +282,7 @@ public class CertificationController(
 
         try
         {
-            var result = await certificationService.ProcessSimulacionUnoAUnoAsync(dto, env.WebRootPath);
+            var result = await simulationService.ProcessSimulacionUnoAUnoAsync(dto, env.WebRootPath);
             return Ok(result);
         }
         catch (Exception ex)
@@ -300,7 +302,7 @@ public class CertificationController(
 
         try
         {
-            var (content, fileName) = await certificationService.SignXmlAsync(xmlFile.OpenReadStream(), rnc);
+            var (content, fileName) = await excelService.SignXmlAsync(xmlFile.OpenReadStream(), rnc);
             return File(content, "application/xml", fileName);
         }
         catch (Exception ex)

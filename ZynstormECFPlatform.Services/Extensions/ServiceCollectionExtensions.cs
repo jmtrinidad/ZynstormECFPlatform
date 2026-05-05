@@ -7,11 +7,9 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddServices(this IServiceCollection services)
     {
-        //services.AddTransient<IAuthenticationService, AuthenticationService>();
         services.AddTransient<IJwtTokenService, JwtTokenService>();
         services.AddTransient<IEncryptedService, EncryptedService>();
         services.AddTransient<IEmailService, EmailService>();
-        services.AddTransient<IEcfGeneratorService, EcfGeneratorService>();
         
         services.AddMemoryCache();
         services.AddSingleton<ICacheService, CacheService>();
@@ -20,8 +18,22 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IXmlSignatureService, XmlSignatureService>();
         services.AddHttpClient<IDgiiAuthService, DgiiAuthService>();
         services.AddHttpClient<IDgiiTransmissionService, DgiiTransmissionService>();
-        services.AddTransient<ICertificationXmlMappingService, CertificationXmlMappingService>();
-        services.AddTransient<ICertificationService, CertificationService>();
+        
+
+        // --- Certification: Excel Passthrough (Data Testing) ---
+        services.AddTransient<ICertificationExcelMappingService, Certification.CertificationExcelMappingService>();
+        services.AddTransient<ICertificationExcelGeneratorService, Certification.CertificationExcelGeneratorService>();
+        services.AddTransient<ICertificationExcelService, Certification.CertificationExcelService>();
+
+        // --- Certification: Simulation ---
+        services.AddTransient<ICertificationSimulationMappingService, Certification.CertificationSimulationMappingService>();
+        services.AddTransient<ICertificationSimulationGeneratorService, Certification.CertificationSimulationGeneratorService>();
+        services.AddTransient<ICertificationSimulationService, Certification.CertificationSimulationService>();
+
+        // --- Production ---
+        services.AddTransient<IEcfProductionGeneratorService, Production.EcfProductionGeneratorService>();
+        services.AddTransient<IEcfProductionService, Production.EcfProductionService>();
+
         services.AddTransient<Jobs.EcfTrackingJob>();
 
         return services;
