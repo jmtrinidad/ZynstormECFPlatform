@@ -54,9 +54,9 @@ public static class Tools
     /// <summary>
     /// Formats a decimal to string with 2 decimal places using InvariantCulture.
     /// </summary>
-    public static string? FormatDecimal(decimal? value)
+    public static string? FormatDecimal(decimal? value, int decimals = 2)
     {
-        return value?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        return value?.ToString($"F{decimals}", System.Globalization.CultureInfo.InvariantCulture);
     }
 
     /// <summary>

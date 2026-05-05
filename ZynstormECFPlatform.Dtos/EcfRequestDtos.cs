@@ -209,6 +209,7 @@ public class EcfItemRequestDto
     public decimal CantidadItem { get; set; }
     public string? UnidadMedida { get; set; }
     public decimal PrecioUnitarioItem { get; set; }
+    public int? PrecioUnitarioItemDecimals { get; set; }
     public decimal? DescuentoMonto { get; set; }
     public EcfTablaSubDescuentoRequest? TablaSubDescuento { get; set; }
     public decimal MontoItem { get; set; }

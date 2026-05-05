@@ -76,10 +76,19 @@ public class EcfXmlItem
     [XmlIgnore]
     public decimal PrecioUnitarioItem { get; set; }
 
+    [XmlIgnore]
+    public int? PrecioUnitarioItemDecimals { get; set; }
+
     [XmlElement("PrecioUnitarioItem", Order = 11)]
     public string PrecioUnitarioItemString
     {
-        get => Tools.FormatDecimal(PrecioUnitarioItem) ?? "0.00";
+        get
+        {
+            var decimals = PrecioUnitarioItemDecimals ?? 4;
+            if (decimals < 0) decimals = 0;
+            if (decimals > 4) decimals = 4;
+            return Tools.FormatDecimal(PrecioUnitarioItem, decimals) ?? "0.0000";
+        }
         set => PrecioUnitarioItem = Tools.ParseDecimal(value) ?? 0m;
     }
 

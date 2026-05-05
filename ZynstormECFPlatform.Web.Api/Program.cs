@@ -17,6 +17,7 @@ using Hangfire;
 using Hangfire.PostgreSql;
 using ZynstormECFPlatform.Data;
 using ZynstormECFPlatform.Data.Seeds;
+using ZynstormECFPlatform.Common.Hubs;
 
 // Program.cs
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -32,6 +33,7 @@ builder.Services.AddControllersWithViews()
     });
 
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSignalR();
 
 builder.Services.AddApiVersioning(options =>
 {
@@ -183,6 +185,7 @@ app.UseSwaggerUI(options =>
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseWebSockets();
 
 app.UseCors("corsGlobalPolicy");
 
@@ -192,6 +195,7 @@ app.UseAuthorization();
 app.UseHangfireDashboard();
 
 app.MapControllers();
+app.MapHub<CertificationHub>("/hubs/certification");
 
 app.Run();
 

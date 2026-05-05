@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+ï»¿using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Abstractions.DataServices;
@@ -6,6 +6,9 @@ using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Web.Api.Filters;
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers;
 
@@ -145,17 +148,60 @@ public class CertificationController(
         return Ok(summary);
     }
 
-    [HttpPost("automate")]
-    public async Task<ActionResult<string>> AutomateCertification([FromForm] IFormFile excelFile)
+    [HttpPost("pruebas-datos-ecf")]
+    public async Task<ActionResult<object>> PruebasDatosEcf([FromForm] IFormFile excelFile, [FromForm] string clientGuidId)
     {
         if (excelFile == null || excelFile.Length == 0)
-            return BadRequest("Debe proporcionar un archivo Excel de certificación.");
+            return BadRequest("Debe proporcionar un archivo Excel de certificaciÃ³n.");
+
+        if (string.IsNullOrWhiteSpace(clientGuidId))
+            return BadRequest("Debe proporcionar el GuidId del cliente.");
 
         using var ms = new MemoryStream();
         await excelFile.CopyToAsync(ms);
         var jobId = await certificationService.EnqueueCertificationJobAsync(ms.ToArray(), excelFile.FileName, env.WebRootPath);
 
-        return Ok(new { JobId = jobId, Message = "Proceso de certificación iniciado en segundo plano." });
+        return Ok(new { jobId, clientGuidId, step = 2, tests = Array.Empty<object>(), generatedFiles = Array.Empty<object>(), message = "Proceso de pruebas de datos e-CF iniciado en segundo plano." });
+    }
+
+    [HttpGet("ws")]
+    public async Task Ws([FromQuery] string jobId, CancellationToken cancellationToken = default)
+    {
+        if (!HttpContext.WebSockets.IsWebSocketRequest)
+        {
+            HttpContext.Response.StatusCode = 400;
+            await HttpContext.Response.WriteAsync("Se requiere una conexiÃ³n WebSocket.", cancellationToken);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            HttpContext.Response.StatusCode = 400;
+            await HttpContext.Response.WriteAsync("Debe proporcionar jobId.", cancellationToken);
+            return;
+        }
+
+        using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+        while (!cancellationToken.IsCancellationRequested && webSocket.State == WebSocketState.Open)
+        {
+            var status = await certificationService.GetJobStatusAsync(jobId);
+            var payload = JsonSerializer.Serialize(new
+            {
+                jobId,
+                status = status.Status,
+                step = status.CurrentStep,
+                totalSteps = status.TotalSteps,
+                currentNcf = status.CurrentNcf,
+                logs = status.CompletedSteps.TakeLast(5),
+                generatedFiles = string.IsNullOrWhiteSpace(status.DownloadUrl)
+                    ? Array.Empty<object>()
+                    : new[] { new { name = $"cert_step4_{jobId}.zip", url = $"/v1/Certification/download/{jobId}" } }
+            });
+            var buffer = Encoding.UTF8.GetBytes(payload);
+            await webSocket.SendAsync(buffer, WebSocketMessageType.Text, true, cancellationToken);
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+            if (status.Status is "Completed" or "Failed")
+                break;
+        }
     }
 
     [HttpGet("job-status/{jobId}")]
@@ -171,10 +217,10 @@ public class CertificationController(
         var status = await certificationService.GetJobStatusAsync(jobId);
 
         if (status.HighestCompletedStep < 3)
-            return BadRequest("La descarga solo está permitida una vez que el Paso 3 (Resúmenes B2C) haya sido completado exitosamente.");
+            return BadRequest("La descarga solo estÃ¡ permitida una vez que el Paso 3 (ResÃºmenes B2C) haya sido completado exitosamente.");
 
         if (string.IsNullOrEmpty(status.DownloadUrl))
-            return BadRequest("El archivo aún no ha sido generado.");
+            return BadRequest("El archivo aÃºn no ha sido generado.");
 
         var bytes = await System.IO.File.ReadAllBytesAsync(status.DownloadUrl);
         return File(bytes, "application/zip", $"cert_step4_{jobId}.zip");
@@ -209,7 +255,7 @@ public class CertificationController(
         try
         {
             var jobId = await certificationService.EnqueueSimulacionEcfJobAsync(dto, env.WebRootPath);
-            return Ok(new { JobId = jobId, Message = "Simulación de e-CF iniciada en segundo plano." });
+            return Ok(new { JobId = jobId, Message = "SimulaciÃ³n de e-CF iniciada en segundo plano." });
         }
         catch (Exception ex)
         {

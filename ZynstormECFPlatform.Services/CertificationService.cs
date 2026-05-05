@@ -22,6 +22,10 @@ using ZynstormECFPlatform.Data;
 using Microsoft.AspNetCore.Hosting;
 using System.Text.Json;
 
+//using Microsoft.AspNetCore.SignalR;
+using ZynstormECFPlatform.Common.Hubs;
+using Microsoft.AspNetCore.SignalR;
+
 namespace ZynstormECFPlatform.Services;
 
 public class CertificationService : ICertificationService
@@ -40,6 +44,8 @@ public class CertificationService : ICertificationService
     private readonly ICertificationDocumentService _documentService;
     private readonly IENcfService _encfService;
     private readonly StorageContext _context;
+    private readonly IHubContext<CertificationHub> _hubContext;
+    private readonly ICertificationXmlMappingService _certificationXmlMappingService;
 
     // In-memory store for certification state
     private static List<CertificationTestDto>? _cachedTests;
@@ -64,7 +70,9 @@ public class CertificationService : ICertificationService
         ICertificationStepService stepService,
         ICertificationDocumentService documentService,
         IENcfService encfService,
-        StorageContext context)
+        StorageContext context,
+        IHubContext<CertificationHub> hubContext,
+        ICertificationXmlMappingService certificationXmlMappingService)
     {
         _configuration = configuration;
         _generatorService = generatorService;
@@ -80,6 +88,8 @@ public class CertificationService : ICertificationService
         _documentService = documentService;
         _encfService = encfService;
         _context = context;
+        _hubContext = hubContext;
+        _certificationXmlMappingService = certificationXmlMappingService;
     }
 
     public async Task<List<CertificationTestDto>> GetTestsAsync()
@@ -235,7 +245,8 @@ public class CertificationService : ICertificationService
             if (string.IsNullOrEmpty(test.ENcf)) test.ENcf = test.CaseNumber;
             GetStr(row, "ENCF");
 
-            var requestDto = MapRowToRequest(row, test.Step);
+            var requestDto = _certificationXmlMappingService.MapRowToRequest(row, test.Step);
+            requestDto = _certificationXmlMappingService.PrepareExcelCertificationXml(requestDto);
 
             string issuerRnc = requestDto.ECF.Encabezado.Emisor.RNCEmisor;
             if (string.IsNullOrEmpty(issuerRnc))
@@ -272,7 +283,8 @@ public class CertificationService : ICertificationService
                     var individualRow = ecfRows.FirstOrDefault(r => GetStr(r, "ENCF") == test.ENcf);
                     if (individualRow != null)
                     {
-                        var individualDto = MapRowToRequest(individualRow, 4);
+                        var individualDto = _certificationXmlMappingService.MapRowToRequest(individualRow, 4);
+                        individualDto = _certificationXmlMappingService.PrepareExcelCertificationXml(individualDto);
                         string individualUnsigned = _generatorService.GenerateUnsignedXml(individualDto, false);
                         string individualSigned = _signerService.SignXml(individualUnsigned, certBase64, certPass);
 
@@ -550,145 +562,6 @@ public class CertificationService : ICertificationService
         return _dateOffset.HasValue ? date.Value.Add(_dateOffset.Value) : date;
     }
 
-    private EcfInvoiceRequestDto MapRowToRequest(IDictionary<string, object> row, int step, DateTime? fallbackDate = null)
-    {
-        var dto = new EcfInvoiceRequestDto
-        {
-            ExternalReference = GetStr(row, "NumeroFacturaInterna") ?? "",
-            ECF = new EcfRequest
-            {
-                Encabezado = new EcfEncabezadoRequest
-                {
-                    IdDoc = new EcfIdDocRequest
-                    {
-                        TipoeCF = GetStr(row, "TipoeCF"),
-                        eNCF = CleanNcf(GetStr(row, "ENCF") ?? GetStr(row, "CasoPrueba") ?? "") ?? "",
-                        FechaVencimientoSecuencia = GetStr(row, "FechaVencimientoSecuencia"),
-                        IndicadorEnvioDiferido = GetStr(row, "IndicadorEnvioDiferido"),
-                        IndicadorMontoGravado = GetStr(row, "IndicadorMontoGravado"),
-                        TipoIngresos = GetStr(row, "TipoIngresos"),
-                        TipoPago = GetStr(row, "TipoPago"),
-                        FechaLimitePago = GetStr(row, "FechaLimitePago"),
-                        IndicadorNotaCredito = GetStr(row, "IndicadorNotaCredito"),
-                        TerminoPago = GetStr(row, "TerminoPago")
-                    },
-                    Emisor = new EcfEmisorRequest
-                    {
-                        RNCEmisor = GetStr(row, "RNCEmisor") ?? "",
-                        RazonSocialEmisor = GetStr(row, "RazonSocialEmisor") ?? "",
-                        NombreComercial = GetStr(row, "NombreComercial"),
-                        Sucursal = GetStr(row, "Sucursal"),
-                        DireccionEmisor = GetStr(row, "DireccionEmisor") ?? "",
-                        Municipio = GetStr(row, "Municipio"),
-                        Provincia = GetStr(row, "Provincia"),
-                        Telefono = GetStr(row, "TelefonoEmisor[1]"),
-                        CorreoEmisor = GetStr(row, "CorreoEmisor"),
-                        WebSite = GetStr(row, "WebSite"),
-                        ActividadEconomica = GetStr(row, "ActividadEconomica"),
-                        CodigoVendedor = GetStr(row, "CodigoVendedor"),
-                        NumeroFacturaInterna = GetStr(row, "NumeroFacturaInterna"),
-                        NumeroPedidoInterno = GetStr(row, "NumeroPedidoInterno"),
-                        ZonaVenta = GetStr(row, "ZonaVenta"),
-                        FechaEmision = GetStr(row, "FechaEmision") ?? fallbackDate?.ToString("dd-MM-yyyy") ?? DateTime.Now.ToString("dd-MM-yyyy")
-                    },
-                    Comprador = new EcfCompradorRequest
-                    {
-                        RNCComprador = GetStr(row, "RNCComprador"),
-                        IdentificadorExtranjero = GetStr(row, "IdentificadorExtranjero"),
-                        RazonSocialComprador = GetStr(row, "RazonSocialComprador"),
-                        ContactoComprador = GetStr(row, "ContactoComprador"),
-                        CorreoComprador = GetStr(row, "CorreoComprador"),
-                        DireccionComprador = GetStr(row, "DireccionComprador"),
-                        PaisComprador = GetStr(row, "PaisComprador"),
-                        TelefonoAdicional = GetStr(row, "TelefonoAdicional"),
-                        MunicipioComprador = GetStr(row, "MunicipioComprador"),
-                        ProvinciaComprador = GetStr(row, "ProvinciaComprador"),
-                        FechaEntrega = GetStr(row, "FechaEntrega"),
-                        FechaOrdenCompra = GetStr(row, "FechaOrdenCompra"),
-                        NumeroOrdenCompra = GetStr(row, "NumeroOrdenCompra"),
-                        CodigoInternoComprador = GetStr(row, "CodigoInternoComprador")
-                    },
-                    Totales = new EcfTotalesRequest
-                    {
-                        MontoGravadoTotal = GetDec(row, "MontoGravadoTotal"),
-                        MontoGravadoI1 = GetDec(row, "MontoGravadoI1"),
-                        MontoGravadoI2 = GetDec(row, "MontoGravadoI2"),
-                        MontoGravadoI3 = GetDec(row, "MontoGravadoI3"),
-                        MontoExento = GetDec(row, "MontoExento"),
-                        TotalITBIS = GetDec(row, "TotalITBIS"),
-                        TotalITBIS1 = GetDec(row, "TotalITBIS1"),
-                        TotalITBIS2 = GetDec(row, "TotalITBIS2"),
-                        TotalITBIS3 = GetDec(row, "TotalITBIS3"),
-                        MontoTotal = GetDec(row, "MontoTotal"),
-                        MontoNoFacturable = GetDec(row, "MontoNoFacturable"),
-                        MontoPeriodo = GetDec(row, "MontoPeriodo"),
-                        ValorPagar = GetDec(row, "ValorPagar"),
-                        TotalITBISRetenido = GetDec(row, "TotalITBISRetenido"),
-                        TotalISRRetencion = GetDec(row, "TotalISRRetencion"),
-                        MontoImpuestoAdicional = GetDec(row, "MontoImpuestoAdicional")
-                    }
-                },
-                InformacionReferencia = (GetStr(row, "TipoeCF") == "33" || GetStr(row, "TipoeCF") == "34") ? new EcfInformacionReferenciaRequest
-                {
-                    NCFModificado = CleanNcf(GetStr(row, "NCFModificado")),
-                    RNCOtroContribuyente = GetStr(row, "RNCOtroContribuyente"),
-                    FechaNCFModificado = GetStr(row, "FechaNCFModificado"),
-                    CodigoModificacion = GetStr(row, "CodigoModificacion") ?? "3",
-                    RazonModificacion = GetStr(row, "RazonModificacion") ?? "Ajuste parcial de montos"
-                } : null
-            }
-        };
-
-        for (int i = 1; i <= 50; i++)
-        {
-            var nombreKey = $"NombreItem[{i}]";
-            var nombre = GetStr(row, nombreKey);
-            if (nombre == null) continue;
-
-            var item = new EcfItemRequestDto
-            {
-                NumeroLinea = i.ToString(),
-                IndicadorFacturacion = GetStr(row, $"IndicadorFacturacion[{i}]"),
-                NombreItem = nombre,
-                DescripcionItem = GetStr(row, $"DescripcionItem[{i}]"),
-                IndicadorBienoServicio = GetStr(row, $"IndicadorBienoServicio[{i}]"),
-                CantidadItem = GetDec(row, $"CantidadItem[{i}]") ?? 1,
-                UnidadMedida = GetStr(row, $"UnidadMedida[{i}]"),
-                PrecioUnitarioItem = GetDec(row, $"PrecioUnitarioItem[{i}]") ?? 0,
-                DescuentoMonto = GetDec(row, $"DescuentoMonto[{i}]"),
-                MontoItem = GetDec(row, $"MontoItem[{i}]") ?? 0,
-                RecargoMonto = GetDec(row, $"RecargoMonto[{i}]"),
-                MontoITBISRetenido = GetDec(row, $"MontoITBISRetenido[{i}]"),
-                MontoISRRetenido = GetDec(row, $"MontoISRRetenido[{i}]"),
-                FechaElaboracion = GetStr(row, $"FechaElaboracion[{i}]"),
-                FechaVencimientoItem = GetStr(row, $"FechaVencimientoItem[{i}]")
-            };
-
-            for (int k = 1; k <= 5; k++)
-            {
-                var subTipo = GetStr(row, $"TipoSubRecargo[{i}][{k}]");
-                var subMonto = GetDec(row, $"MontosubRecargo[{i}][{k}]");
-                if (subTipo != null || subMonto != null)
-                {
-                    item.TablaSubRecargo ??= new EcfTablaSubRecargoRequest();
-                    item.TablaSubRecargo.SubRecargo.Add(new EcfSubRecargoRequest
-                    {
-                        TipoSubRecargo = subTipo ?? "$",
-                        MontoSubRecargo = subMonto ?? 0,
-                        SubRecargoPorcentaje = GetDec(row, $"SubRecargoPorcentaje[{i}][{k}]")
-                    });
-                }
-            }
-
-            dto.ECF.DetallesItems.Item.Add(item);
-
-            if ((dto.ECF.Encabezado.IdDoc.TipoeCF == "33" || dto.ECF.Encabezado.IdDoc.TipoeCF == "34") && dto.ECF.DetallesItems.Item.Count >= 1)
-                break;
-        }
-
-        return dto;
-    }
-
     public async Task<CertificationSummaryDto> GetSummaryAsync()
     {
         var tests = await GetTestsAsync();
@@ -770,6 +643,7 @@ public class CertificationService : ICertificationService
 
         var status = _jobStatuses[jobId];
         status.Status = "Processing";
+        await PublishJobEventAsync(jobId, new { status = "processing", message = "Iniciando procesamiento de pruebas e-CF" });
 
         try
         {
@@ -834,6 +708,15 @@ public class CertificationService : ICertificationService
             {
                 status.CurrentStep++;
                 status.CurrentNcf = test.ENcf;
+                await PublishJobEventAsync(jobId, new
+                {
+                    status = "sending",
+                    step = test.Step,
+                    index = test.Index,
+                    code = test.EcfType,
+                    ncf = test.ENcf,
+                    message = $"Enviando XML {test.ENcf}"
+                });
 
                 Console.WriteLine($"[DEBUG-JOB] Processing Step {test.Step}, Index {test.Index}, NCF {test.ENcf}, Type {test.EcfType}");
 
@@ -860,6 +743,17 @@ public class CertificationService : ICertificationService
                         Status = "Generado",
                         Message = string.IsNullOrEmpty(sharedCode) ? "XML generado (aleatorio)" : $"XML generado con código sincronizado: {sharedCode}"
                     });
+                    await PublishJobEventAsync(jobId, new
+                    {
+                        status = "generated",
+                        step = 4,
+                        index = test.Index,
+                        code = test.EcfType,
+                        ncf = test.ENcf,
+                        approved = true,
+                        approvedAt = DateTime.UtcNow,
+                        message = "XML generado para subida manual DGII"
+                    });
                 }
                 else
                 {
@@ -874,7 +768,8 @@ public class CertificationService : ICertificationService
                             var ecfRow = ecfRows.FirstOrDefault(r => CleanNcf(GetStr(r, "ENCF") ?? "") == ncf);
                             if (ecfRow != null)
                             {
-                                var individualDto = MapRowToRequest(ecfRow, 4, jobStartTime);
+                                var individualDto = _certificationXmlMappingService.MapRowToRequest(ecfRow, 4, jobStartTime);
+                                individualDto = _certificationXmlMappingService.PrepareExcelCertificationXml(individualDto);
                                 individualDto.SignatureDateOverride = jobStartTime;
 
                                 var activeCert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
@@ -921,6 +816,17 @@ public class CertificationService : ICertificationService
                         Status = result.Success ? "Aceptado" : "Rechazado",
                         Message = result.Success ? $"Paso exitoso (Code: {forcedCode})" : result.Error
                     });
+                    await PublishJobEventAsync(jobId, new
+                    {
+                        status = result.Success ? "approved" : "rejected",
+                        step = test.Step,
+                        index = test.Index,
+                        code = test.EcfType,
+                        ncf = test.ENcf,
+                        approved = result.Success,
+                        approvedAt = result.Success ? DateTime.UtcNow : (DateTime?)null,
+                        message = result.Success ? $"Aprobado DGII ({forcedCode})" : result.Error
+                    });
 
                     if (result.Success)
                     {
@@ -954,23 +860,44 @@ public class CertificationService : ICertificationService
                     }
                 }
                 status.DownloadUrl = zipPath;
+                await PublishJobEventAsync(jobId, new
+                {
+                    status = "step4_ready",
+                    message = "Archivos XML de paso 4 listos para descarga",
+                    generatedFiles = new[]
+                    {
+                        new
+                        {
+                            name = $"cert_step4_{jobId}.zip",
+                            url = $"/v1/Certification/download/{jobId}"
+                        }
+                    }
+                });
             }
 
             if (status.Status != "Failed")
                 status.Status = "Completed";
+            await PublishJobEventAsync(jobId, new { status = status.Status.ToLowerInvariant(), message = "Proceso finalizado" });
         }
         catch (Exception ex)
         {
             status.Status = "Failed";
             status.ErrorMessage = ex.Message;
+            await PublishJobEventAsync(jobId, new { status = "failed", message = ex.Message });
         }
+    }
+
+    private Task PublishJobEventAsync(string jobId, object payload)
+    {
+        return _hubContext.Clients.Group($"cert-job:{jobId}").SendAsync("CertificationProgress", payload);
     }
 
     private async Task<string> GenerateSignedXmlForTestAsync(CertificationTestDto test, Client client, List<IDictionary<string, object>> virtualRows, string? forcedCode = null, DateTime? fallbackDate = null)
     {
         var row = test.Index < virtualRows.Count ? virtualRows[test.Index] : virtualRows.Last();
 
-        var requestDto = MapRowToRequest(row, test.Step, fallbackDate);
+        var requestDto = _certificationXmlMappingService.MapRowToRequest(row, test.Step, fallbackDate);
+        requestDto = _certificationXmlMappingService.PrepareExcelCertificationXml(requestDto);
         requestDto.SignatureDateOverride = fallbackDate;
 
         if (!string.IsNullOrEmpty(forcedCode))
@@ -996,7 +923,8 @@ public class CertificationService : ICertificationService
     private async Task<DgiiTransmissionResult> RunTestInternalAsync(CertificationTestDto test, Client client, List<IDictionary<string, object>> virtualRows, string? forcedCode = null, DateTime? fallbackDate = null)
     {
         var row = virtualRows[test.Index];
-        var requestDto = MapRowToRequest(row, test.Step, fallbackDate);
+        var requestDto = _certificationXmlMappingService.MapRowToRequest(row, test.Step, fallbackDate);
+        requestDto = _certificationXmlMappingService.PrepareExcelCertificationXml(requestDto);
         requestDto.SignatureDateOverride = fallbackDate;
 
         // ALWAYS ensure randomization/forced code to avoid 'Already used' errors
@@ -1252,16 +1180,9 @@ public class CertificationService : ICertificationService
             }
             else
             {
-                process = new CertificationProcess
-                {
-                    ClientId = client.ClientId,
-                    Environment = DgiiEnvironment.CerteCF,
-                    Status = CertificationStatus.InProgress,
-                    StartDate = DateTime.Now,
-                    CurrentStepId = step4.CertificationStepId,
-                    RegisteredAt = DateTime.Now
-                };
-                await _processService.InsertAsync(process);
+                throw new InvalidOperationException(
+                    $"No existe un proceso de certificación en curso para el cliente {client.Rnc}. " +
+                    "Debe iniciar el proceso desde el flujo de certificación antes de ejecutar automatización.");
             }
 
             // 3. Prepare Credentials

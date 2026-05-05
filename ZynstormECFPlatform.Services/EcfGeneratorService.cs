@@ -297,6 +297,7 @@ public class EcfGeneratorService : IEcfGeneratorService
                     SubDescuentos = item.TablaSubDescuento.SubDescuento.Select(s => new EcfXmlSubDescuento
                     {
                         TipoSubDescuento = s.TipoSubDescuento ?? "$",
+                        SubDescuentoPorcentaje = s.SubDescuentoPorcentaje,
                         MontoSubDescuento = s.MontoSubDescuento ?? 0
                     }).ToList()
                 };
@@ -336,6 +337,7 @@ public class EcfGeneratorService : IEcfGeneratorService
                 CantidadItem = item.CantidadItem,
                 UnidadMedida = int.TryParse(item.UnidadMedida, out int um) ? um : null,
                 PrecioUnitarioItem = item.PrecioUnitarioItem,
+                PrecioUnitarioItemDecimals = item.PrecioUnitarioItemDecimals,
                 DescuentoMonto = item.DescuentoMonto,
                 TablaSubDescuento = tablaSubDescuento,
                 RecargoMonto = item.RecargoMonto,
@@ -379,6 +381,7 @@ public class EcfGeneratorService : IEcfGeneratorService
             ValorPagar = e.Totales.ValorPagar,
             TotalITBISRetenido = e.Totales.TotalITBISRetenido,
             TotalISRRetencion = e.Totales.TotalISRRetencion,
+            MontoImpuestoAdicional = e.Totales.MontoImpuestoAdicional,
             MontoNoFacturable = e.Totales.MontoNoFacturable,
             MontoTotal = e.Totales.MontoTotal ?? 0
         };

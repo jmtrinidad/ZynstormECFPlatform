@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IXmlSignatureService, XmlSignatureService>();
         services.AddHttpClient<IDgiiAuthService, DgiiAuthService>();
         services.AddHttpClient<IDgiiTransmissionService, DgiiTransmissionService>();
+        services.AddTransient<ICertificationXmlMappingService, CertificationXmlMappingService>();
         services.AddTransient<ICertificationService, CertificationService>();
         services.AddTransient<Jobs.EcfTrackingJob>();
 
