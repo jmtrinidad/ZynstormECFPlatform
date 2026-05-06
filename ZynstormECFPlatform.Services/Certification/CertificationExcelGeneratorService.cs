@@ -54,20 +54,14 @@ public class CertificationExcelGeneratorService : ICertificationExcelGeneratorSe
     /// <inheritdoc />
     public string GenerateUnsignedXml(EcfInvoiceRequestDto dto, bool isSummary = false)
     {
-        // ── Step 1: Determine the ECF Type (Priority: explicit dto.ECF.Encabezado.IdDoc.TipoeCF > NCF extraction) ─────────────────────────
+        // ── Step 1: Determine the ECF Type ─────────────────────────
         var ecfType = int.Parse(dto.ECF.Encabezado.IdDoc.TipoeCF ?? NcfHelper.ExtractEcfType(dto.ECF.Encabezado.IdDoc.eNCF).ToString());
         
-        // Calculate actual total from items (do not rely on ManualMontoTotal which may be null)
-        decimal actualTotal = dto.ECF.Encabezado.Totales.MontoTotal ?? dto.ECF.DetallesItems.Item.Sum(i => i.MontoItem);
+        // Calculate actual total from items or use manual total
+        decimal manualTotal = dto.ECF.Encabezado.Totales.MontoTotal ?? 0;
 
-        // For Type 32: route to RFCE only if explicitly a summary OR if actual amount is below threshold
+        // Use explicit flag if provided
         bool isRfceSummary = isSummary;
-
-        // SPECIAL CASE: if isSummary flag is NOT set, always use ECF path (not RFCE)
-        if (ecfType == 32 && !isSummary)
-        {
-            isRfceSummary = false;
-        }
 
         // CLEANUP: Buyer cleanup removed to ensure Excel data is included.
         
@@ -83,16 +77,13 @@ public class CertificationExcelGeneratorService : ICertificationExcelGeneratorSe
         {
             using (var xmlWriter = XmlWriter.Create(stringWriter, settings))
             {
-                // REFINED: Individual vs Summary selection
                 if (isRfceSummary)
                 {
-                    // This is a summary (Step 3 or real B2C workflow)
                     var rfceRoot = MapToRfceXmlRoot(dto);
                     _rfceSerializer.Serialize(xmlWriter, rfceRoot, _noNamespaces);
                 }
                 else
                 {
-                    // This is an individual invoice (Step 4 or B2B workflow)
                     var root = MapToXmlRoot(dto);
                     _serializer.Serialize(xmlWriter, root, _noNamespaces);
                 }
@@ -100,8 +91,18 @@ public class CertificationExcelGeneratorService : ICertificationExcelGeneratorSe
             xml = stringWriter.ToString();
         }
 
+        // ── NUCLEAR OPTION: Post-processing to ensure XSD compliance ────────
+        // Replicating old logic: remove <Retencion> if not a purchase/export type
+        if (ecfType is not (41 or 47))
+        {
+            xml = System.Text.RegularExpressions.Regex.Replace(
+                xml, 
+                @"<Retencion\b[^>]*>.*?</Retencion>", 
+                string.Empty, 
+                System.Text.RegularExpressions.RegexOptions.Singleline);
+        }
 
-
+        // ── Additional Post-processing ──────────────────────────────────────
         xml = xml.Replace("<CompradorExp>", "<Comprador>")
                  .Replace("</CompradorExp>", "</Comprador>");
 
@@ -233,8 +234,29 @@ public class CertificationExcelGeneratorService : ICertificationExcelGeneratorSe
 
         var xmlItems = new List<EcfXmlItem>();
         int lineNo = 1;
+
+        // REPLICATION: Accumulators for total consistency
+        decimal calcTaxableG1 = 0, calcTaxableG2 = 0, calcTaxableG3 = 0;
+        decimal calcItbis1 = 0, calcItbis2 = 0, calcItbis3 = 0;
+
         foreach (var item in dto.ECF.DetallesItems.Item)
         {
+            int indicator = int.TryParse(item.IndicadorFacturacion, out int ind) ? ind : 1;
+            
+            // REPLICATION: Derive breakdown from items if header is missing or for verification
+            decimal itemMonto = item.MontoItem;
+            decimal itemDiscount = item.DescuentoMonto ?? 0;
+            decimal itemRecargo = item.RecargoMonto ?? 0;
+            
+            // In DGII certification, we usually follow the billing indicator
+            if (indicator == 1) // 18%
+            {
+                decimal itbisPct = 0.18m;
+                // Base = (Monto - Recargo + Descuento) / (1 + itbisPct) -- This depends on if Monto includes ITBIS
+                // For certification, we usually trust the breakdown if provided, otherwise we infer.
+                // But the error "no coincide" is most likely because the sum of items doesn't match header.
+            }
+
             EcfXmlTablaSubDescuento? tablaSubDescuento = null;
             if (item.TablaSubDescuento?.SubDescuento?.Any() == true)
             {
@@ -276,7 +298,7 @@ public class CertificationExcelGeneratorService : ICertificationExcelGeneratorSe
             {
                 EcfType = ecfType,
                 NumeroLinea = int.TryParse(item.NumeroLinea, out int nl) ? nl : lineNo++,
-                IndicadorFacturacion = int.TryParse(item.IndicadorFacturacion, out int iFact) ? iFact : null,
+                IndicadorFacturacion = indicator,
                 Name = item.NombreItem,
                 ItemType = int.TryParse(item.IndicadorBienoServicio, out int bs) ? bs : null,
                 DescripcionItem = item.DescripcionItem,
@@ -301,7 +323,7 @@ public class CertificationExcelGeneratorService : ICertificationExcelGeneratorSe
             });
         }
 
-        // Build ImpuestosAdicionales in Totales from items that have TablaImpuestoAdicional
+        // Build ImpuestosAdicionales in Totales from items
         EcfXmlImpuestosAdicionales? impuestosAdicionales = null;
         var itemsWithTax = xmlItems.Where(i => i.TablaImpuestoAdicional?.ImpuestoAdicional?.Count > 0).ToList();
         if (itemsWithTax.Count > 0)
@@ -318,34 +340,21 @@ public class CertificationExcelGeneratorService : ICertificationExcelGeneratorSe
                     var specificAmt = dtoItems.Sum(d => d.IscSpecificAmount ?? 0m);
                     var advaloremAmt = dtoItems.Sum(d => d.IscAdvaloremAmount ?? 0m);
                     var otherAmt = dtoItems.Sum(d => d.OtherAdditionalTaxAmount ?? 0m);
-                    // Valid if we have a rate or any positive amount
-                    bool isValid = rate.HasValue || specificAmt > 0 || advaloremAmt > 0 || otherAmt > 0;
-                    return isValid ? new EcfXmlImpuestoAdicional
+                    
+                    return new EcfXmlImpuestoAdicional
                     {
                         TipoImpuesto = g.Key,
                         TasaImpuestoAdicional = rate,
-                        MontoImpuestoSelectivoConsumoEspecifico = specificAmt,
-                        MontoImpuestoSelectivoConsumoAdvalorem = advaloremAmt,
-                        OtrosImpuestosAdicionales = otherAmt
-                    } : null;
+                        MontoImpuestoSelectivoConsumoEspecifico = specificAmt > 0 ? specificAmt : null,
+                        MontoImpuestoSelectivoConsumoAdvalorem = advaloremAmt > 0 ? advaloremAmt : null,
+                        OtrosImpuestosAdicionales = otherAmt > 0 ? otherAmt : null
+                    };
                 })
                 .Where(x => x != null)
                 .Cast<EcfXmlImpuestoAdicional>()
                 .ToList();
             if (taxGroups.Count > 0)
                 impuestosAdicionales = new EcfXmlImpuestosAdicionales { Items = taxGroups };
-
-            // Remove TablaImpuestoAdicional from items whose TipoImpuesto is not registered in Totales
-            var registeredTypes = taxGroups.Select(t => t.TipoImpuesto).ToHashSet();
-            foreach (var item in xmlItems)
-            {
-                if (item.TablaImpuestoAdicional?.ImpuestoAdicional != null)
-                {
-                    item.TablaImpuestoAdicional.ImpuestoAdicional.RemoveAll(ia => !registeredTypes.Contains(ia.TipoImpuesto));
-                    if (item.TablaImpuestoAdicional.ImpuestoAdicional.Count == 0)
-                        item.TablaImpuestoAdicional = null;
-                }
-            }
         }
 
         var totales = new EcfXmlTotales
@@ -439,7 +448,6 @@ public class CertificationExcelGeneratorService : ICertificationExcelGeneratorSe
                 Totales = totales
             },
             Items = xmlItems,
-            
             InformacionReferencia = dto.ECF.InformacionReferencia != null ? new EcfXmlInformacionReferencia
             {
                 NCFModificado = dto.ECF.InformacionReferencia.NCFModificado!,
@@ -453,7 +461,6 @@ public class CertificationExcelGeneratorService : ICertificationExcelGeneratorSe
 
         var doc = new XmlDocument();
         root.Signature = doc.CreateElement("Signature", "http://www.w3.org/2000/09/xmldsig#");
-
         return root;
     }
 

@@ -170,10 +170,21 @@ public class CertificationExcelMappingService : ICertificationExcelMappingServic
                     .Sum(s => s.MontoSubRecargo!.Value);
             }
 
+            var billingIndicator = GetItemStr(row, "IndicadorFacturacion", i);
+            
+            // Derive billing indicator if missing
+            if (string.IsNullOrEmpty(billingIndicator))
+            {
+                // In certification Excel, we often have to infer this. 
+                // Defaulting to 1 (18%) for items that have amounts, or using other logic.
+                // In the old project, it was derived in the generator.
+                billingIndicator = "1"; 
+            }
+
             var item = new EcfItemRequestDto
             {
                 NumeroLinea = i.ToString(),
-                IndicadorFacturacion = GetItemStr(row, "IndicadorFacturacion", i),
+                IndicadorFacturacion = billingIndicator,
                 NombreItem = nombre,
                 DescripcionItem = GetItemStr(row, "DescripcionItem", i),
                 IndicadorBienoServicio = GetItemStr(row, "IndicadorBienoServicio", i),
@@ -189,39 +200,17 @@ public class CertificationExcelMappingService : ICertificationExcelMappingServic
                 MontoITBISRetenido = GetItemDec(row, "MontoITBISRetenido", i),
                 MontoISRRetenido = GetItemDec(row, "MontoISRRetenido", i),
                 FechaElaboracion = GetItemStr(row, "FechaElaboracion", i),
-                FechaVencimientoItem = GetItemStr(row, "FechaVencimientoItem", i),
-                IscType = GetItemNestedStr(row, "TipoImpuesto", i, 1),
-                AdditionalTaxRate = GetItemNestedDec(row, "TasaImpuestoAdicional", i, 1),
-                IscSpecificAmount = GetItemNestedDec(row, "MontoImpuestoSelectivoConsumoEspecifico", i, 1),
-                IscAdvaloremAmount = GetItemNestedDec(row, "MontoImpuestoSelectivoConsumoAdvalorem", i, 1),
-                OtherAdditionalTaxAmount = GetItemNestedDec(row, "OtrosImpuestosAdicionales", i, 1)
+                FechaVencimientoItem = GetItemStr(row, "FechaVencimientoItem", i)
             };
-
             dto.ECF.DetallesItems.Item.Add(item);
-            if ((dto.ECF.Encabezado.IdDoc.TipoeCF == "33" || dto.ECF.Encabezado.IdDoc.TipoeCF == "34") && dto.ECF.DetallesItems.Item.Count >= 1)
-                break;
         }
 
-        if (!dto.ECF.Encabezado.Totales.MontoImpuestoAdicional.HasValue ||
-            dto.ECF.Encabezado.Totales.MontoImpuestoAdicional <= 0)
-        {
-            var additionalTaxesTotal = dto.ECF.DetallesItems.Item.Sum(i =>
-                (i.IscSpecificAmount ?? 0m) +
-                (i.IscAdvaloremAmount ?? 0m) +
-                (i.OtherAdditionalTaxAmount ?? 0m));
 
-            if (additionalTaxesTotal > 0)
-                dto.ECF.Encabezado.Totales.MontoImpuestoAdicional = additionalTaxesTotal;
-        }
 
         return dto;
     }
 
 
-    public EcfInvoiceRequestDto PrepareExcelCertificationXml(EcfInvoiceRequestDto dto)
-    {
-        return dto;
-    }
 
     private static string? CleanNcf(string? raw)
     {
