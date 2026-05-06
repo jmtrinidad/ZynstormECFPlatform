@@ -17,7 +17,7 @@ public class DgiiTransmissionResult
     public bool? SecuenciaUtilizada { get; set; }
     public string? SignedXml { get; set; }
 
-    public bool Success => (!string.IsNullOrEmpty(TrackId) || Estado == "Aceptado" || Codigo == 0) && string.IsNullOrEmpty(Error);
+    public bool Success => (!string.IsNullOrEmpty(TrackId) || string.Equals(Estado, "Aceptado", StringComparison.OrdinalIgnoreCase) || Codigo == 0) && string.IsNullOrEmpty(Error);
 }
 
 public class RfceMensaje

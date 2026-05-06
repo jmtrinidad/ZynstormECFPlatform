@@ -13,6 +13,8 @@ using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Common.Utilities;
 using ZynstormECFPlatform.Data;
+using Microsoft.AspNetCore.SignalR;
+using ZynstormECFPlatform.Common.Hubs;
 
 namespace ZynstormECFPlatform.Services.Certification;
 
@@ -34,6 +36,7 @@ public class CertificationExcelService : ICertificationExcelService
     private readonly ICacheService _cacheService;
     private readonly IENcfService _encfService;
     private readonly StorageContext _context;
+    private readonly IHubContext<CertificationHub> _hubContext;
 
     private static readonly ConcurrentDictionary<string, CertificationJobStatusDto> _jobStatuses = new();
 
@@ -53,6 +56,7 @@ public class CertificationExcelService : ICertificationExcelService
         Microsoft.Extensions.Configuration.IConfiguration configuration,
         ICacheService cacheService,
         IENcfService encfService,
+        IHubContext<CertificationHub> hubContext,
         StorageContext context)
     {
         _mappingService = mappingService;
@@ -70,6 +74,7 @@ public class CertificationExcelService : ICertificationExcelService
         _configuration = configuration;
         _cacheService = cacheService;
         _encfService = encfService;
+        _hubContext = hubContext;
         _context = context;
     }
 
@@ -207,20 +212,68 @@ public class CertificationExcelService : ICertificationExcelService
 
     public async Task<CertificationSummaryDto> GetSummaryAsync() => new CertificationSummaryDto { Tests = await GetTestsAsync() };
 
-    public async Task<string> EnqueueCertificationJobAsync(byte[] excelBytes, string fileName, string webRootPath)
+    public async Task<CertificationJobStatusDto> EnqueueCertificationJobAsync(byte[] excelBytes, string fileName, string webRootPath)
     {
         string jobId = Guid.NewGuid().ToString("N").Substring(0, 8);
-        string path = Path.Combine(webRootPath, "certification_files", $"suite_{jobId}.xlsx");
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
-        await File.WriteAllBytesAsync(path, excelBytes);
-        _jobStatuses[jobId] = new CertificationJobStatusDto { JobId = jobId, Status = "Pending" };
-        BackgroundJob.Enqueue<ICertificationExcelService>(x => x.ProcessAutomationJobAsync(path, jobId, webRootPath));
-        return jobId;
+        string path = System.IO.Path.Combine(webRootPath, "certification_files", $"suite_{jobId}.xlsx");
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+        await System.IO.File.WriteAllBytesAsync(path, excelBytes);
+
+        // Parse Excel to get initial tests immediately using the existing helper method
+        var tests = await GetTestsFromExcelAsync(path);
+
+        // CertificationAutomation Job Progress Initial State
+        var status = new CertificationJobStatusDto 
+        { 
+            JobId = jobId, 
+            Status = "Pending",
+            TotalSteps = tests.Count,
+            TotalComprobantes = tests.Count(t => t.Step is 1 or 2),
+            TotalResumenes = tests.Count(t => t.Step == 3)
+        };
+
+        foreach (var t in tests)
+        {
+            status.CompletedSteps.Add(new CertificationStepResultDto
+            {
+                Index = t.Index,
+                Ncf = t.ENcf,
+                Step = t.Step.ToString(),
+                Status = "Pendiente",
+                Message = "Esperando procesamiento..."
+            });
+        }
+
+        _jobStatuses[jobId] = status;
+        
+        Console.WriteLine($"[DEBUG-JOB] Enqueued automation job {jobId}. Total tests: {tests.Count}. WebRootPath: {webRootPath}");
+
+        try
+        {
+            BackgroundJob.Enqueue<ICertificationExcelService>(x => x.ProcessAutomationJobAsync(path, jobId, webRootPath));
+        }
+        catch (Exception ex)
+        {
+            status.Status = "Failed";
+            status.ErrorMessage = ex.Message;
+        }
+
+        return status;
     }
 
     public async Task<CertificationJobStatusDto> GetJobStatusAsync(string jobId) => _jobStatuses.TryGetValue(jobId, out var s) ? s : new CertificationJobStatusDto { JobId = jobId, Status = "NotFound" };
 
-    public async Task<List<CertificationStepResultDto>> GetJobLogsAsync(string jobId) => _jobStatuses.TryGetValue(jobId, out var s) ? s.CompletedSteps : new List<CertificationStepResultDto>();
+    public async Task<List<CertificationStepResultDto>> GetJobLogsAsync(string jobId)
+    {
+        if (_jobStatuses.TryGetValue(jobId, out var s))
+        {
+            lock (s.CompletedSteps)
+            {
+                return s.CompletedSteps.ToList();
+            }
+        }
+        return new List<CertificationStepResultDto>();
+    }
 
     [AutomaticRetry(Attempts = 0)]
     public async Task ProcessAutomationJobAsync(string tempFilePath, string jobId, string webRootPath)
@@ -306,6 +359,7 @@ public class CertificationExcelService : ICertificationExcelService
 
                 status.CurrentStep++;
                 status.CurrentNcf = test.ENcf;
+                string generatedXmlName = "";
 
                 Console.WriteLine($"[DEBUG-JOB] Processing Step {test.Step}, Index {test.Index}, NCF {test.ENcf}, Type {test.EcfType}");
 
@@ -337,14 +391,18 @@ public class CertificationExcelService : ICertificationExcelService
                         string xmlFileName = $"{requestDto.ECF.Encabezado.Emisor.RNCEmisor}{requestDto.ECF.Encabezado.IdDoc.eNCF}.xml";
                         await File.WriteAllTextAsync(Path.Combine(jobDir, xmlFileName), signedXml);
 
-                        status.CompletedSteps.Add(new CertificationStepResultDto
+                        lock (status.CompletedSteps)
                         {
-                            Index = test.Index,
-                            Ncf = test.ENcf,
-                            Step = "4",
-                            Status = "Generado",
-                            Message = string.IsNullOrEmpty(sharedCode) ? "XML generado (aleatorio)" : $"XML generado con código sincronizado: {sharedCode}"
-                        });
+                            status.CompletedSteps.Add(new CertificationStepResultDto
+                            {
+                                Index = test.Index,
+                                Ncf = test.ENcf,
+                                Step = "4",
+                                Status = "Generado",
+                                Message = string.IsNullOrEmpty(sharedCode) ? "XML generado (aleatorio)" : $"XML generado con código sincronizado: {sharedCode}",
+                                XmlFileName = xmlFileName
+                            });
+                        }
 
                         if (test.Step > status.HighestCompletedStep) status.HighestCompletedStep = test.Step;
                     }
@@ -418,14 +476,17 @@ public class CertificationExcelService : ICertificationExcelService
                         if (validationErrors.Any(e => e.StartsWith("[ERROR]")))
                         {
                             var errorMsg = "Error de esquema (XSD): " + string.Join(" | ", validationErrors);
-                            status.CompletedSteps.Add(new CertificationStepResultDto
+                            lock (status.CompletedSteps)
                             {
-                                Index = test.Index,
-                                Ncf = test.ENcf,
-                                Step = test.Step.ToString(),
-                                Status = "Rechazado",
-                                Message = errorMsg
-                            });
+                                status.CompletedSteps.Add(new CertificationStepResultDto
+                                {
+                                    Index = test.Index,
+                                    Ncf = test.ENcf,
+                                    Step = test.Step.ToString(),
+                                    Status = "Rechazado",
+                                    Message = errorMsg
+                                });
+                            }
 
                             if (test.Step == 1 || test.Step == 2)
                             {
@@ -451,29 +512,22 @@ public class CertificationExcelService : ICertificationExcelService
 
                         var finalResult = result;
 
-                        // NEW: Poll DGII Status until Aceptado or Rechazado (Legacy replication)
+                        DgiiStatusResponse pollStatus = null;
                         if (result.Success && !string.IsNullOrEmpty(result.TrackId))
                         {
                             Console.WriteLine($"[DEBUG-JOB] Document sent. TrackId: {result.TrackId}. Polling for status...");
-                            var pollStatus = await PollDgiiStatusAsync(result.TrackId, client.Rnc);
+                            pollStatus = await PollDgiiStatusAsync(result.TrackId, client.Rnc);
+                            bool isAceptado = string.Equals(pollStatus.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase);
+                            bool isGenerado = string.Equals(pollStatus.Estado, "Generado", StringComparison.OrdinalIgnoreCase);
 
-                            if (pollStatus.Estado == "Aceptado" || (test.Step == 3 && pollStatus.Estado == "Generado"))
+                            if (isAceptado || (test.Step == 3 && isGenerado))
                             {
                                 ncfSecurityCodes[test.ENcf] = forcedCode;
                                 if (test.Step > status.HighestCompletedStep) status.HighestCompletedStep = test.Step;
 
-                                // Save individual XML for Steps 1 & 2
-                                if (!isSummary)
-                                {
-                                    string xmlFileName = $"{requestDto.ECF.Encabezado.Emisor.RNCEmisor}{requestDto.ECF.Encabezado.IdDoc.eNCF}.xml";
-                                    await File.WriteAllTextAsync(Path.Combine(jobDir, xmlFileName), signedXml);
-                                }
-                                else
-                                {
-                                    // Save RFCE XML for Step 3
-                                    string xmlFileName = $"{requestDto.ECF.Encabezado.Emisor.RNCEmisor}{requestDto.ECF.Encabezado.IdDoc.eNCF}RFCE.xml";
-                                    await File.WriteAllTextAsync(Path.Combine(jobDir, xmlFileName), signedXml);
-                                }
+                                string xmlFileName = $"{requestDto.ECF.Encabezado.Emisor.RNCEmisor}{requestDto.ECF.Encabezado.IdDoc.eNCF}{(isSummary ? "RFCE" : "")}.xml";
+                                await File.WriteAllTextAsync(Path.Combine(jobDir, xmlFileName), signedXml);
+                                generatedXmlName = xmlFileName;
                             }
                             else
                             {
@@ -485,15 +539,24 @@ public class CertificationExcelService : ICertificationExcelService
                             }
                         }
 
-                        status.CompletedSteps.Add(new CertificationStepResultDto
+                        lock (status.CompletedSteps)
                         {
-                            Index = test.Index,
-                            Ncf = test.ENcf,
-                            Step = test.Step.ToString(),
-                            Status = finalResult.Success ? "Aceptado" : "Rechazado",
-                            Message = finalResult.Success ? $"Paso exitoso (Code: {forcedCode})" : finalResult.Error,
-                            TrackId = finalResult.TrackId
-                        });
+                            status.CompletedSteps.Add(new CertificationStepResultDto
+                            {
+                                Index = test.Index,
+                                Ncf = test.ENcf,
+                                Step = test.Step.ToString(),
+                                Status = finalResult.Success ? "Aceptado" : "Rechazado",
+                                Message = finalResult.Success ? $"Paso exitoso (Code: {forcedCode})" : finalResult.Error,
+                                TrackId = finalResult.TrackId,
+                                XmlFileName = generatedXmlName
+                            });
+                        }
+                        
+                        Console.WriteLine($"[DEBUG-JOB] Step {test.Step} completed for {test.ENcf}. Status: {(finalResult.Success ? "Aceptado" : "Rechazado")}");
+
+                        // Notify listeners via SignalR
+                        await _hubContext.Clients.Group($"cert-job:{jobId}").SendAsync("ReceiveJobUpdate", status);
 
                         if (!finalResult.Success && (test.Step == 1 || test.Step == 2))
                         {
@@ -527,8 +590,9 @@ public class CertificationExcelService : ICertificationExcelService
                 string zipPath = Path.Combine(webRootPath, "certification_files", $"cert_step4_{jobId}.zip");
                 if (File.Exists(zipPath)) File.Delete(zipPath);
                 ZipFile.CreateFromDirectory(jobDir, zipPath);
-                status.DownloadUrl = $"/certification_files/cert_step4_{jobId}.zip";
+                status.DownloadUrl = zipPath; // Store PHYSICAL path for ReadAllBytes in Controller
                 status.Status = "Completed";
+                Console.WriteLine($"[DEBUG-JOB] Job {jobId} completed. ZIP created at: {zipPath}");
             }
         }
         catch (Exception ex)
@@ -564,7 +628,9 @@ public class CertificationExcelService : ICertificationExcelService
             await Task.Delay(2500); // Wait 2.5s between polls
             status = await _transmissionService.GetStatusAsync(DgiiEnvironment.CerteCF, token, trackId);
 
-            if (status.Estado == "Aceptado" || status.Estado == "Rechazado" || status.Estado == "Generado")
+            if (string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase) || 
+                string.Equals(status.Estado, "Rechazado", StringComparison.OrdinalIgnoreCase) || 
+                string.Equals(status.Estado, "Generado", StringComparison.OrdinalIgnoreCase))
                 break;
         } while (attempts < maxAttempts);
 

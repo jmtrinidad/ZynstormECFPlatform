@@ -96,7 +96,7 @@ public class DgiiTransmissionService : IDgiiTransmissionService
                 // Mapping success based on RFCE fields if present
                 if (result.Estado != null || result.Codigo.HasValue)
                 {
-                    bool isRfceSuccess = result.Estado == "Aceptado" || result.Codigo == 1 || result.Codigo == 0;
+                    bool isRfceSuccess = string.Equals(result.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase) || result.Codigo == 1 || result.Codigo == 0;
                     
                     if (!isRfceSuccess)
                     {

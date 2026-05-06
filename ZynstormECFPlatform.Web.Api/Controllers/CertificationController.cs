@@ -9,6 +9,7 @@ using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Web.Api.Filters;
+using Microsoft.AspNetCore.Hosting;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers;
 
@@ -161,9 +162,8 @@ public class CertificationController(
         using var ms = new MemoryStream();
         await excelFile.CopyToAsync(ms);
 
-        var jobId = await excelService.EnqueueCertificationJobAsync(ms.ToArray(), excelFile.FileName, env.WebRootPath);
-
-        return Ok(new { jobId, clientGuidId, step = 2, tests = Array.Empty<object>(), generatedFiles = Array.Empty<object>(), message = "Proceso de pruebas de datos e-CF iniciado en segundo plano." });
+        var status = await excelService.EnqueueCertificationJobAsync(ms.ToArray(), excelFile.FileName, env.WebRootPath);
+        return Ok(new { jobId = status.JobId, clientGuidId, step = 2, tests = status.CompletedSteps, generatedFiles = Array.Empty<object>(), message = "Proceso de pruebas de datos e-CF iniciado en segundo plano." });
     }
 
     [HttpGet("ws")]
@@ -186,10 +186,14 @@ public class CertificationController(
         while (!cancellationToken.IsCancellationRequested && webSocket.State == WebSocketState.Open)
         {
             var status = await excelService.GetJobStatusAsync(jobId);
-            var completedSteps = status.CompletedSteps;
-            var comprobantesSteps = completedSteps.Where(s => s.Step is "1" or "2").ToList();
-            var resumenesSteps = completedSteps.Where(s => s.Step == "3").ToList();
-            var generatedSteps = completedSteps.Where(s => s.Step == "4").ToList();
+            List<CertificationStepResultDto> logs;
+            lock (status.CompletedSteps)
+            {
+                logs = status.CompletedSteps.ToList();
+            }
+
+            var comprobantesSteps = logs.Where(s => s.Step is "1" or "2").ToList();
+            var resumenesSteps = logs.Where(s => s.Step == "3").ToList();
             var payload = JsonSerializer.Serialize(new
             {
                 jobId,
@@ -197,11 +201,11 @@ public class CertificationController(
                 step = status.CurrentStep,
                 totalSteps = status.TotalSteps,
                 currentNcf = status.CurrentNcf,
-                logs = completedSteps,
+                logs = logs,
                 // Progress counters for real-time panel
-                comprobantesApproved = comprobantesSteps.Count(s => s.Status == "Aceptado"),
+                comprobantesApproved = comprobantesSteps.Count(s => string.Equals(s.Status, "Aceptado", StringComparison.OrdinalIgnoreCase)),
                 comprobantesTotal = status.TotalComprobantes,
-                resumenesApproved = resumenesSteps.Count(s => s.Status == "Aceptado" || s.Status == "Generado"),
+                resumenesApproved = resumenesSteps.Count(s => string.Equals(s.Status, "Aceptado", StringComparison.OrdinalIgnoreCase) || string.Equals(s.Status, "Generado", StringComparison.OrdinalIgnoreCase)),
                 resumenesTotal = status.TotalResumenes,
                 generatedFiles = string.IsNullOrWhiteSpace(status.DownloadUrl)
                     ? Array.Empty<object>()
@@ -233,8 +237,35 @@ public class CertificationController(
         if (string.IsNullOrEmpty(status.DownloadUrl))
             return BadRequest("El archivo aún no ha sido generado.");
 
-        var bytes = await System.IO.File.ReadAllBytesAsync(status.DownloadUrl);
+        string physicalPath = status.DownloadUrl;
+
+        if (!System.IO.Path.IsPathRooted(physicalPath))
+        {
+            physicalPath = System.IO.Path.Combine(env.WebRootPath, physicalPath.TrimStart('/'));
+        }
+
+        if (!System.IO.File.Exists(physicalPath))
+            return BadRequest($"El archivo no se encontró en la ruta: {physicalPath}");
+
+        var bytes = await System.IO.File.ReadAllBytesAsync(physicalPath);
         return File(bytes, "application/zip", $"cert_step4_{jobId}.zip");
+    }
+
+    [HttpGet("download-xml/{jobId}/{ncf}")]
+    public async Task<ActionResult> DownloadIndividualXml(string jobId, string ncf)
+    {
+        var status = await excelService.GetJobStatusAsync(jobId);
+        var stepResult = status.CompletedSteps.FirstOrDefault(x => x.Ncf == ncf && !string.IsNullOrEmpty(x.XmlFileName));
+
+        if (stepResult == null) return NotFound("XML no encontrado o aún no generado.");
+
+        string jobDir = System.IO.Path.Combine(env.WebRootPath, "certification_files", $"suite_{jobId}");
+        string filePath = System.IO.Path.Combine(jobDir, stepResult.XmlFileName);
+
+        if (!System.IO.File.Exists(filePath)) return NotFound("El archivo físico no existe.");
+
+        var bytes = await System.IO.File.ReadAllBytesAsync(filePath);
+        return File(bytes, "application/xml", stepResult.XmlFileName);
     }
 
     [HttpGet("job-status/{jobId}/logs")]

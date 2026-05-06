@@ -7,7 +7,7 @@ public interface ICertificationExcelService
     Task<List<CertificationTestDto>> GetTestsAsync();
     Task<DgiiTransmissionResult> RunTestAsync(int index, string webRootPath);
     Task<CertificationSummaryDto> GetSummaryAsync();
-    Task<string> EnqueueCertificationJobAsync(byte[] excelBytes, string fileName, string webRootPath);
+    Task<CertificationJobStatusDto> EnqueueCertificationJobAsync(byte[] excelBytes, string fileName, string webRootPath);
     Task ProcessAutomationJobAsync(string tempFilePath, string jobId, string webRootPath);
     Task<CertificationJobStatusDto> GetJobStatusAsync(string jobId);
     Task<List<CertificationStepResultDto>> GetJobLogsAsync(string jobId);

@@ -183,9 +183,9 @@ app.UseSwaggerUI(options =>
 });
 // }
 
+app.UseWebSockets();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-app.UseWebSockets();
 
 app.UseCors("corsGlobalPolicy");
 

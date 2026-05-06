@@ -28,4 +28,5 @@ public class CertificationStepResultDto
     public string TrackId { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
+    public string XmlFileName { get; set; } = string.Empty;
 }
