@@ -120,7 +120,6 @@ public class CertificationExcelService : ICertificationExcelService
             test.Step = 3;
             tests.Add(test);
         }
-
         // Block 3: Step 4 -> RFCE rows (mapping them as individual invoices for download)
         foreach (var rfceRow in rfceRows)
         {
@@ -131,6 +130,7 @@ public class CertificationExcelService : ICertificationExcelService
 
         return tests;
     }
+
 
     private CertificationTestDto MapToTest(IDictionary<string, object> row, int index, HashSet<string> referencedNcfs)
     {
@@ -172,6 +172,7 @@ public class CertificationExcelService : ICertificationExcelService
         }
 
         // 3. Any document that IS REFERENCED by someone else MUST be in Step 1
+
         if (referencedNcfs.Contains(test.ENcf?.Trim()))
             return 1;
 
@@ -223,9 +224,9 @@ public class CertificationExcelService : ICertificationExcelService
         var tests = await GetTestsFromExcelAsync(path);
 
         // CertificationAutomation Job Progress Initial State
-        var status = new CertificationJobStatusDto 
-        { 
-            JobId = jobId, 
+        var status = new CertificationJobStatusDto
+        {
+            JobId = jobId,
             Status = "Pending",
             TotalSteps = tests.Count,
             TotalComprobantes = tests.Count(t => t.Step is 1 or 2),
@@ -245,7 +246,7 @@ public class CertificationExcelService : ICertificationExcelService
         }
 
         _jobStatuses[jobId] = status;
-        
+
         Console.WriteLine($"[DEBUG-JOB] Enqueued automation job {jobId}. Total tests: {tests.Count}. WebRootPath: {webRootPath}");
 
         try
@@ -283,7 +284,7 @@ public class CertificationExcelService : ICertificationExcelService
 
         try
         {
-            var client = await _clientService.GetByAsync(x => x.GuidId == clientGuidId) 
+            var client = await _clientService.GetByAsync(x => x.GuidId == clientGuidId)
                          ?? throw new Exception("Cliente no encontrado.");
 
             var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)
@@ -523,7 +524,7 @@ public class CertificationExcelService : ICertificationExcelService
                                 XmlFileName = generatedXmlName
                             });
                         }
-                        
+
                         Console.WriteLine($"[DEBUG-JOB] Step {test.Step} completed for {test.ENcf}. Status: {(finalResult.Success ? "Aceptado" : "Rechazado")}");
 
                         // Notify listeners via SignalR
@@ -581,14 +582,14 @@ public class CertificationExcelService : ICertificationExcelService
         await System.IO.File.WriteAllBytesAsync(path, excelBytes);
 
         var rows = MiniExcel.Query(path, useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
-        
-        var status = new CertificationJobStatusDto 
-        { 
-            JobId = jobId, 
+
+        var status = new CertificationJobStatusDto
+        {
+            JobId = jobId,
             Status = "Pending",
             TotalSteps = rows.Count,
-            TotalComprobantes = rows.Count, // For AC, we count all as approvals
-            TotalResumenes = 0
+            TotalComprobantes = 0,
+            TotalResumenes = rows.Count
         };
 
         foreach (var row in rows)
@@ -603,7 +604,7 @@ public class CertificationExcelService : ICertificationExcelService
         }
 
         _jobStatuses[jobId] = status;
-        
+
         try
         {
             BackgroundJob.Enqueue<ICertificationExcelService>(x => x.ProcessAprobacionComercialJobAsync(path, jobId, webRootPath, clientGuidId));
@@ -625,7 +626,7 @@ public class CertificationExcelService : ICertificationExcelService
 
         try
         {
-            var client = await _clientService.GetByAsync(x => x.GuidId == clientGuidId) 
+            var client = await _clientService.GetByAsync(x => x.GuidId == clientGuidId)
                          ?? throw new Exception("Cliente no encontrado.");
 
             var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)
@@ -657,15 +658,17 @@ public class CertificationExcelService : ICertificationExcelService
 
                     var result = await _transmissionService.SendArecfAsync(DgiiEnvironment.CerteCF, token, signedXml, client.Rnc, requestDto.ENcf);
 
+                    Console.WriteLine($"[DEBUG-AC] Sent AC for {requestDto.ENcf}. Success: {result.Success}");
+
                     lock (status.CompletedSteps)
                     {
-                        var stepResult = status.CompletedSteps.FirstOrDefault(s => s.Ncf == requestDto.ENcf) 
+                        var stepResult = status.CompletedSteps.FirstOrDefault(s => s.Ncf == requestDto.ENcf)
                                         ?? new CertificationStepResultDto { Ncf = requestDto.ENcf };
-                        
+
                         stepResult.Status = result.Success ? "Aceptado" : "Rechazado";
                         stepResult.Message = result.Success ? "Aprobación Comercial exitosa" : result.Error;
                         stepResult.Step = "3";
-                        
+
                         if (!status.CompletedSteps.Contains(stepResult)) status.CompletedSteps.Add(stepResult);
                     }
 
@@ -674,7 +677,7 @@ public class CertificationExcelService : ICertificationExcelService
 
                     if (!result.Success)
                     {
-                        // In Step 3, we might continue or stop based on requirements. 
+                        // In Step 3, we might continue or stop based on requirements.
                         // User said "replicar paso 2", and step 2 stops on error for Step 1/2.
                         // We'll just continue for Step 3 unless it's a critical infrastructure error.
                     }
@@ -725,8 +728,8 @@ public class CertificationExcelService : ICertificationExcelService
             await Task.Delay(2500); // Wait 2.5s between polls
             status = await _transmissionService.GetStatusAsync(DgiiEnvironment.CerteCF, token, trackId);
 
-            if (string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase) || 
-                string.Equals(status.Estado, "Rechazado", StringComparison.OrdinalIgnoreCase) || 
+            if (string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status.Estado, "Rechazado", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(status.Estado, "Generado", StringComparison.OrdinalIgnoreCase))
                 break;
         } while (attempts < maxAttempts);

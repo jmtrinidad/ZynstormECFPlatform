@@ -166,6 +166,27 @@ public class CertificationController(
         return Ok(new { jobId = status.JobId, clientGuidId, step = 2, tests = status.CompletedSteps, generatedFiles = Array.Empty<object>(), message = "Proceso de pruebas de datos e-CF iniciado en segundo plano." });
     }
 
+    [HttpGet("business-types")]
+    public async Task<ActionResult<IEnumerable<BusinessTypeDto>>> GetBusinessTypes()
+    {
+        return Ok(await simulationService.GetBusinessTypesAsync());
+    }
+
+    [HttpPost("start-business-simulation")]
+    public async Task<ActionResult> StartBusinessSimulation([FromQuery] string businessTypeGuidId, [FromQuery] string clientGuidId)
+    {
+        try
+        {
+            var jobId = await simulationService.EnqueueBusinessSimulationJobAsync(businessTypeGuidId, clientGuidId, env.WebRootPath);
+            return Ok(new { JobId = jobId, Message = "Simulación por tipo de negocio iniciada." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+
     [HttpGet("ws")]
     public async Task Ws([FromQuery] string jobId, CancellationToken cancellationToken = default)
     {
@@ -187,6 +208,7 @@ public class CertificationController(
         {
             var status = await excelService.GetJobStatusAsync(jobId);
             List<CertificationStepResultDto> logs;
+
             lock (status.CompletedSteps)
             {
                 logs = status.CompletedSteps.ToList();
@@ -202,7 +224,6 @@ public class CertificationController(
                 totalSteps = status.TotalSteps,
                 currentNcf = status.CurrentNcf,
                 logs = logs,
-                // Progress counters for real-time panel
                 comprobantesApproved = comprobantesSteps.Count(s => string.Equals(s.Status, "Aceptado", StringComparison.OrdinalIgnoreCase)),
                 comprobantesTotal = status.TotalComprobantes,
                 resumenesApproved = resumenesSteps.Count(s => string.Equals(s.Status, "Aceptado", StringComparison.OrdinalIgnoreCase) || string.Equals(s.Status, "Generado", StringComparison.OrdinalIgnoreCase)),
@@ -211,6 +232,39 @@ public class CertificationController(
                     ? Array.Empty<object>()
                     : new[] { new { name = $"cert_step4_{jobId}.zip", url = $"/v1/Certification/download/{jobId}" } }
             });
+
+            var buffer = Encoding.UTF8.GetBytes(payload);
+            await webSocket.SendAsync(buffer, WebSocketMessageType.Text, true, cancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000), cancellationToken);
+            if (status.Status is "Completed" or "Failed")
+                break;
+        }
+    }
+
+    [HttpGet("simulation/ws/{jobId}")]
+    public async Task SimulationWs(string jobId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(jobId)) return;
+        using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+        while (!cancellationToken.IsCancellationRequested && webSocket.State == WebSocketState.Open)
+        {
+            var status = await simulationService.GetJobStatusAsync(jobId);
+            List<CertificationStepResultDto> logs;
+            lock (status.CompletedSteps)
+            {
+                logs = status.CompletedSteps.ToList();
+            }
+
+            var payload = JsonSerializer.Serialize(new
+            {
+                jobId,
+                status = status.Status,
+                step = status.CurrentStep,
+                totalSteps = status.TotalSteps,
+                currentNcf = status.CurrentNcf,
+                logs = logs
+            });
+
             var buffer = Encoding.UTF8.GetBytes(payload);
             await webSocket.SendAsync(buffer, WebSocketMessageType.Text, true, cancellationToken);
             await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
@@ -219,12 +273,22 @@ public class CertificationController(
         }
     }
 
+
     [HttpGet("job-status/{jobId}")]
     public async Task<ActionResult<CertificationJobStatusDto>> GetJobStatus(string jobId)
     {
         var status = await excelService.GetJobStatusAsync(jobId);
         return Ok(status);
     }
+
+    [HttpGet("simulation/job-status/{jobId}")]
+    public async Task<ActionResult<CertificationJobStatusDto>> GetSimulationJobStatus(string jobId)
+    {
+        var status = await simulationService.GetJobStatusAsync(jobId);
+        return Ok(status);
+    }
+
+
 
     [HttpGet("download/{jobId}")]
     public async Task<ActionResult> DownloadStep4Results(string jobId)
@@ -275,6 +339,15 @@ public class CertificationController(
         return Ok(logs);
     }
 
+    [HttpGet("simulation/job-status/{jobId}/logs")]
+    public async Task<ActionResult<List<CertificationStepResultDto>>> GetSimulationJobLogs(string jobId)
+    {
+        var logs = await simulationService.GetJobLogsAsync(jobId);
+        return Ok(logs);
+    }
+
+
+
     [HttpPost("aprobacion-comercial")]
     public async Task<ActionResult<object>> ProcessAprobacionComercial([FromForm] IFormFile excelFile, [FromForm] string clientGuidId)
     {
@@ -290,6 +363,7 @@ public class CertificationController(
         var status = await excelService.EnqueueAprobacionComercialJobAsync(ms.ToArray(), excelFile.FileName, env.WebRootPath, clientGuidId);
         return Ok(new { jobId = status.JobId, clientGuidId, step = 3, tests = status.CompletedSteps, message = "Proceso de pruebas de aprobación comercial iniciado en segundo plano." });
     }
+
 
     [HttpPost("simulacion-ecf")]
     public async Task<ActionResult<string>> SimulacionEcf([FromBody] EcfInvoiceRequestDto dto)
@@ -324,6 +398,21 @@ public class CertificationController(
             return BadRequest(ex.Message);
         }
     }
+
+    [HttpPost("initialize-simulation-samples")]
+    public async Task<ActionResult> InitializeSimulationSamples()
+    {
+        try
+        {
+            await simulationService.InitializeSimulationSamplesAsync();
+            return Ok("Muestras de simulación inicializadas correctamente.");
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
 
     [HttpPost("sign-xml")]
     public async Task<ActionResult> SignXml([FromForm] IFormFile xmlFile, [FromForm] string rnc)

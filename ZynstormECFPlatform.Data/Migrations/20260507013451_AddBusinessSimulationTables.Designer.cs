@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ZynstormECFPlatform.Data;
@@ -11,9 +12,11 @@ using ZynstormECFPlatform.Data;
 namespace ZynstormECFPlatform.Data.Migrations
 {
     [DbContext(typeof(StorageContext))]
-    partial class StorageContextModelSnapshot : ModelSnapshot
+    [Migration("20260507013451_AddBusinessSimulationTables")]
+    partial class AddBusinessSimulationTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -237,7 +240,7 @@ namespace ZynstormECFPlatform.Data.Migrations
 
                     b.HasIndex("BusinessTypeId");
 
-                    b.ToTable("BusinessSimulationSample");
+                    b.ToTable("BusinessSimulationSamples");
                 });
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.BusinessType", b =>
@@ -285,63 +288,7 @@ namespace ZynstormECFPlatform.Data.Migrations
 
                     b.HasKey("BusinessTypeId");
 
-                    b.ToTable("BusinessType");
-
-                    b.HasData(
-                        new
-                        {
-                            BusinessTypeId = 1,
-                            Description = "Servicios de transporte de carga y logística.",
-                            GuidId = "7a8b9c0d-1e2f-3g4h-5i6j-7k8l9m0n1o2p",
-                            IsDeleted = false,
-                            Name = "Transporte",
-                            RegisteredAt = new DateTime(2026, 5, 5, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessTypeId = 2,
-                            Description = "Venta de medicamentos y productos de salud.",
-                            GuidId = "8a9b0c1d-2e3f-4g5h-6i7j-8k9l0m1n2o3p",
-                            IsDeleted = false,
-                            Name = "Farmacia",
-                            RegisteredAt = new DateTime(2026, 5, 5, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessTypeId = 3,
-                            Description = "Venta de piezas y accesorios para vehículos.",
-                            GuidId = "9a0b1c2d-3e4f-5g6h-7i8j-9k0l1m2n3o4p",
-                            IsDeleted = false,
-                            Name = "Repuesto",
-                            RegisteredAt = new DateTime(2026, 5, 5, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessTypeId = 4,
-                            Description = "Servicios de mantenimiento y reparación de vehículos.",
-                            GuidId = "0a1b2c3d-4e5f-6g7h-8i9j-0k1l2m3n4o5p",
-                            IsDeleted = false,
-                            Name = "Taller de Mecánica",
-                            RegisteredAt = new DateTime(2026, 5, 5, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessTypeId = 5,
-                            Description = "Venta al por mayor y detalle de productos de consumo.",
-                            GuidId = "1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
-                            IsDeleted = false,
-                            Name = "Surtidora",
-                            RegisteredAt = new DateTime(2026, 5, 5, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessTypeId = 6,
-                            Description = "Venta de libros, útiles escolares y papelería.",
-                            GuidId = "2a3b4c5d-6e7f-8g9h-0i1j-2k3l4m5n6o7p",
-                            IsDeleted = false,
-                            Name = "Librerías",
-                            RegisteredAt = new DateTime(2026, 5, 5, 20, 0, 0, 0, DateTimeKind.Local)
-                        });
+                    b.ToTable("BusinessTypes");
                 });
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.CertificationDocument", b =>
@@ -3563,37 +3510,37 @@ namespace ZynstormECFPlatform.Data.Migrations
                         {
                             NotificationTypeId = 1,
                             Description = "Recibir email cuando una factura es aceptada por la DGII",
-                            GuidId = "a1b2c3d4-e5f6-4a5b-9c8d-1e2f3a4b5c6d",
+                            GuidId = "8353c320-168a-4d3e-b46b-64048f47aa06",
                             IsDeleted = false,
                             Name = "Factura Aceptada (Email)",
-                            RegisteredAt = new DateTime(2026, 4, 30, 20, 0, 0, 0, DateTimeKind.Local)
+                            RegisteredAt = new DateTime(2026, 5, 7, 1, 34, 50, 652, DateTimeKind.Utc).AddTicks(3530)
                         },
                         new
                         {
                             NotificationTypeId = 2,
                             Description = "Recibir email cuando una factura es rechazada por la DGII",
-                            GuidId = "b2c3d4e5-f6a1-4b6c-0d9e-2f3a4b5c6d7e",
+                            GuidId = "6a6402d7-72e0-4e0c-99d5-15ad06b31c46",
                             IsDeleted = false,
                             Name = "Factura Rechazada (Email)",
-                            RegisteredAt = new DateTime(2026, 4, 30, 20, 0, 0, 0, DateTimeKind.Local)
+                            RegisteredAt = new DateTime(2026, 5, 7, 1, 34, 50, 652, DateTimeKind.Utc).AddTicks(7478)
                         },
                         new
                         {
                             NotificationTypeId = 3,
                             Description = "Recibir resumen diario de facturas procesadas",
-                            GuidId = "c3d4e5f6-a1b2-4c7d-1e0f-3a4b5c6d7e8f",
+                            GuidId = "b5e7ece5-a1e0-4898-8031-6d1fde57089d",
                             IsDeleted = false,
                             Name = "Reporte Diario",
-                            RegisteredAt = new DateTime(2026, 4, 30, 20, 0, 0, 0, DateTimeKind.Local)
+                            RegisteredAt = new DateTime(2026, 5, 7, 1, 34, 50, 652, DateTimeKind.Utc).AddTicks(7504)
                         },
                         new
                         {
                             NotificationTypeId = 4,
                             Description = "Recibir resumen semanal con estadísticas detalladas",
-                            GuidId = "d4e5f6a1-b2c3-4d8e-2f1a-4b5c6d7e8f9a",
+                            GuidId = "967a7834-7772-483f-a28e-afcc2403f6c5",
                             IsDeleted = false,
                             Name = "Reporte Semanal",
-                            RegisteredAt = new DateTime(2026, 4, 30, 20, 0, 0, 0, DateTimeKind.Local)
+                            RegisteredAt = new DateTime(2026, 5, 7, 1, 34, 50, 652, DateTimeKind.Utc).AddTicks(7508)
                         });
                 });
 

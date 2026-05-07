@@ -33,6 +33,9 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
     }
 
 
+
+
+
     protected StorageContext()
     {
     }
@@ -247,12 +250,76 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.HasQueryFilter(c => !c.IsDeleted);
 
             entity.HasData(
-                new NotificationType { NotificationTypeId = 1, Name = "Factura Aceptada (Email)", Description = "Recibir email cuando una factura es aceptada por la DGII", RegisteredAt = DateTime.UtcNow, GuidId = Guid.NewGuid().ToString() },
-                new NotificationType { NotificationTypeId = 2, Name = "Factura Rechazada (Email)", Description = "Recibir email cuando una factura es rechazada por la DGII", RegisteredAt = DateTime.UtcNow, GuidId = Guid.NewGuid().ToString() },
-                new NotificationType { NotificationTypeId = 3, Name = "Reporte Diario", Description = "Recibir resumen diario de facturas procesadas", RegisteredAt = DateTime.UtcNow, GuidId = Guid.NewGuid().ToString() },
-                new NotificationType { NotificationTypeId = 4, Name = "Reporte Semanal", Description = "Recibir resumen semanal con estadísticas detalladas", RegisteredAt = DateTime.UtcNow, GuidId = Guid.NewGuid().ToString() }
+                new NotificationType { NotificationTypeId = 1, Name = "Factura Aceptada (Email)", Description = "Recibir email cuando una factura es aceptada por la DGII", RegisteredAt = DateTime.Parse("2026-05-01T00:00:00Z"), GuidId = "a1b2c3d4-e5f6-4a5b-9c8d-1e2f3a4b5c6d" },
+                new NotificationType { NotificationTypeId = 2, Name = "Factura Rechazada (Email)", Description = "Recibir email cuando una factura es rechazada por la DGII", RegisteredAt = DateTime.Parse("2026-05-01T00:00:00Z"), GuidId = "b2c3d4e5-f6a1-4b6c-0d9e-2f3a4b5c6d7e" },
+                new NotificationType { NotificationTypeId = 3, Name = "Reporte Diario", Description = "Recibir resumen diario de facturas procesadas", RegisteredAt = DateTime.Parse("2026-05-01T00:00:00Z"), GuidId = "c3d4e5f6-a1b2-4c7d-1e0f-3a4b5c6d7e8f" },
+                new NotificationType { NotificationTypeId = 4, Name = "Reporte Semanal", Description = "Recibir resumen semanal con estadísticas detalladas", RegisteredAt = DateTime.Parse("2026-05-01T00:00:00Z"), GuidId = "d4e5f6a1-b2c3-4d8e-2f1a-4b5c6d7e8f9a" }
             );
         });
+
+        modelBuilder.Entity<BusinessType>(entity =>
+        {
+            entity.HasKey(e => e.BusinessTypeId);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Description).HasMaxLength(255);
+
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+        });
+
+        modelBuilder.Entity<BusinessSimulationSample>(entity =>
+        {
+            entity.HasKey(e => e.BusinessSimulationSampleId);
+            entity.Property(e => e.EcfType).IsRequired().HasMaxLength(2);
+            entity.Property(e => e.JsonData).IsRequired();
+
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.BusinessType)
+                  .WithMany(p => p.Samples)
+                  .HasForeignKey(d => d.BusinessTypeId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
 
         // Apply global PostgreSQL DateTime column type configuration
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
@@ -1576,5 +1643,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .OnDelete(DeleteBehavior.Cascade)
                   .HasConstraintName("FK_UserAuditLog_User");
         });
+
+        BusinessSimulationSeeds.Seed(modelBuilder);
     }
 }
