@@ -210,6 +210,22 @@ public class CertificationExcelMappingService : ICertificationExcelMappingServic
         return dto;
     }
 
+    public AcecfRequestDto MapRowToAcecfRequest(IDictionary<string, object> row, DateTime? fallbackDate = null)
+    {
+        return new AcecfRequestDto
+        {
+            Version = GetStr(row, "Version") ?? "1.0",
+            RNCEmisor = GetStr(row, "RNCEmisor") ?? "",
+            ENcf = CleanNcf(GetStr(row, "ENCF") ?? GetStr(row, "eNCF") ?? "") ?? "",
+            FechaEmision = GetStr(row, "FechaEmision") ?? fallbackDate?.ToString("dd-MM-yyyy") ?? DateTime.Now.ToString("dd-MM-yyyy"),
+            MontoTotal = GetDec(row, "MontoTotal") ?? 0,
+            RNCComprador = GetStr(row, "RNCComprador") ?? "",
+            Estado = GetNullableInt(row, "Estado") ?? 0,
+            DetalleMotivoRechazo = GetStr(row, "DetalleMotivoRechazo") ?? "",
+            FechaHoraAprobacionComercial = GetStr(row, "FechaHoraAprobacionComercial") ?? fallbackDate?.ToString("dd-MM-yyyy HH:mm:ss") ?? DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss")
+        };
+    }
+
 
 
     private static string? CleanNcf(string? raw)

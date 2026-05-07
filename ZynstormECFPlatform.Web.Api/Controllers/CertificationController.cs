@@ -162,7 +162,7 @@ public class CertificationController(
         using var ms = new MemoryStream();
         await excelFile.CopyToAsync(ms);
 
-        var status = await excelService.EnqueueCertificationJobAsync(ms.ToArray(), excelFile.FileName, env.WebRootPath);
+        var status = await excelService.EnqueueCertificationJobAsync(ms.ToArray(), excelFile.FileName, env.WebRootPath, clientGuidId);
         return Ok(new { jobId = status.JobId, clientGuidId, step = 2, tests = status.CompletedSteps, generatedFiles = Array.Empty<object>(), message = "Proceso de pruebas de datos e-CF iniciado en segundo plano." });
     }
 
@@ -276,16 +276,19 @@ public class CertificationController(
     }
 
     [HttpPost("aprobacion-comercial")]
-    public async Task<ActionResult<List<DgiiTransmissionResult>>> ProcessAprobacionComercial([FromForm] IFormFile excelFile)
+    public async Task<ActionResult<object>> ProcessAprobacionComercial([FromForm] IFormFile excelFile, [FromForm] string clientGuidId)
     {
         if (excelFile == null || excelFile.Length == 0)
-            return BadRequest("Debe proporcionar el archivo Excel 'Aprobacion comerciar.xlsx'.");
+            return BadRequest("Debe proporcionar el archivo Excel de aprobación comercial.");
+
+        if (string.IsNullOrWhiteSpace(clientGuidId))
+            return BadRequest("Debe proporcionar el GuidId del cliente.");
 
         using var ms = new MemoryStream();
         await excelFile.CopyToAsync(ms);
-        var results = await excelService.ProcessAprobacionComercialAsync(ms.ToArray());
 
-        return Ok(results);
+        var status = await excelService.EnqueueAprobacionComercialJobAsync(ms.ToArray(), excelFile.FileName, env.WebRootPath, clientGuidId);
+        return Ok(new { jobId = status.JobId, clientGuidId, step = 3, tests = status.CompletedSteps, message = "Proceso de pruebas de aprobación comercial iniciado en segundo plano." });
     }
 
     [HttpPost("simulacion-ecf")]

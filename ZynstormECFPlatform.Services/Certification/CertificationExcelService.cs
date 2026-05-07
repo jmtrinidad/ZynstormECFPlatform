@@ -212,7 +212,7 @@ public class CertificationExcelService : ICertificationExcelService
 
     public async Task<CertificationSummaryDto> GetSummaryAsync() => new CertificationSummaryDto { Tests = await GetTestsAsync() };
 
-    public async Task<CertificationJobStatusDto> EnqueueCertificationJobAsync(byte[] excelBytes, string fileName, string webRootPath)
+    public async Task<CertificationJobStatusDto> EnqueueCertificationJobAsync(byte[] excelBytes, string fileName, string webRootPath, string clientGuidId)
     {
         string jobId = Guid.NewGuid().ToString("N").Substring(0, 8);
         string path = System.IO.Path.Combine(webRootPath, "certification_files", $"suite_{jobId}.xlsx");
@@ -250,7 +250,7 @@ public class CertificationExcelService : ICertificationExcelService
 
         try
         {
-            BackgroundJob.Enqueue<ICertificationExcelService>(x => x.ProcessAutomationJobAsync(path, jobId, webRootPath));
+            BackgroundJob.Enqueue<ICertificationExcelService>(x => x.ProcessAutomationJobAsync(path, jobId, webRootPath, clientGuidId));
         }
         catch (Exception ex)
         {
@@ -276,13 +276,25 @@ public class CertificationExcelService : ICertificationExcelService
     }
 
     [AutomaticRetry(Attempts = 0)]
-    public async Task ProcessAutomationJobAsync(string tempFilePath, string jobId, string webRootPath)
+    public async Task ProcessAutomationJobAsync(string tempFilePath, string jobId, string webRootPath, string clientGuidId)
     {
         if (!_jobStatuses.TryGetValue(jobId, out var status)) return;
         status.Status = "Processing";
 
         try
         {
+            var client = await _clientService.GetByAsync(x => x.GuidId == clientGuidId) 
+                         ?? throw new Exception("Cliente no encontrado.");
+
+            var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)
+                         ?? throw new Exception("API Key no encontrada.");
+            var secretKey = _encryptedService.DecryptString(apiKey.SecretKey);
+
+            var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId)
+                         ?? throw new Exception("Certificado no encontrado.");
+            var certBase64 = Convert.ToBase64String(_encryptedService.DecryptWithSecret(cert.Certificate, secretKey));
+            var certPass = Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(cert.Password, secretKey));
+
             var ecfRows = MiniExcel.Query(tempFilePath, sheetName: "ECF", useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
             var rfceRows = MiniExcel.Query(tempFilePath, sheetName: "RFCE", useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
 
@@ -293,25 +305,6 @@ public class CertificationExcelService : ICertificationExcelService
             status.CurrentStep = 0;
 
             var jobStartTime = DateTime.Now;
-
-            // Extract the RNC exactly from the Excel file as requested by the user
-            string? issuerRnc = GetStr(ecfRows.FirstOrDefault() ?? new Dictionary<string, object>(), "RNCEmisor");
-            if (string.IsNullOrEmpty(issuerRnc))
-            {
-                var firstCase = GetStr(ecfRows.FirstOrDefault() ?? new Dictionary<string, object>(), "CasoPrueba");
-                if (!string.IsNullOrEmpty(firstCase))
-                {
-                    var match = System.Text.RegularExpressions.Regex.Match(firstCase, @"^\d+");
-                    if (match.Success) issuerRnc = match.Value;
-                }
-            }
-
-            if (!string.IsNullOrEmpty(issuerRnc))
-            {
-                // Force the Excel's primary RNC across all rows to avoid DGII consistency errors from dummy data
-                foreach (var r in ecfRows) r["RNCEmisor"] = issuerRnc;
-                foreach (var r in rfceRows) r["RNCEmisor"] = issuerRnc;
-            }
 
             // Create a 'Virtual' collection for data mapping
             var virtualRows = new List<IDictionary<string, object>>();
@@ -378,13 +371,6 @@ public class CertificationExcelService : ICertificationExcelService
                         requestDto.SecurityCodeOverride = sharedCode;
                         requestDto.SignatureDateOverride = jobStartTime;
 
-                        var client = await _clientService.GetByAsync(x => x.Rnc == requestDto.ECF.Encabezado.Emisor.RNCEmisor);
-                        var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId);
-                        var secretKey = _encryptedService.DecryptString(apiKey.SecretKey);
-                        var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
-                        var certBase64 = Convert.ToBase64String(_encryptedService.DecryptWithSecret(cert.Certificate, secretKey));
-                        var certPass = Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(cert.Password, secretKey));
-
                         string unsignedXml = _generatorService.GenerateUnsignedXml(requestDto, false);
                         string signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
 
@@ -424,13 +410,6 @@ public class CertificationExcelService : ICertificationExcelService
                             var individualDto = _mappingService.MapRowToRequest(row, 4, jobStartTime);
                             individualDto.SignatureDateOverride = jobStartTime;
 
-                            var client = await _clientService.GetByAsync(x => x.Rnc == individualDto.ECF.Encabezado.Emisor.RNCEmisor);
-                            var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId);
-                            var secretKey = _encryptedService.DecryptString(apiKey.SecretKey);
-                            var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
-                            var certBase64 = Convert.ToBase64String(_encryptedService.DecryptWithSecret(cert.Certificate, secretKey));
-                            var certPass = Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(cert.Password, secretKey));
-
                             string unsignedInd = _generatorService.GenerateUnsignedXml(individualDto, false);
                             string signedInd = _signerService.SignXml(unsignedInd, certBase64, certPass);
 
@@ -458,14 +437,6 @@ public class CertificationExcelService : ICertificationExcelService
                         var requestDto = _mappingService.MapRowToRequest(row, test.Step, jobStartTime);
                         requestDto.SecurityCodeOverride = forcedCode;
                         requestDto.SignatureDateOverride = jobStartTime;
-
-                        
-                        var client = await _clientService.GetByAsync(x => x.Rnc == requestDto.ECF.Encabezado.Emisor.RNCEmisor);
-                        var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId);
-                        var secretKey = _encryptedService.DecryptString(apiKey.SecretKey);
-                        var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
-                        var certBase64 = Convert.ToBase64String(_encryptedService.DecryptWithSecret(cert.Certificate, secretKey));
-                        var certPass = Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(cert.Password, secretKey));
 
                         bool isSummary = (test.Step == 3);
                         string unsignedXml = _generatorService.GenerateUnsignedXml(requestDto, isSummary);
@@ -593,6 +564,132 @@ public class CertificationExcelService : ICertificationExcelService
                 status.DownloadUrl = zipPath; // Store PHYSICAL path for ReadAllBytes in Controller
                 status.Status = "Completed";
                 Console.WriteLine($"[DEBUG-JOB] Job {jobId} completed. ZIP created at: {zipPath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            status.Status = "Failed";
+            status.ErrorMessage = ex.Message;
+        }
+    }
+
+    public async Task<CertificationJobStatusDto> EnqueueAprobacionComercialJobAsync(byte[] excelBytes, string fileName, string webRootPath, string clientGuidId)
+    {
+        string jobId = Guid.NewGuid().ToString("N").Substring(0, 8);
+        string path = System.IO.Path.Combine(webRootPath, "certification_files", $"aprobacion_{jobId}.xlsx");
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+        await System.IO.File.WriteAllBytesAsync(path, excelBytes);
+
+        var rows = MiniExcel.Query(path, useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
+        
+        var status = new CertificationJobStatusDto 
+        { 
+            JobId = jobId, 
+            Status = "Pending",
+            TotalSteps = rows.Count,
+            TotalComprobantes = rows.Count, // For AC, we count all as approvals
+            TotalResumenes = 0
+        };
+
+        foreach (var row in rows)
+        {
+            status.CompletedSteps.Add(new CertificationStepResultDto
+            {
+                Ncf = GetStr(row, "ENCF") ?? GetStr(row, "eNCF") ?? "N/A",
+                Step = "3",
+                Status = "Pendiente",
+                Message = "Esperando procesamiento..."
+            });
+        }
+
+        _jobStatuses[jobId] = status;
+        
+        try
+        {
+            BackgroundJob.Enqueue<ICertificationExcelService>(x => x.ProcessAprobacionComercialJobAsync(path, jobId, webRootPath, clientGuidId));
+        }
+        catch (Exception ex)
+        {
+            status.Status = "Failed";
+            status.ErrorMessage = ex.Message;
+        }
+
+        return status;
+    }
+
+    [AutomaticRetry(Attempts = 0)]
+    public async Task ProcessAprobacionComercialJobAsync(string tempFilePath, string jobId, string webRootPath, string clientGuidId)
+    {
+        if (!_jobStatuses.TryGetValue(jobId, out var status)) return;
+        status.Status = "Processing";
+
+        try
+        {
+            var client = await _clientService.GetByAsync(x => x.GuidId == clientGuidId) 
+                         ?? throw new Exception("Cliente no encontrado.");
+
+            var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)
+                         ?? throw new Exception("API Key no encontrada.");
+            var secretKey = _encryptedService.DecryptString(apiKey.SecretKey);
+
+            var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId)
+                         ?? throw new Exception("Certificado no encontrado.");
+            var certBase64 = Convert.ToBase64String(_encryptedService.DecryptWithSecret(cert.Certificate, secretKey));
+            var certPass = Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(cert.Password, secretKey));
+
+            var rows = MiniExcel.Query(tempFilePath, useHeaderRow: true).Cast<IDictionary<string, object>>().ToList();
+            status.TotalSteps = rows.Count;
+            status.CurrentStep = 0;
+            var jobStartTime = DateTime.Now;
+
+            foreach (var row in rows)
+            {
+                status.CurrentStep++;
+                var requestDto = _mappingService.MapRowToAcecfRequest(row, jobStartTime);
+                status.CurrentNcf = requestDto.ENcf;
+
+                await Task.Delay(2000); // Stability delay
+
+                try
+                {
+                    string signedXml = _signerService.SignXml(_generatorService.GenerateArecfXml(requestDto), certBase64, certPass);
+                    string token = await _authService.GetTokenAsync(client.Rnc, DgiiEnvironment.CerteCF, certBase64, certPass);
+
+                    var result = await _transmissionService.SendArecfAsync(DgiiEnvironment.CerteCF, token, signedXml, client.Rnc, requestDto.ENcf);
+
+                    lock (status.CompletedSteps)
+                    {
+                        var stepResult = status.CompletedSteps.FirstOrDefault(s => s.Ncf == requestDto.ENcf) 
+                                        ?? new CertificationStepResultDto { Ncf = requestDto.ENcf };
+                        
+                        stepResult.Status = result.Success ? "Aceptado" : "Rechazado";
+                        stepResult.Message = result.Success ? "Aprobación Comercial exitosa" : result.Error;
+                        stepResult.Step = "3";
+                        
+                        if (!status.CompletedSteps.Contains(stepResult)) status.CompletedSteps.Add(stepResult);
+                    }
+
+                    // Notify listeners via SignalR
+                    await _hubContext.Clients.Group($"cert-job:{jobId}").SendAsync("ReceiveJobUpdate", status);
+
+                    if (!result.Success)
+                    {
+                        // In Step 3, we might continue or stop based on requirements. 
+                        // User said "replicar paso 2", and step 2 stops on error for Step 1/2.
+                        // We'll just continue for Step 3 unless it's a critical infrastructure error.
+                    }
+                }
+                catch (Exception ex)
+                {
+                    status.Status = "Failed";
+                    status.ErrorMessage = $"Error en NCF {requestDto.ENcf}: {ex.Message}";
+                    break;
+                }
+            }
+
+            if (status.Status != "Failed")
+            {
+                status.Status = "Completed";
             }
         }
         catch (Exception ex)
