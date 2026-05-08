@@ -150,6 +150,57 @@ public class OldEcfInvoiceRequestDto
     public int? ManualIndicadorNotaCredito { get; set; }
     public decimal? ManualMontoNoFacturable { get; set; }
     public decimal? ManualMontoImpuestoAdicional { get; set; }
+
+    // ── Exportation Information (Type 46) ──────────────────────────────────────
+
+    public string? ExportFechaEmbarque { get; set; }
+    public string? ExportNumeroEmbarque { get; set; }
+    public string? ExportNumeroContenedor { get; set; }
+    public string? ExportNumeroReferencia { get; set; }
+    public string? ExportNombrePuertoEmbarque { get; set; }
+    public string? ExportCondicionesEntrega { get; set; }
+    public decimal? ExportTotalFob { get; set; }
+    public decimal? ExportSeguro { get; set; }
+    public decimal? ExportFlete { get; set; }
+    public decimal? ExportOtrosGastos { get; set; }
+    public decimal? ExportTotalCif { get; set; }
+    public string? ExportRegimenAduanero { get; set; }
+    public string? ExportNombrePuertoSalida { get; set; }
+    public string? ExportNombrePuertoDesembarque { get; set; }
+    public decimal? ExportPesoBruto { get; set; }
+    public decimal? ExportPesoNeto { get; set; }
+    public string? ExportUnidadPesoBruto { get; set; }
+    public string? ExportUnidadPesoNeto { get; set; }
+    public decimal? ExportCantidadBulto { get; set; }
+    public string? ExportUnidadBulto { get; set; }
+    public decimal? ExportVolumenBulto { get; set; }
+    public string? ExportUnidadVolumen { get; set; }
+
+    // ── Transport Information (Type 46) ────────────────────────────────────────
+
+    public string? TranspViaTransporte { get; set; }
+    public string? TranspPaisOrigen { get; set; }
+    public string? TranspDireccionDestino { get; set; }
+    public string? TranspPaisDestino { get; set; }
+    public string? TranspRncCompaniaTransportista { get; set; }
+    public string? TranspNombreCompaniaTransportista { get; set; }
+    public string? TranspNumeroViaje { get; set; }
+    public string? TranspConductor { get; set; }
+    public string? TranspDocumentoTransporte { get; set; }
+    public string? TranspFicha { get; set; }
+    public string? TranspPlaca { get; set; }
+    public string? TranspRutaTransporte { get; set; }
+    public string? TranspZonaTransporte { get; set; }
+    public string? TranspNumeroAlbaran { get; set; }
+
+    // ── Other Currency (Type 47) ───────────────────────────────────────────────
+
+    public string? CurrencyTipoMoneda { get; set; }
+    public decimal? CurrencyTipoCambio { get; set; }
+    public decimal? CurrencyMontoGravado { get; set; }
+    public decimal? CurrencyMontoExento { get; set; }
+    public decimal? CurrencyTotalITBIS { get; set; }
+    public decimal? CurrencyMontoTotal { get; set; }
 }
 
 public class OldEcfItemRequestDto

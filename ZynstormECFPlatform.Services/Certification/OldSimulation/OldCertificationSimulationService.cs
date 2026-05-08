@@ -73,7 +73,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
     }
 
     [AutomaticRetry(Attempts = 0)]
-    private async Task ProcessSimulacionEcfJobInternalAsync(OldEcfInvoiceRequestDto dto, string jobId, string webRootPath)
+    private async Task ProcessSimulacionEcfJobInternalAsync(OldEcfInvoiceRequestDto dto, string jobId, string webRootPath, Dictionary<string, string>? samples = null, Dictionary<string, int>? sampleIds = null, int? businessTypeId = null)
     {
         var accepted31Pool = new List<(string Ncf, DateTime IssueDate, string? CustomerRnc, OldEcfInvoiceRequestDto Dto)>();
         var rfcePool = new List<(string Ncf, string SecurityCode, OldEcfInvoiceRequestDto Dto)>();
@@ -162,7 +162,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
             status.TotalSteps = matrix.Sum(m => m.Count);
             status.CurrentStep = 0;
-            
+
             // Initialize totals in stats
             status.SimulationStats.TotalType31 = matrix.Where(m => m.Type == 31).Sum(m => m.Count);
             status.SimulationStats.TotalType32Rfce = matrix.Where(m => m.Type == 32 && m.IsSummary).Sum(m => m.Count);
@@ -184,11 +184,12 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                 for (int i = 0; i < item.Count; i++)
                 {
                     status.CurrentStep++;
-                    Console.WriteLine($"[Simulation] Processing Step {status.CurrentStep}/{status.TotalSteps} - Type {item.Type} (Iteration {i+1}/{item.Count})");
-                    
+                    Console.WriteLine($"[Simulation] Processing Step {status.CurrentStep}/{status.TotalSteps} - Type {item.Type} (Iteration {i + 1}/{item.Count})");
+
                     // Increment specific type counter
                     if (item.Type == 31) status.SimulationStats.Type31++;
-                    else if (item.Type == 32) {
+                    else if (item.Type == 32)
+                    {
                         if (item.IsSummary) status.SimulationStats.Type32Rfce++;
                         else status.SimulationStats.Type32Greater250k++;
                     }
@@ -202,12 +203,12 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                     else if (item.Type == 47) status.SimulationStats.Type47++;
 
                     // Add a placeholder log entry so the UI shows activity
-                    var placeholderLog = new CertificationStepResultDto 
-                    { 
-                        Index = status.CurrentStep, 
-                        Ncf = "Procesando...", 
-                        Status = "Enviando", 
-                        Message = $"Iniciando paso {status.CurrentStep} de {status.TotalSteps} (Tipo {item.Type})..." 
+                    var placeholderLog = new CertificationStepResultDto
+                    {
+                        Index = status.CurrentStep,
+                        Ncf = "Procesando...",
+                        Status = "Enviando",
+                        Message = $"Iniciando paso {status.CurrentStep} de {status.TotalSteps} (Tipo {item.Type})..."
                     };
                     status.CompletedSteps.Add(placeholderLog);
 
@@ -228,6 +229,22 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                     else
                     {
                         currentDto = CloneDto(dto)!;
+
+                        // Try to use a specific sample for this type if available
+                        if (samples != null && samples.TryGetValue(item.Type.ToString(), out var sampleJson))
+                        {
+                            var specificDto = JsonSerializer.Deserialize<OldEcfInvoiceRequestDto>(sampleJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                            if (specificDto != null)
+                            {
+                                currentDto = specificDto;
+                                // Keep issuer info from the original request
+                                currentDto.IssuerRnc = dto.IssuerRnc;
+                                currentDto.IssuerName = dto.IssuerName;
+                                currentDto.IssuerAddress = dto.IssuerAddress;
+                                currentDto.ClientId = dto.ClientId;
+                            }
+                        }
+
                         currentDto.EcfType = item.Type;
                         currentDto.IncomeType ??= "01";
                         currentDto.PaymentType ??= 1;
@@ -236,15 +253,23 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
                         bool isNote = item.Type == 33 || item.Type == 34;
 
-                        if (item.Type == 31)
+                        // Mixed Scenarios: Inject discounts for complex testing
+                        if (!isNote && item.Type != 43 && currentDto.Items.Any())
+                        {
+                            // 1. Item-level discount (5% on the first item)
+                            var firstItem = currentDto.Items[0];
+                            decimal itemTotalBeforeDiscount = Math.Round(firstItem.UnitPrice * firstItem.Quantity, 2);
+                            firstItem.Discount = Math.Round(itemTotalBeforeDiscount * 0.05m, 2);
+
+                            // 2. Global discount (fixed amount)
+                            currentDto.GlobalDiscountAmount = 100.00m;
+                            currentDto.GlobalDiscountDescription = "Descuento por Certificación";
+                        }
+
+                        // Type 31 logic simplified as we now use validated samples
+                        if (item.Type == 31 && currentDto.ManualIndicadorMontoGravado == null)
                         {
                             currentDto.ManualIndicadorMontoGravado = 0;
-                            foreach (var itm in currentDto.Items)
-                            {
-                                itm.BillingIndicator = 4; // Exempt
-                                itm.TaxPercentage = 0;
-                                itm.ItbisAmount = 0;
-                            }
                         }
 
                         if (isNote)
@@ -375,6 +400,43 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                     if (xsdErrors.Any())
                         throw new Exception($"Error de validación XSD en Paso {status.CurrentStep}: {string.Join(" | ", xsdErrors.Take(2))}");
 
+                    // --- BLOCKING REFERENCE VALIDATION ---
+                    try
+                    {
+                        // Locate the Xml references folder relative to base directory
+                        string schemasXmlPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "ZynstormECFPlatform.Schemas", "Xml"));
+
+                        if (!Directory.Exists(schemasXmlPath))
+                        {
+                            // Fallback for different build structures
+                            schemasXmlPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "Xml"));
+                        }
+
+                        if (Directory.Exists(schemasXmlPath))
+                        {
+                            var referenceFiles = Directory.GetFiles(schemasXmlPath, $"*E{item.Type}*.xml");
+                            if (referenceFiles.Any())
+                            {
+                                // Validate against the first matching reference file
+                                var refErrors = _generatorService.ValidateXmlAgainstReference(unsignedXmlTemp, item.Type, referenceFiles[0]);
+                                if (refErrors.Any())
+                                {
+                                    throw new Exception($"Error de validación contra XML de referencia DGII en Paso {status.CurrentStep} (Tipo {item.Type}): {string.Join(" | ", refErrors)}");
+                                }
+                                Console.WriteLine($"[Simulation] Paso {status.CurrentStep} validado exitosamente contra referencia: {Path.GetFileName(referenceFiles[0])}");
+                            }
+                        }
+                    }
+                    catch (Exception ex) when (ex.Message.Contains("Error de validación contra XML de referencia"))
+                    {
+                        throw; // Rethrow structural mismatch errors as blocking
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[Simulation] Warning: Error al intentar validar contra referencia: {ex.Message}");
+                    }
+                    // ------------------------------------
+
                     var ecfTypeRecord = await _context.Set<ZynstormECFPlatform.Core.Entities.EcfType>().FirstOrDefaultAsync(t => t.Code == item.Type.ToString());
                     ENcf? encfRecord = null;
                     if (!skipNcfConsumption)
@@ -463,8 +525,43 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                         SentAt = DateTime.Now,
                         RegisteredAt = DateTime.Now
                     };
-                    _context.Set<CertificationDocument>().Add(certDoc);
-                    await _context.SaveChangesAsync();
+                    // --- AUTO-UPDATE / INSERT SAMPLES ---
+                    if (isAccepted && businessTypeId.HasValue)
+                    {
+                        var ecfTypeCode = item.Type.ToString();
+                        var dbSample = await _context.Set<BusinessSimulationSample>()
+                            .FirstOrDefaultAsync(s => s.BusinessTypeId == businessTypeId.Value && s.EcfType == ecfTypeCode);
+
+                        if (dbSample == null)
+                        {
+                            Console.WriteLine($"[Simulation] Inserting new sample for BusinessType {businessTypeId.Value}, Type {ecfTypeCode} (DGII Accepted).");
+                            var newSample = new BusinessSimulationSample
+                            {
+                                BusinessTypeId = businessTypeId.Value,
+                                EcfType = ecfTypeCode,
+                                Name = $"{currentDto.IssuerName} - {ecfTypeCode} (Auto-generado)",
+                                Description = $"Ejemplo autogenerado y aprobado por DGII para el tipo de negocio.",
+                                JsonData = JsonSerializer.Serialize(currentDto),
+                                IsDgiiApproved = true,
+                                RegisteredAt = DateTime.Now,
+                                GuidId = Guid.NewGuid().ToString()
+                            };
+                            _context.Set<BusinessSimulationSample>().Add(newSample);
+                            await _context.SaveChangesAsync();
+
+                            // Update sampleIds for this run
+                            if (sampleIds != null) sampleIds[ecfTypeCode] = newSample.BusinessSimulationSampleId;
+                        }
+                        else if (!dbSample.IsDgiiApproved)
+                        {
+                            Console.WriteLine($"[Simulation] Updating existing sample {dbSample.BusinessSimulationSampleId} with DGII-accepted structure.");
+                            dbSample.JsonData = JsonSerializer.Serialize(currentDto);
+                            dbSample.IsDgiiApproved = true;
+                            _context.Entry(dbSample).State = EntityState.Modified;
+                            await _context.SaveChangesAsync();
+                        }
+                    }
+                    // -------------------------------------
 
                     if (item.Type == 31 && isAccepted) accepted31Pool.Add((currentDto.Ncf, currentDto.IssueDate, currentDto.CustomerRnc, CloneDto(currentDto)!));
 
@@ -559,13 +656,13 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
             var client = await _clientService.GetByAsync(x => x.GuidId == clientGuidId)
                 ?? throw new Exception("El cliente seleccionado no existe.");
 
-            var sample = businessType.Samples.FirstOrDefault() 
+            var sample = businessType.Samples.FirstOrDefault()
                 ?? throw new Exception($"No se encontraron muestras de datos configuradas para el tipo de negocio '{businessType.Name}'.");
 
             Console.WriteLine($"[Simulation] Preparing invoice DTO from sample...");
             // Map sample JSON to OldEcfInvoiceRequestDto
             OldEcfInvoiceRequestDto invoiceDto;
-            try 
+            try
             {
                 invoiceDto = JsonSerializer.Deserialize<OldEcfInvoiceRequestDto>(sample.JsonData, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                     ?? throw new Exception("El resultado de la deserialización fue nulo.");
@@ -580,6 +677,9 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
             invoiceDto.IssuerRnc = client.Rnc;
             invoiceDto.IssuerName = client.Name;
 
+            var allSamples = businessType.Samples.ToDictionary(s => s.EcfType, s => s.JsonData);
+            var sampleIds = businessType.Samples.ToDictionary(s => s.EcfType, s => s.BusinessSimulationSampleId);
+
             // Ensure required fields for the DTO are not null
             if (string.IsNullOrEmpty(invoiceDto.Ncf)) invoiceDto.Ncf = "E310000000000";
             if (string.IsNullOrEmpty(invoiceDto.ExternalReference)) invoiceDto.ExternalReference = $"SIM-{jobId}";
@@ -587,7 +687,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
             Console.WriteLine($"[Simulation] Handing over to internal simulation logic...");
             // Continue with simulation logic
-            await ProcessSimulacionEcfJobInternalAsync(invoiceDto, jobId, webRootPath);
+            await ProcessSimulacionEcfJobInternalAsync(invoiceDto, jobId, webRootPath, allSamples, sampleIds, businessType.BusinessTypeId);
             Console.WriteLine($"[Simulation] Background job {jobId} completed successfully.");
         }
         catch (Exception ex)

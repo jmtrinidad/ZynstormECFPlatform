@@ -138,6 +138,58 @@ public class OldEcfGeneratorService : IOldEcfGeneratorService
         return errors;
     }
 
+    public List<string> ValidateXmlAgainstReference(string xml, int ecfType, string referenceXmlPath)
+    {
+        var errors = new List<string>();
+        try
+        {
+            var generatedDoc = new XmlDocument();
+            generatedDoc.LoadXml(xml);
+
+            var referenceDoc = new XmlDocument();
+            referenceDoc.Load(referenceXmlPath);
+
+            var referencePaths = GetUniqueElementPaths(referenceDoc);
+            var generatedPaths = GetUniqueElementPaths(generatedDoc);
+
+            foreach (var path in referencePaths)
+            {
+                if (path.Contains("Signature") || path.Contains("FechaHoraFirma")) continue;
+
+                if (!generatedPaths.Contains(path))
+                {
+                    errors.Add($"Elemento '{path}' (presente en referencia aprobada) no se encuentra en el XML generado.");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"Error en comparación estructural: {ex.Message}");
+        }
+        return errors;
+    }
+
+    private HashSet<string> GetUniqueElementPaths(XmlDocument doc)
+    {
+        var paths = new HashSet<string>();
+        if (doc.DocumentElement != null)
+            GetPathsRecursive(doc.DocumentElement, "", paths);
+        return paths;
+    }
+
+    private void GetPathsRecursive(XmlElement element, string currentPath, HashSet<string> paths)
+    {
+        string path = string.IsNullOrEmpty(currentPath) ? element.Name : $"{currentPath}/{element.Name}";
+        paths.Add(path);
+        foreach (XmlNode child in element.ChildNodes)
+        {
+            if (child is XmlElement childElement)
+            {
+                GetPathsRecursive(childElement, path, paths);
+            }
+        }
+    }
+
     public List<string> ValidateDto(OldEcfInvoiceRequestDto dto)
     {
         var errors = new List<string>();
@@ -158,7 +210,7 @@ public class OldEcfGeneratorService : IOldEcfGeneratorService
         var issueDate = dto.IssueDate.ToString(DateFormat);
         var expirationDate = (dto.SequenceExpirationDate ?? dto.IssueDate.AddYears(1)).ToString(DateFormat);
         var signatureDate = (dto.SignatureDateOverride ?? DateTime.UtcNow).ToDrTime();
-        var signatureDateTime = signatureDate.ToString("dd-MM-yyyy hh:mm:ss tt");
+        var signatureDateTime = signatureDate.ToString(DateTimeFormat);
 
         var xmlItems = new List<EcfXmlItem>();
         decimal totalBase = 0, totalItemDiscounts = 0, totalItbis = 0, totalExempt = 0, totalNoFacturable = 0;
@@ -349,6 +401,66 @@ public class OldEcfGeneratorService : IOldEcfGeneratorService
                 } : null,
             FechaHoraFirma = signatureDateTime
         };
+
+        if (ecfType == 46)
+        {
+            root.Encabezado.InformacionesAdicionales = new EcfXmlInformacionesAdicionales
+            {
+                FechaEmbarque = dto.ExportFechaEmbarque,
+                NumeroEmbarque = dto.ExportNumeroEmbarque,
+                NumeroContenedor = dto.ExportNumeroContenedor,
+                NumeroReferencia = dto.ExportNumeroReferencia,
+                NombrePuertoEmbarque = dto.ExportNombrePuertoEmbarque,
+                CondicionesEntrega = dto.ExportCondicionesEntrega,
+                TotalFob = dto.ExportTotalFob,
+                Seguro = dto.ExportSeguro,
+                Flete = dto.ExportFlete,
+                OtrosGastos = dto.ExportOtrosGastos,
+                TotalCif = dto.ExportTotalCif,
+                RegimenAduanero = dto.ExportRegimenAduanero,
+                NombrePuertoSalida = dto.ExportNombrePuertoSalida,
+                NombrePuertoDesembarque = dto.ExportNombrePuertoDesembarque,
+                PesoBruto = dto.ExportPesoBruto,
+                PesoNeto = dto.ExportPesoNeto,
+                UnidadPesoBruto = dto.ExportUnidadPesoBruto,
+                UnidadPesoNeto = dto.ExportUnidadPesoNeto,
+                CantidadBulto = dto.ExportCantidadBulto,
+                UnidadBulto = dto.ExportUnidadBulto,
+                VolumenBulto = dto.ExportVolumenBulto,
+                UnidadVolumen = dto.ExportUnidadVolumen
+            };
+
+            root.Encabezado.Transporte = new EcfXmlTransporte
+            {
+                ViaTransporte = dto.TranspViaTransporte,
+                PaisOrigen = dto.TranspPaisOrigen,
+                DireccionDestino = dto.TranspDireccionDestino,
+                PaisDestino = dto.TranspPaisDestino,
+                RncCompaniaTransportista = dto.TranspRncCompaniaTransportista,
+                NombreCompaniaTransportista = dto.TranspNombreCompaniaTransportista,
+                NumeroViaje = dto.TranspNumeroViaje,
+                Conductor = dto.TranspConductor,
+                DocumentoTransporte = dto.TranspDocumentoTransporte,
+                Ficha = dto.TranspFicha,
+                Placa = dto.TranspPlaca,
+                RutaTransporte = dto.TranspRutaTransporte,
+                ZonaTransporte = dto.TranspZonaTransporte,
+                NumeroAlbaran = dto.TranspNumeroAlbaran
+            };
+        }
+
+        if (ecfType == 47 && !string.IsNullOrWhiteSpace(dto.CurrencyTipoMoneda))
+        {
+            root.Encabezado.OtraMoneda = new EcfXmlOtraMoneda
+            {
+                TipoMoneda = dto.CurrencyTipoMoneda,
+                TipoCambio = dto.CurrencyTipoCambio,
+                MontoGravadoOtraMoneda = dto.CurrencyMontoGravado,
+                MontoExentoOtraMoneda = dto.CurrencyMontoExento,
+                TotalITBISOtraMoneda = dto.CurrencyTotalITBIS,
+                MontoTotalOtraMoneda = dto.CurrencyMontoTotal
+            };
+        }
 
         var doc = new XmlDocument();
         root.Signature = doc.CreateElement("Signature", "http://www.w3.org/2000/09/xmldsig#");

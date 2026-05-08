@@ -41,6 +41,10 @@ public class EcfXmlEncabezado
     public EcfXmlTransporte? Transporte { get; set; }
     public bool ShouldSerializeTransporte() => Transporte != null;
 
+    [XmlElement("OtraMoneda")]
+    public EcfXmlOtraMoneda? OtraMoneda { get; set; }
+    public bool ShouldSerializeOtraMoneda() => OtraMoneda != null;
+
     [XmlElement("Totales")]
     public EcfXmlTotales Totales { get; set; } = null!;
 }

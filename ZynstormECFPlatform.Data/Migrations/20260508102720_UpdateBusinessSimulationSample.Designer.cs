@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ZynstormECFPlatform.Data;
@@ -11,9 +12,11 @@ using ZynstormECFPlatform.Data;
 namespace ZynstormECFPlatform.Data.Migrations
 {
     [DbContext(typeof(StorageContext))]
-    partial class StorageContextModelSnapshot : ModelSnapshot
+    [Migration("20260508102720_UpdateBusinessSimulationSample")]
+    partial class UpdateBusinessSimulationSample
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -224,9 +227,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
-                    b.Property<bool>("IsDgiiApproved")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("JsonData")
                         .IsRequired()
                         .HasColumnType("text");
@@ -259,7 +259,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "31",
                             GuidId = "98765432-1234-5678-90ab-cdef12345601",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"ncf\":\"E310000000001\",\"customerRnc\":\"130862346\",\"customerName\":\"IT SOLUCLICK SRL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"CEDEBRAL 5000 JARABE\",\"quantity\":1,\"unitPrice\":244.00,\"billingIndicator\":4}]}",
                             Name = "Factura de Crédito Fiscal",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -272,7 +271,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345612",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"ncf\":\"E320000000001\",\"customerRnc\":\"40208719662\",\"customerName\":\"BRYAN TORRES\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"GREEN PIGEON PEAS CARIDOM 24/15 OZ.\",\"quantity\":2,\"unitPrice\":300000.00,\"billingIndicator\":4}]}",
                             Name = "Factura de Consumo (Gran Monto)",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -285,7 +283,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "33",
                             GuidId = "98765432-1234-5678-90ab-cdef12345613",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"ncf\":\"E330000000001\",\"customerRnc\":\"131880657\",\"customerName\":\"CLIENTES DE LA ADMINISTRACION\",\"incomeType\":\"01\",\"paymentType\":1,\"referenceNcf\":\"E310000000002\",\"referenceReasonCode\":3,\"items\":[{\"name\":\"GENERAL\",\"quantity\":1,\"unitPrice\":203898.31,\"billingIndicator\":4}]}",
                             Name = "Nota de Crédito",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -298,7 +295,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "34",
                             GuidId = "98765432-1234-5678-90ab-cdef12345614",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"ncf\":\"E340000000001\",\"customerRnc\":\"131880657\",\"customerName\":\"CLIENTES DE LA ADMINISTRACION\",\"incomeType\":\"01\",\"paymentType\":2,\"referenceNcf\":\"E310000000002\",\"referenceReasonCode\":3,\"items\":[{\"name\":\"CORACOR A C/30 TABS.\",\"quantity\":5,\"unitPrice\":601.00,\"billingIndicator\":4}]}",
                             Name = "Nota de Débito",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -311,7 +307,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "41",
                             GuidId = "98765432-1234-5678-90ab-cdef12345615",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}",
                             Name = "Comprobante de Compras",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -324,7 +319,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "43",
                             GuidId = "98765432-1234-5678-90ab-cdef12345616",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"ncf\":\"E430000000001\",\"customerRnc\":\"\",\"customerName\":\"\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"PROPIETARIO COMPANIA DE TRANSPORTE DIVER\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
                             Name = "Gastos Menores",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -337,7 +331,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "44",
                             GuidId = "98765432-1234-5678-90ab-cdef12345617",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"ncf\":\"E440000000001\",\"customerRnc\":\"131098843\",\"customerName\":\"ZONA FRANCA 6 DE NOVIEMBRE SRL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"GREEN PIGEON PEAS CARIDOM 24/15 OZ.\",\"quantity\":1,\"unitPrice\":29.50,\"billingIndicator\":4}]}",
                             Name = "Regímenes Especiales",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -350,7 +343,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "45",
                             GuidId = "98765432-1234-5678-90ab-cdef12345618",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"ncf\":\"E450000000001\",\"customerRnc\":\"401506459\",\"customerName\":\"PLAN DE ASISTENCIA SOCIAL DE LA PRESIDENCIA\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"OXIGEN 200 C/30 TABS.\",\"quantity\":1,\"unitPrice\":1197.00,\"billingIndicator\":4}]}",
                             Name = "Gubernamental",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -363,7 +355,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "46",
                             GuidId = "98765432-1234-5678-90ab-cdef12345619",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"ncf\":\"E460000000001\",\"customerRnc\":\"131880681\",\"customerName\":\"ZONA FRANCA LOI\",\"customerForeignId\":\"533445888\",\"customerCountry\":\"PUERTO RICO\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"AGUACATE CRIOLLO\",\"quantity\":100,\"unitPrice\":18000.00,\"billingIndicator\":3}],\"exportRegimenAduanero\":\"EXPORTACION NACIONAL\",\"transpViaTransporte\":\"02\",\"transpPaisDestino\":\"PUERTO RICO\"}",
                             Name = "Exportación",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -376,7 +367,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "47",
                             GuidId = "98765432-1234-5678-90ab-cdef12345620",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"ncf\":\"E470000000001\",\"customerForeignId\":\"533445888\",\"customerName\":\"ALEJA FERMIN SANTOS\",\"currencyTipoMoneda\":\"USD\",\"currencyTipoCambio\":60.0,\"items\":[{\"name\":\"SERVICIO PROFESIONAL EXTERIOR\",\"quantity\":1,\"unitPrice\":3000.0,\"billingIndicator\":4}]}",
                             Name = "Pagos Exterior",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -389,7 +379,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345602",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Farmacia Salud\",\"IssuerAddress\":\"Av. 27 de Febrero 123\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Amoxicilina 500mg\",\"Quantity\":1,\"UnitPrice\":450.00,\"TaxPercentage\":0},{\"Name\":\"Vitamina C 1000mg\",\"Quantity\":2,\"UnitPrice\":300.00,\"TaxPercentage\":18}]}",
                             Name = "Farmacia Consumo",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -402,7 +391,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345604",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Taller Los Amigos\",\"IssuerAddress\":\"Av. Imbert 78\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Cambio de Aceite (Labor)\",\"Quantity\":1,\"UnitPrice\":1500.00,\"TaxPercentage\":18},{\"Name\":\"Revisión de Frenos\",\"Quantity\":1,\"UnitPrice\":800.00,\"TaxPercentage\":18}]}",
                             Name = "Taller Mecánico Consumo",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -415,7 +403,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345605",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Surtidora El Pueblo\",\"IssuerAddress\":\"Calle Central 10\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Refresco 2L\",\"Quantity\":12,\"UnitPrice\":75.00,\"TaxPercentage\":18},{\"Name\":\"Arroz 10lb\",\"Quantity\":5,\"UnitPrice\":350.00,\"TaxPercentage\":0}]}",
                             Name = "Surtidora Consumo",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -428,7 +415,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345606",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Librería Minerva\",\"IssuerAddress\":\"Calle Independencia 55\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Cuaderno A4\",\"Quantity\":5,\"UnitPrice\":120.00,\"TaxPercentage\":18},{\"Name\":\"Lápiz de Grafito\",\"Quantity\":20,\"UnitPrice\":15.00,\"TaxPercentage\":18}]}",
                             Name = "Librería Consumo",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -441,7 +427,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345671",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Pinturas del Este\",\"IssuerAddress\":\"Av. Independencia 456\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Cubeta Pintura Blanca Satinada\",\"Quantity\":1,\"UnitPrice\":2000.00,\"TaxPercentage\":18},{\"Name\":\"Brocha 4 Pulgadas Profesional\",\"Quantity\":2,\"UnitPrice\":250.00,\"TaxPercentage\":18}]}",
                             Name = "Tienda Pintura Consumo",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -454,7 +439,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345672",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Boutique Elegance\",\"IssuerAddress\":\"Calle del Sol 789\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Vestido de Gala Azul\",\"Quantity\":1,\"UnitPrice\":3500.00,\"TaxPercentage\":18},{\"Name\":\"Cinturón Cuero Genuino\",\"Quantity\":1,\"UnitPrice\":1000.00,\"TaxPercentage\":18}]}",
                             Name = "Boutique Consumo",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -467,7 +451,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345673",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Colchones Confort\",\"IssuerAddress\":\"Av. Winston Churchill 101\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Colchón King Size Ortopédico\",\"Quantity\":1,\"UnitPrice\":12000.00,\"TaxPercentage\":18},{\"Name\":\"Almohada Memory Foam\",\"Quantity\":2,\"UnitPrice\":1500.00,\"TaxPercentage\":18}]}",
                             Name = "Colchoneria Consumo",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -480,7 +463,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345674",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Restaurante Sabores\",\"IssuerAddress\":\"Calle Gourmet 202\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Cena Especial del Chef (Dúo)\",\"Quantity\":1,\"UnitPrice\":2500.00,\"TaxPercentage\":18},{\"Name\":\"Botella de Vino Tinto Reserva\",\"Quantity\":1,\"UnitPrice\":700.00,\"TaxPercentage\":18}]}",
                             Name = "Restaurante Consumo",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
@@ -493,62 +475,9 @@ namespace ZynstormECFPlatform.Data.Migrations
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345675",
                             IsDeleted = false,
-                            IsDgiiApproved = false,
                             JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Café Aroma\",\"IssuerAddress\":\"Plaza Central Local 5\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Café Latte Grande\",\"Quantity\":2,\"UnitPrice\":175.00,\"TaxPercentage\":18},{\"Name\":\"Croissant de Almendras\",\"Quantity\":2,\"UnitPrice\":250.00,\"TaxPercentage\":18}]}",
                             Name = "Cafeteria Consumo",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 21,
-                            BusinessTypeId = 12,
-                            Description = "Ejemplo validado para Tipo 31.",
-                            EcfType = "31",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345621",
-                            IsDeleted = false,
-                            IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E310000000001\",\"customerRnc\":\"130862346\",\"customerName\":\"IT SOLUCLICK SRL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"NEVERA SAMSUNG BESPOKE 23 P3\",\"quantity\":1,\"unitPrice\":85000.00,\"billingIndicator\":1},{\"name\":\"TELEVISOR LG OLED 55\\\"\",\"quantity\":1,\"unitPrice\":65000.00,\"billingIndicator\":1}]}",
-                            Name = "Tienda Electrodomésticos Crédito Fiscal",
-                            RegisteredAt = new DateTime(2026, 5, 7, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 22,
-                            BusinessTypeId = 12,
-                            Description = "Ejemplo validado para Tipo 32.",
-                            EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345622",
-                            IsDeleted = false,
-                            IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E320000000001\",\"customerRnc\":\"22400000000\",\"customerName\":\"CONSUMIDOR FINAL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"LICUADORA NINJA PROFESSIONAL\",\"quantity\":1,\"unitPrice\":8500.00,\"billingIndicator\":1},{\"name\":\"FREIDORA DE AIRE DIGITAL 5.5L\",\"quantity\":1,\"unitPrice\":7200.00,\"billingIndicator\":1}]}",
-                            Name = "Tienda Electrodomésticos Consumo",
-                            RegisteredAt = new DateTime(2026, 5, 7, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 23,
-                            BusinessTypeId = 13,
-                            Description = "Ejemplo validado para Tipo 31.",
-                            EcfType = "31",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345623",
-                            IsDeleted = false,
-                            IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E310000000001\",\"customerRnc\":\"131880657\",\"customerName\":\"MUEBLES Y DECORACIONES S.A.\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"JUEGO DE COMEDOR MODERNO 6 SILLAS\",\"quantity\":1,\"unitPrice\":45000.00,\"billingIndicator\":1}]}",
-                            Name = "Mueblería Crédito Fiscal",
-                            RegisteredAt = new DateTime(2026, 5, 7, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 24,
-                            BusinessTypeId = 13,
-                            Description = "Ejemplo validado para Tipo 32.",
-                            EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345624",
-                            IsDeleted = false,
-                            IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E320000000001\",\"customerRnc\":\"22400000000\",\"customerName\":\"CONSUMIDOR FINAL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"SOFA SECCIONAL EN TELA GRIS\",\"quantity\":1,\"unitPrice\":38000.00,\"billingIndicator\":1},{\"name\":\"CAMA QUEEN SIZE CON BASE\",\"quantity\":1,\"unitPrice\":22000.00,\"billingIndicator\":1}]}",
-                            Name = "Mueblería Consumo",
-                            RegisteredAt = new DateTime(2026, 5, 7, 20, 0, 0, 0, DateTimeKind.Local)
                         });
                 });
 
@@ -698,24 +627,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                             IsDeleted = false,
                             Name = "Cafeteria",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessTypeId = 12,
-                            Description = "Venta de equipos para el hogar y dispositivos electrónicos.",
-                            GuidId = "8a9b0c1d-1e2f-3g4h-5i6j-8k9l0m1n2o3q",
-                            IsDeleted = false,
-                            Name = "Tienda de electrodomésticos",
-                            RegisteredAt = new DateTime(2026, 5, 7, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessTypeId = 13,
-                            Description = "Venta de muebles, decoración y artículos para el hogar.",
-                            GuidId = "9b0c1d2e-3f4g-5h6i-7j8k-9l0m1n2o3p4r",
-                            IsDeleted = false,
-                            Name = "Mueblería",
-                            RegisteredAt = new DateTime(2026, 5, 7, 20, 0, 0, 0, DateTimeKind.Local)
                         });
                 });
 
