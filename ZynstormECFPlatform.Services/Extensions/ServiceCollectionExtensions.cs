@@ -30,6 +30,10 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ICertificationSimulationGeneratorService, Certification.CertificationSimulationGeneratorService>();
         services.AddTransient<ICertificationSimulationService, Certification.CertificationSimulationService>();
 
+        // --- Old Simulation (Legacy Matrix) ---
+        services.AddTransient<Certification.OldSimulation.IOldEcfGeneratorService, Certification.OldSimulation.OldEcfGeneratorService>();
+        services.AddTransient<Certification.OldSimulation.IOldCertificationSimulationService, Certification.OldSimulation.OldCertificationSimulationService>();
+
         // --- Production ---
         services.AddTransient<IEcfProductionGeneratorService, Production.EcfProductionGeneratorService>();
         services.AddTransient<IEcfProductionService, Production.EcfProductionService>();

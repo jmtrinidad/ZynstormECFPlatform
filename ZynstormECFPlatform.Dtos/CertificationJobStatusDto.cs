@@ -61,5 +61,6 @@ public class CertificationStepResultDto
     public decimal? Amount { get; set; }
     public string SecurityCode { get; set; } = string.Empty;
     public string FechaFirma { get; set; } = string.Empty;
+    public string FechaEmision { get; set; } = string.Empty;
     public string BuyerRnc { get; set; } = string.Empty;
 }

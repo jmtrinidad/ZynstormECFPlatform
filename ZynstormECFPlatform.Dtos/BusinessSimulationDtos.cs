@@ -13,3 +13,10 @@ public class BusinessSimulationSampleDto
     public string EcfType { get; set; } = string.Empty;
     public string JsonData { get; set; } = string.Empty;
 }
+
+public class StartSimulationRequestDto
+{
+    public string BusinessTypeGuidId { get; set; } = string.Empty;
+    public string ClientGuidId { get; set; } = string.Empty;
+}
+

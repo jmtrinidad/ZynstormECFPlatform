@@ -10,6 +10,8 @@ using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Web.Api.Filters;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
+using ZynstormECFPlatform.Services.Certification.OldSimulation;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers;
 
@@ -19,10 +21,12 @@ namespace ZynstormECFPlatform.Web.Api.Controllers;
 public class CertificationController(
     ICertificationExcelService excelService,
     ICertificationSimulationService simulationService,
+    ZynstormECFPlatform.Services.Certification.OldSimulation.IOldCertificationSimulationService oldSimulationService,
     ICacheService cacheService,
     IWebHostEnvironment env,
     IClientService clientService,
-    ICertificationProcessService certificationProcessService) : ControllerBase
+    ICertificationProcessService certificationProcessService,
+    ICertificationDocumentService documentService) : ControllerBase
 {
     [HttpGet("clients/{clientGuidId}/progress")]
     public async Task<ActionResult<ClientCertificationProgressDto>> GetClientProgress(string clientGuidId, CancellationToken cancellationToken)
@@ -172,20 +176,23 @@ public class CertificationController(
         return Ok(await simulationService.GetBusinessTypesAsync());
     }
 
-    [HttpPost("start-business-simulation")]
-    public async Task<ActionResult> StartBusinessSimulation([FromQuery] string businessTypeGuidId, [FromQuery] string clientGuidId)
+    [HttpPost("business-simulation")]
+    public async Task<ActionResult> StartBusinessSimulation([FromBody] StartSimulationRequestDto dto)
     {
         try
         {
-            var jobId = await simulationService.EnqueueBusinessSimulationJobAsync(businessTypeGuidId, clientGuidId, env.WebRootPath);
+            var jobId = await oldSimulationService.EnqueueBusinessSimulationJobAsync(dto.BusinessTypeGuidId, dto.ClientGuidId, env.WebRootPath);
             return Ok(new { JobId = jobId, Message = "Simulación por tipo de negocio iniciada." });
         }
         catch (Exception ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequest(new { 
+                Message = ex.Message, 
+                StackTrace = ex.StackTrace,
+                InnerException = ex.InnerException?.Message 
+            });
         }
     }
-
 
     [HttpGet("ws")]
     public async Task Ws([FromQuery] string jobId, CancellationToken cancellationToken = default)
@@ -248,7 +255,9 @@ public class CertificationController(
         using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
         while (!cancellationToken.IsCancellationRequested && webSocket.State == WebSocketState.Open)
         {
-            var status = await simulationService.GetJobStatusAsync(jobId);
+            var status = await oldSimulationService.GetJobStatusAsync(jobId);
+            if (status.Status == "NotFound")
+                status = await simulationService.GetJobStatusAsync(jobId);
             List<CertificationStepResultDto> logs;
             lock (status.CompletedSteps)
             {
@@ -262,6 +271,8 @@ public class CertificationController(
                 step = status.CurrentStep,
                 totalSteps = status.TotalSteps,
                 currentNcf = status.CurrentNcf,
+                simulationStats = status.SimulationStats,
+                errorMessage = status.ErrorMessage,
                 logs = logs
             });
 
@@ -273,7 +284,6 @@ public class CertificationController(
         }
     }
 
-
     [HttpGet("job-status/{jobId}")]
     public async Task<ActionResult<CertificationJobStatusDto>> GetJobStatus(string jobId)
     {
@@ -284,11 +294,12 @@ public class CertificationController(
     [HttpGet("simulation/job-status/{jobId}")]
     public async Task<ActionResult<CertificationJobStatusDto>> GetSimulationJobStatus(string jobId)
     {
-        var status = await simulationService.GetJobStatusAsync(jobId);
+        var status = await oldSimulationService.GetJobStatusAsync(jobId);
+        if (status.Status == "NotFound")
+            status = await simulationService.GetJobStatusAsync(jobId);
+
         return Ok(status);
     }
-
-
 
     [HttpGet("download/{jobId}")]
     public async Task<ActionResult> DownloadStep4Results(string jobId)
@@ -315,21 +326,67 @@ public class CertificationController(
         return File(bytes, "application/zip", $"cert_step4_{jobId}.zip");
     }
 
+    [HttpGet("simulation/download/{jobId}")]
+    public async Task<ActionResult> DownloadSimulationResults(string jobId)
+    {
+        var status = await oldSimulationService.GetJobStatusAsync(jobId);
+        if (status.Status == "NotFound")
+            status = await simulationService.GetJobStatusAsync(jobId);
+
+        if (string.IsNullOrEmpty(status.DownloadUrl))
+            return BadRequest("El archivo aún no ha sido generado.");
+
+        string physicalPath = status.DownloadUrl;
+
+        if (!System.IO.Path.IsPathRooted(physicalPath))
+        {
+            physicalPath = System.IO.Path.Combine(env.WebRootPath, physicalPath.TrimStart('/'));
+        }
+
+        if (!System.IO.File.Exists(physicalPath))
+            return BadRequest($"El archivo no se encontró en la ruta: {physicalPath}");
+
+        var bytes = await System.IO.File.ReadAllBytesAsync(physicalPath);
+        return File(bytes, "application/zip", $"simulacion_{jobId}.zip");
+    }
+
     [HttpGet("download-xml/{jobId}/{ncf}")]
     public async Task<ActionResult> DownloadIndividualXml(string jobId, string ncf)
     {
+        // 1. Try to find in Excel Service (Step 2/3)
         var status = await excelService.GetJobStatusAsync(jobId);
         var stepResult = status.CompletedSteps.FirstOrDefault(x => x.Ncf == ncf && !string.IsNullOrEmpty(x.XmlFileName));
 
-        if (stepResult == null) return NotFound("XML no encontrado o aún no generado.");
+        if (stepResult != null)
+        {
+            string jobDir = System.IO.Path.Combine(env.WebRootPath, "certification_files", $"suite_{jobId}");
+            string filePath = System.IO.Path.Combine(jobDir, stepResult.XmlFileName);
 
-        string jobDir = System.IO.Path.Combine(env.WebRootPath, "certification_files", $"suite_{jobId}");
-        string filePath = System.IO.Path.Combine(jobDir, stepResult.XmlFileName);
+            if (System.IO.File.Exists(filePath))
+            {
+                var bytes = await System.IO.File.ReadAllBytesAsync(filePath);
+                return File(bytes, "application/xml", stepResult.XmlFileName);
+            }
+        }
 
-        if (!System.IO.File.Exists(filePath)) return NotFound("El archivo físico no existe.");
+        // 2. Try to find in Simulation Service (Step 4/5)
+        var simStatus = await simulationService.GetJobStatusAsync(jobId);
+        var simResult = simStatus.CompletedSteps.FirstOrDefault(x => x.Ncf == ncf);
 
-        var bytes = await System.IO.File.ReadAllBytesAsync(filePath);
-        return File(bytes, "application/xml", stepResult.XmlFileName);
+        // Simulations might not save to disk, so we fall back to Database if not in disk
+
+        // 3. Fallback to Database (persistent storage)
+        var dbDoc = await documentService.Table
+            .OrderByDescending(x => x.SentAt)
+            .FirstOrDefaultAsync(x => x.ENcfSecuence == ncf);
+
+        if (dbDoc != null)
+        {
+            var bytes = Encoding.UTF8.GetBytes(dbDoc.XmlSent);
+            return File(bytes, "application/xml", $"{ncf}.xml");
+        }
+
+        return NotFound("XML no encontrado o aún no generado.");
     }
 
     [HttpGet("job-status/{jobId}/logs")]
@@ -342,11 +399,12 @@ public class CertificationController(
     [HttpGet("simulation/job-status/{jobId}/logs")]
     public async Task<ActionResult<List<CertificationStepResultDto>>> GetSimulationJobLogs(string jobId)
     {
-        var logs = await simulationService.GetJobLogsAsync(jobId);
+        var logs = await oldSimulationService.GetJobLogsAsync(jobId);
+        if (logs.Count == 0)
+            logs = await simulationService.GetJobLogsAsync(jobId);
+
         return Ok(logs);
     }
-
-
 
     [HttpPost("aprobacion-comercial")]
     public async Task<ActionResult<object>> ProcessAprobacionComercial([FromForm] IFormFile excelFile, [FromForm] string clientGuidId)
@@ -364,17 +422,16 @@ public class CertificationController(
         return Ok(new { jobId = status.JobId, clientGuidId, step = 3, tests = status.CompletedSteps, message = "Proceso de pruebas de aprobación comercial iniciado en segundo plano." });
     }
 
-
     [HttpPost("simulacion-ecf")]
-    public async Task<ActionResult<string>> SimulacionEcf([FromBody] EcfInvoiceRequestDto dto)
+    public async Task<ActionResult<string>> SimulacionEcf([FromBody] OldEcfInvoiceRequestDto dto)
     {
         if (dto == null)
             return BadRequest("Debe proporcionar los datos de la factura en formato JSON.");
 
         try
         {
-            var jobId = await simulationService.EnqueueSimulacionEcfJobAsync(dto, env.WebRootPath);
-            return Ok(new { JobId = jobId, Message = "Simulación de e-CF iniciada en segundo plano." });
+            var jobId = await oldSimulationService.EnqueueSimulacionEcfJobAsync(dto, env.WebRootPath);
+            return Ok(new { JobId = jobId, Message = "Simulación de e-CF iniciada en segundo plano (Legacy Matrix)." });
         }
         catch (Exception ex)
         {
@@ -412,7 +469,6 @@ public class CertificationController(
             return BadRequest(ex.Message);
         }
     }
-
 
     [HttpPost("sign-xml")]
     public async Task<ActionResult> SignXml([FromForm] IFormFile xmlFile, [FromForm] string rnc)

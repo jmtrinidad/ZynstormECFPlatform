@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ZynstormECFPlatform.Data;
@@ -11,9 +12,11 @@ using ZynstormECFPlatform.Data;
 namespace ZynstormECFPlatform.Data.Migrations
 {
     [DbContext(typeof(StorageContext))]
-    partial class StorageContextModelSnapshot : ModelSnapshot
+    [Migration("20260508020938_UpdateSimulationSamplesStatic")]
+    partial class UpdateSimulationSamplesStatic
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -243,66 +246,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                         new
                         {
                             BusinessSimulationSampleId = 1,
-                            BusinessTypeId = 1,
-                            EcfType = "31",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345601",
-                            IsDeleted = false,
-                            JsonData = "{\"IssuerRnc\":\"133009889\",\"IssuerName\":\"Transporte NJ, SRL\",\"IssuerAddress\":\"Ensanche Gregorio Luperon, Santiago\",\"CustomerRnc\":\"102620717\",\"CustomerName\":\"Morteros de Europa\",\"Items\":[{\"Name\":\"Servicio de Transporte de Carga\",\"Quantity\":1,\"UnitPrice\":6000.00,\"TaxPercentage\":0,\"BillingIndicator\":4}]}",
-                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 2,
-                            BusinessTypeId = 2,
-                            EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345602",
-                            IsDeleted = false,
-                            JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Farmacia Salud\",\"IssuerAddress\":\"Av. 27 de Febrero 123\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Amoxicilina 500mg\",\"Quantity\":1,\"UnitPrice\":450.00,\"TaxPercentage\":0},{\"Name\":\"Vitamina C 1000mg\",\"Quantity\":2,\"UnitPrice\":300.00,\"TaxPercentage\":18}]}",
-                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 3,
-                            BusinessTypeId = 3,
-                            EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345603",
-                            IsDeleted = false,
-                            JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Repuestos El Motor\",\"IssuerAddress\":\"Calle Duarte 45\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Filtro de Aceite\",\"Quantity\":1,\"UnitPrice\":650.00,\"TaxPercentage\":18},{\"Name\":\"Aceite Sintético 5W30\",\"Quantity\":4,\"UnitPrice\":850.00,\"TaxPercentage\":18}]}",
-                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 4,
-                            BusinessTypeId = 4,
-                            EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345604",
-                            IsDeleted = false,
-                            JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Taller Los Amigos\",\"IssuerAddress\":\"Av. Imbert 78\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Cambio de Aceite (Labor)\",\"Quantity\":1,\"UnitPrice\":1500.00,\"TaxPercentage\":18},{\"Name\":\"Revisión de Frenos\",\"Quantity\":1,\"UnitPrice\":800.00,\"TaxPercentage\":18}]}",
-                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 5,
-                            BusinessTypeId = 5,
-                            EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345605",
-                            IsDeleted = false,
-                            JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Surtidora El Pueblo\",\"IssuerAddress\":\"Calle Central 10\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Refresco 2L\",\"Quantity\":12,\"UnitPrice\":75.00,\"TaxPercentage\":18},{\"Name\":\"Arroz 10lb\",\"Quantity\":5,\"UnitPrice\":350.00,\"TaxPercentage\":0}]}",
-                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 6,
-                            BusinessTypeId = 6,
-                            EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345606",
-                            IsDeleted = false,
-                            JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Librería Minerva\",\"IssuerAddress\":\"Calle Independencia 55\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Cuaderno A4\",\"Quantity\":5,\"UnitPrice\":120.00,\"TaxPercentage\":18},{\"Name\":\"Lápiz de Grafito\",\"Quantity\":20,\"UnitPrice\":15.00,\"TaxPercentage\":18}]}",
-                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 7,
                             BusinessTypeId = 7,
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345671",
@@ -312,7 +255,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         },
                         new
                         {
-                            BusinessSimulationSampleId = 8,
+                            BusinessSimulationSampleId = 2,
                             BusinessTypeId = 8,
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345672",
@@ -322,7 +265,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         },
                         new
                         {
-                            BusinessSimulationSampleId = 9,
+                            BusinessSimulationSampleId = 3,
                             BusinessTypeId = 9,
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345673",
@@ -332,7 +275,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         },
                         new
                         {
-                            BusinessSimulationSampleId = 10,
+                            BusinessSimulationSampleId = 4,
                             BusinessTypeId = 10,
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345674",
@@ -342,7 +285,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         },
                         new
                         {
-                            BusinessSimulationSampleId = 11,
+                            BusinessSimulationSampleId = 5,
                             BusinessTypeId = 11,
                             EcfType = "32",
                             GuidId = "98765432-1234-5678-90ab-cdef12345675",

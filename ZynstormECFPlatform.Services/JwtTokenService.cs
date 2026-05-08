@@ -29,7 +29,9 @@ public class JwtTokenService : IJwtTokenService
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(key),
             ValidateIssuer = false,
-            ValidateAudience = false
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(5)
         };
         return handler.ValidateToken(token, validations, out _);
     }
@@ -43,7 +45,9 @@ public class JwtTokenService : IJwtTokenService
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(key),
             ValidateIssuer = false,
-            ValidateAudience = false
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(5)
         };
         var claims = handler.ValidateToken(token, validations, out _);
         var nameIdentifier = claims.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
@@ -53,7 +57,7 @@ public class JwtTokenService : IJwtTokenService
     public TokenDto CreateToken(User user, IdentityRole role)
     {
         var secret = Encoding.UTF8.GetBytes(_appSettings.Secret);
-        var issuedAt = DateTime.Now;
+        var issuedAt = DateTime.UtcNow;
         var expirationTime = issuedAt.AddDays(1);
 
         var tokenDescriptor = new SecurityTokenDescriptor

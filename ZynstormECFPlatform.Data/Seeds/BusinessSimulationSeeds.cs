@@ -31,47 +31,101 @@ public static class BusinessSimulationSeeds
             new BusinessSimulationSample 
             { 
                 BusinessSimulationSampleId = 1, 
-                BusinessTypeId = 7, 
-                EcfType = "32", 
-                GuidId = Guid.NewGuid().ToString(),
+                BusinessTypeId = 1, 
+                EcfType = "31", 
+                GuidId = "98765432-1234-5678-90ab-cdef12345601",
                 RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
-                JsonData = "{\"ECF\":{\"Encabezado\":{\"Version\":\"1.0\",\"IdDoc\":{\"TipoeCF\":\"32\",\"eNCF\":\"E320000000001\",\"FechaVencimientoSecuencia\":\"2026-12-31\"},\"Emisor\":{\"RNCEmisor\":\"131794021\",\"RazonSocialEmisor\":\"Pinturas del Este\",\"DireccionEmisor\":\"Av. Independencia 456\",\"FechaEmision\":\"2026-05-07\"},\"Comprador\":{\"RazonSocialComprador\":\"Consumidor Final\"},\"Totales\":{\"MontoGravadoTotal\":2500.00,\"MontoGravadoI1\":2500.00,\"ITBIS1\":18,\"TotalITBIS\":450.00,\"TotalITBIS1\":450.00,\"MontoTotal\":2950.00}},\"DetallesItems\":{\"Item\":[{\"NumeroLinea\":\"1\",\"NombreItem\":\"Cubeta Pintura Blanca Satinada\",\"CantidadItem\":1,\"PrecioUnitarioItem\":2000.00,\"MontoItem\":2000.00},{\"NumeroLinea\":\"2\",\"NombreItem\":\"Brocha 4 Pulgadas Profesional\",\"CantidadItem\":2,\"PrecioUnitarioItem\":250.00,\"MontoItem\":500.00}]}}}"
+                JsonData = "{\"issuerRnc\":\"133009889\",\"issuerName\":\"TRANSPORTE NJ, SRL\",\"issuerAddress\":\"Ensanche Gregorio Luperon, Santiago\",\"customerRnc\":\"102620717\",\"customerName\":\"MORTEROS DE EUROPA\",\"incomeType\":\"01\",\"paymentType\":2,\"manualIndicadorMontoGravado\":0,\"items\":[{\"name\":\"Servicio de Transporte de Carga\",\"quantity\":1,\"unitPrice\":6000.00,\"taxPercentage\":0,\"billingIndicator\":4}]}"
             },
             new BusinessSimulationSample 
             { 
                 BusinessSimulationSampleId = 2, 
-                BusinessTypeId = 8, 
+                BusinessTypeId = 2, 
                 EcfType = "32", 
-                GuidId = Guid.NewGuid().ToString(),
+                GuidId = "98765432-1234-5678-90ab-cdef12345602",
                 RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
-                JsonData = "{\"ECF\":{\"Encabezado\":{\"Version\":\"1.0\",\"IdDoc\":{\"TipoeCF\":\"32\",\"eNCF\":\"E320000000002\",\"FechaVencimientoSecuencia\":\"2026-12-31\"},\"Emisor\":{\"RNCEmisor\":\"131794021\",\"RazonSocialEmisor\":\"Boutique Elegance\",\"DireccionEmisor\":\"Calle del Sol 789\",\"FechaEmision\":\"2026-05-07\"},\"Comprador\":{\"RazonSocialComprador\":\"Consumidor Final\"},\"Totales\":{\"MontoGravadoTotal\":4500.00,\"MontoGravadoI1\":4500.00,\"ITBIS1\":18,\"TotalITBIS\":810.00,\"TotalITBIS1\":810.00,\"MontoTotal\":5310.00}},\"DetallesItems\":{\"Item\":[{\"NumeroLinea\":\"1\",\"NombreItem\":\"Vestido de Gala Azul\",\"CantidadItem\":1,\"PrecioUnitarioItem\":3500.00,\"MontoItem\":3500.00},{\"NumeroLinea\":\"2\",\"NombreItem\":\"Cinturón Cuero Genuino\",\"CantidadItem\":1,\"PrecioUnitarioItem\":1000.00,\"MontoItem\":1000.00}]}}}"
+                JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Farmacia Salud\",\"IssuerAddress\":\"Av. 27 de Febrero 123\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Amoxicilina 500mg\",\"Quantity\":1,\"UnitPrice\":450.00,\"TaxPercentage\":0},{\"Name\":\"Vitamina C 1000mg\",\"Quantity\":2,\"UnitPrice\":300.00,\"TaxPercentage\":18}]}"
             },
             new BusinessSimulationSample 
             { 
                 BusinessSimulationSampleId = 3, 
-                BusinessTypeId = 9, 
+                BusinessTypeId = 3, 
                 EcfType = "32", 
-                GuidId = Guid.NewGuid().ToString(),
+                GuidId = "98765432-1234-5678-90ab-cdef12345603",
                 RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
-                JsonData = "{\"ECF\":{\"Encabezado\":{\"Version\":\"1.0\",\"IdDoc\":{\"TipoeCF\":\"32\",\"eNCF\":\"E320000000003\",\"FechaVencimientoSecuencia\":\"2026-12-31\"},\"Emisor\":{\"RNCEmisor\":\"131794021\",\"RazonSocialEmisor\":\"Colchones Confort\",\"DireccionEmisor\":\"Av. Winston Churchill 101\",\"FechaEmision\":\"2026-05-07\"},\"Comprador\":{\"RazonSocialComprador\":\"Consumidor Final\"},\"Totales\":{\"MontoGravadoTotal\":15000.00,\"MontoGravadoI1\":15000.00,\"ITBIS1\":18,\"TotalITBIS\":2700.00,\"TotalITBIS1\":2700.00,\"MontoTotal\":17700.00}},\"DetallesItems\":{\"Item\":[{\"NumeroLinea\":\"1\",\"NombreItem\":\"Colchón King Size Ortopédico\",\"CantidadItem\":1,\"PrecioUnitarioItem\":12000.00,\"MontoItem\":12000.00},{\"NumeroLinea\":\"2\",\"NombreItem\":\"Almohada Memory Foam\",\"CantidadItem\":2,\"PrecioUnitarioItem\":1500.00,\"MontoItem\":3000.00}]}}}"
+                JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Repuestos El Motor\",\"IssuerAddress\":\"Calle Duarte 45\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Filtro de Aceite\",\"Quantity\":1,\"UnitPrice\":650.00,\"TaxPercentage\":18},{\"Name\":\"Aceite Sintético 5W30\",\"Quantity\":4,\"UnitPrice\":850.00,\"TaxPercentage\":18}]}"
             },
             new BusinessSimulationSample 
             { 
                 BusinessSimulationSampleId = 4, 
-                BusinessTypeId = 10, 
+                BusinessTypeId = 4, 
                 EcfType = "32", 
-                GuidId = Guid.NewGuid().ToString(),
+                GuidId = "98765432-1234-5678-90ab-cdef12345604",
                 RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
-                JsonData = "{\"ECF\":{\"Encabezado\":{\"Version\":\"1.0\",\"IdDoc\":{\"TipoeCF\":\"32\",\"eNCF\":\"E320000000004\",\"FechaVencimientoSecuencia\":\"2026-12-31\"},\"Emisor\":{\"RNCEmisor\":\"131794021\",\"RazonSocialEmisor\":\"Restaurante Sabores\",\"DireccionEmisor\":\"Calle Gourmet 202\",\"FechaEmision\":\"2026-05-07\"},\"Comprador\":{\"RazonSocialComprador\":\"Consumidor Final\"},\"Totales\":{\"MontoGravadoTotal\":3200.00,\"MontoGravadoI1\":3200.00,\"ITBIS1\":18,\"TotalITBIS\":576.00,\"TotalITBIS1\":576.00,\"MontoTotal\":3776.00}},\"DetallesItems\":{\"Item\":[{\"NumeroLinea\":\"1\",\"NombreItem\":\"Cena Especial del Chef (Dúo)\",\"CantidadItem\":1,\"PrecioUnitarioItem\":2500.00,\"MontoItem\":2500.00},{\"NumeroLinea\":\"2\",\"NombreItem\":\"Botella de Vino Tinto Reserva\",\"CantidadItem\":1,\"PrecioUnitarioItem\":700.00,\"MontoItem\":700.00}]}}}"
+                JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Taller Los Amigos\",\"IssuerAddress\":\"Av. Imbert 78\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Cambio de Aceite (Labor)\",\"Quantity\":1,\"UnitPrice\":1500.00,\"TaxPercentage\":18},{\"Name\":\"Revisión de Frenos\",\"Quantity\":1,\"UnitPrice\":800.00,\"TaxPercentage\":18}]}"
             },
             new BusinessSimulationSample 
             { 
                 BusinessSimulationSampleId = 5, 
+                BusinessTypeId = 5, 
+                EcfType = "32", 
+                GuidId = "98765432-1234-5678-90ab-cdef12345605",
+                RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Surtidora El Pueblo\",\"IssuerAddress\":\"Calle Central 10\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Refresco 2L\",\"Quantity\":12,\"UnitPrice\":75.00,\"TaxPercentage\":18},{\"Name\":\"Arroz 10lb\",\"Quantity\":5,\"UnitPrice\":350.00,\"TaxPercentage\":0}]}"
+            },
+            new BusinessSimulationSample 
+            { 
+                BusinessSimulationSampleId = 6, 
+                BusinessTypeId = 6, 
+                EcfType = "32", 
+                GuidId = "98765432-1234-5678-90ab-cdef12345606",
+                RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Librería Minerva\",\"IssuerAddress\":\"Calle Independencia 55\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Cuaderno A4\",\"Quantity\":5,\"UnitPrice\":120.00,\"TaxPercentage\":18},{\"Name\":\"Lápiz de Grafito\",\"Quantity\":20,\"UnitPrice\":15.00,\"TaxPercentage\":18}]}"
+            },
+            new BusinessSimulationSample 
+            { 
+                BusinessSimulationSampleId = 7, 
+                BusinessTypeId = 7, 
+                EcfType = "32", 
+                GuidId = "98765432-1234-5678-90ab-cdef12345671",
+                RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Pinturas del Este\",\"IssuerAddress\":\"Av. Independencia 456\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Cubeta Pintura Blanca Satinada\",\"Quantity\":1,\"UnitPrice\":2000.00,\"TaxPercentage\":18},{\"Name\":\"Brocha 4 Pulgadas Profesional\",\"Quantity\":2,\"UnitPrice\":250.00,\"TaxPercentage\":18}]}"
+            },
+            new BusinessSimulationSample 
+            { 
+                BusinessSimulationSampleId = 8, 
+                BusinessTypeId = 8, 
+                EcfType = "32", 
+                GuidId = "98765432-1234-5678-90ab-cdef12345672",
+                RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Boutique Elegance\",\"IssuerAddress\":\"Calle del Sol 789\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Vestido de Gala Azul\",\"Quantity\":1,\"UnitPrice\":3500.00,\"TaxPercentage\":18},{\"Name\":\"Cinturón Cuero Genuino\",\"Quantity\":1,\"UnitPrice\":1000.00,\"TaxPercentage\":18}]}"
+            },
+            new BusinessSimulationSample 
+            { 
+                BusinessSimulationSampleId = 9, 
+                BusinessTypeId = 9, 
+                EcfType = "32", 
+                GuidId = "98765432-1234-5678-90ab-cdef12345673",
+                RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Colchones Confort\",\"IssuerAddress\":\"Av. Winston Churchill 101\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Colchón King Size Ortopédico\",\"Quantity\":1,\"UnitPrice\":12000.00,\"TaxPercentage\":18},{\"Name\":\"Almohada Memory Foam\",\"Quantity\":2,\"UnitPrice\":1500.00,\"TaxPercentage\":18}]}"
+            },
+            new BusinessSimulationSample 
+            { 
+                BusinessSimulationSampleId = 10, 
+                BusinessTypeId = 10, 
+                EcfType = "32", 
+                GuidId = "98765432-1234-5678-90ab-cdef12345674",
+                RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Restaurante Sabores\",\"IssuerAddress\":\"Calle Gourmet 202\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Cena Especial del Chef (Dúo)\",\"Quantity\":1,\"UnitPrice\":2500.00,\"TaxPercentage\":18},{\"Name\":\"Botella de Vino Tinto Reserva\",\"Quantity\":1,\"UnitPrice\":700.00,\"TaxPercentage\":18}]}"
+            },
+            new BusinessSimulationSample 
+            { 
+                BusinessSimulationSampleId = 11, 
                 BusinessTypeId = 11, 
                 EcfType = "32", 
-                GuidId = Guid.NewGuid().ToString(),
+                GuidId = "98765432-1234-5678-90ab-cdef12345675",
                 RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
-                JsonData = "{\"ECF\":{\"Encabezado\":{\"Version\":\"1.0\",\"IdDoc\":{\"TipoeCF\":\"32\",\"eNCF\":\"E320000000005\",\"FechaVencimientoSecuencia\":\"2026-12-31\"},\"Emisor\":{\"RNCEmisor\":\"131794021\",\"RazonSocialEmisor\":\"Café Aroma\",\"DireccionEmisor\":\"Plaza Central Local 5\",\"FechaEmision\":\"2026-05-07\"},\"Comprador\":{\"RazonSocialComprador\":\"Consumidor Final\"},\"Totales\":{\"MontoGravadoTotal\":850.00,\"MontoGravadoI1\":850.00,\"ITBIS1\":18,\"TotalITBIS\":153.00,\"TotalITBIS1\":153.00,\"MontoTotal\":1003.00}},\"DetallesItems\":{\"Item\":[{\"NumeroLinea\":\"1\",\"NombreItem\":\"Café Latte Grande\",\"CantidadItem\":2,\"PrecioUnitarioItem\":175.00,\"MontoItem\":350.00},{\"NumeroLinea\":\"2\",\"NombreItem\":\"Croissant de Almendras\",\"CantidadItem\":2,\"PrecioUnitarioItem\":250.00,\"MontoItem\":500.00}]}}}"
+                JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Café Aroma\",\"IssuerAddress\":\"Plaza Central Local 5\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Café Latte Grande\",\"Quantity\":2,\"UnitPrice\":175.00,\"TaxPercentage\":18},{\"Name\":\"Croissant de Almendras\",\"Quantity\":2,\"UnitPrice\":250.00,\"TaxPercentage\":18}]}"
             }
         };
 

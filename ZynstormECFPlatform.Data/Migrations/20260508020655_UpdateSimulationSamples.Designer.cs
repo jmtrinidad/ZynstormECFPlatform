@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ZynstormECFPlatform.Data;
@@ -11,9 +12,11 @@ using ZynstormECFPlatform.Data;
 namespace ZynstormECFPlatform.Data.Migrations
 {
     [DbContext(typeof(StorageContext))]
-    partial class StorageContextModelSnapshot : ModelSnapshot
+    [Migration("20260508020655_UpdateSimulationSamples")]
+    partial class UpdateSimulationSamples
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -243,109 +246,49 @@ namespace ZynstormECFPlatform.Data.Migrations
                         new
                         {
                             BusinessSimulationSampleId = 1,
-                            BusinessTypeId = 1,
-                            EcfType = "31",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345601",
-                            IsDeleted = false,
-                            JsonData = "{\"IssuerRnc\":\"133009889\",\"IssuerName\":\"Transporte NJ, SRL\",\"IssuerAddress\":\"Ensanche Gregorio Luperon, Santiago\",\"CustomerRnc\":\"102620717\",\"CustomerName\":\"Morteros de Europa\",\"Items\":[{\"Name\":\"Servicio de Transporte de Carga\",\"Quantity\":1,\"UnitPrice\":6000.00,\"TaxPercentage\":0,\"BillingIndicator\":4}]}",
-                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 2,
-                            BusinessTypeId = 2,
-                            EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345602",
-                            IsDeleted = false,
-                            JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Farmacia Salud\",\"IssuerAddress\":\"Av. 27 de Febrero 123\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Amoxicilina 500mg\",\"Quantity\":1,\"UnitPrice\":450.00,\"TaxPercentage\":0},{\"Name\":\"Vitamina C 1000mg\",\"Quantity\":2,\"UnitPrice\":300.00,\"TaxPercentage\":18}]}",
-                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 3,
-                            BusinessTypeId = 3,
-                            EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345603",
-                            IsDeleted = false,
-                            JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Repuestos El Motor\",\"IssuerAddress\":\"Calle Duarte 45\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Filtro de Aceite\",\"Quantity\":1,\"UnitPrice\":650.00,\"TaxPercentage\":18},{\"Name\":\"Aceite Sintético 5W30\",\"Quantity\":4,\"UnitPrice\":850.00,\"TaxPercentage\":18}]}",
-                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 4,
-                            BusinessTypeId = 4,
-                            EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345604",
-                            IsDeleted = false,
-                            JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Taller Los Amigos\",\"IssuerAddress\":\"Av. Imbert 78\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Cambio de Aceite (Labor)\",\"Quantity\":1,\"UnitPrice\":1500.00,\"TaxPercentage\":18},{\"Name\":\"Revisión de Frenos\",\"Quantity\":1,\"UnitPrice\":800.00,\"TaxPercentage\":18}]}",
-                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 5,
-                            BusinessTypeId = 5,
-                            EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345605",
-                            IsDeleted = false,
-                            JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Surtidora El Pueblo\",\"IssuerAddress\":\"Calle Central 10\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Refresco 2L\",\"Quantity\":12,\"UnitPrice\":75.00,\"TaxPercentage\":18},{\"Name\":\"Arroz 10lb\",\"Quantity\":5,\"UnitPrice\":350.00,\"TaxPercentage\":0}]}",
-                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 6,
-                            BusinessTypeId = 6,
-                            EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345606",
-                            IsDeleted = false,
-                            JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Librería Minerva\",\"IssuerAddress\":\"Calle Independencia 55\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Cuaderno A4\",\"Quantity\":5,\"UnitPrice\":120.00,\"TaxPercentage\":18},{\"Name\":\"Lápiz de Grafito\",\"Quantity\":20,\"UnitPrice\":15.00,\"TaxPercentage\":18}]}",
-                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
-                        },
-                        new
-                        {
-                            BusinessSimulationSampleId = 7,
                             BusinessTypeId = 7,
                             EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345671",
+                            GuidId = "d0bd3362-54a8-42ed-bf2b-cd0fb0c39db0",
                             IsDeleted = false,
                             JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Pinturas del Este\",\"IssuerAddress\":\"Av. Independencia 456\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Cubeta Pintura Blanca Satinada\",\"Quantity\":1,\"UnitPrice\":2000.00,\"TaxPercentage\":18},{\"Name\":\"Brocha 4 Pulgadas Profesional\",\"Quantity\":2,\"UnitPrice\":250.00,\"TaxPercentage\":18}]}",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
                         new
                         {
-                            BusinessSimulationSampleId = 8,
+                            BusinessSimulationSampleId = 2,
                             BusinessTypeId = 8,
                             EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345672",
+                            GuidId = "5ca120a5-253b-4b6a-bdbd-12fade5ec2bb",
                             IsDeleted = false,
                             JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Boutique Elegance\",\"IssuerAddress\":\"Calle del Sol 789\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Vestido de Gala Azul\",\"Quantity\":1,\"UnitPrice\":3500.00,\"TaxPercentage\":18},{\"Name\":\"Cinturón Cuero Genuino\",\"Quantity\":1,\"UnitPrice\":1000.00,\"TaxPercentage\":18}]}",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
                         new
                         {
-                            BusinessSimulationSampleId = 9,
+                            BusinessSimulationSampleId = 3,
                             BusinessTypeId = 9,
                             EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345673",
+                            GuidId = "1d68f593-3b2b-480e-8c2a-b3f729a4bf14",
                             IsDeleted = false,
                             JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Colchones Confort\",\"IssuerAddress\":\"Av. Winston Churchill 101\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Colchón King Size Ortopédico\",\"Quantity\":1,\"UnitPrice\":12000.00,\"TaxPercentage\":18},{\"Name\":\"Almohada Memory Foam\",\"Quantity\":2,\"UnitPrice\":1500.00,\"TaxPercentage\":18}]}",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
                         new
                         {
-                            BusinessSimulationSampleId = 10,
+                            BusinessSimulationSampleId = 4,
                             BusinessTypeId = 10,
                             EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345674",
+                            GuidId = "f23cbe89-2c93-45af-872d-7fdb029faba8",
                             IsDeleted = false,
                             JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Restaurante Sabores\",\"IssuerAddress\":\"Calle Gourmet 202\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Cena Especial del Chef (Dúo)\",\"Quantity\":1,\"UnitPrice\":2500.00,\"TaxPercentage\":18},{\"Name\":\"Botella de Vino Tinto Reserva\",\"Quantity\":1,\"UnitPrice\":700.00,\"TaxPercentage\":18}]}",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
                         new
                         {
-                            BusinessSimulationSampleId = 11,
+                            BusinessSimulationSampleId = 5,
                             BusinessTypeId = 11,
                             EcfType = "32",
-                            GuidId = "98765432-1234-5678-90ab-cdef12345675",
+                            GuidId = "84043e4c-644a-441c-9d8f-c50690d53ba7",
                             IsDeleted = false,
                             JsonData = "{\"IssuerRnc\":\"131794021\",\"IssuerName\":\"Café Aroma\",\"IssuerAddress\":\"Plaza Central Local 5\",\"CustomerRnc\":\"22400000000\",\"CustomerName\":\"Consumidor Final\",\"Items\":[{\"Name\":\"Café Latte Grande\",\"Quantity\":2,\"UnitPrice\":175.00,\"TaxPercentage\":18},{\"Name\":\"Croissant de Almendras\",\"Quantity\":2,\"UnitPrice\":250.00,\"TaxPercentage\":18}]}",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)

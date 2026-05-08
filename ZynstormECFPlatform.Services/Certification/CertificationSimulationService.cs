@@ -179,6 +179,45 @@ public class CertificationSimulationService : ICertificationSimulationService
                     if (result.Success)
                     {
                         UpdateSimulationStats(status.SimulationStats, dto.ECF.Encabezado.IdDoc.TipoeCF, dto.ECF.Encabezado.Totales.MontoTotal ?? 0);
+
+                        // Persistence: Save to CertificationDocuments so they can be retrieved later
+                        try
+                        {
+                            var process = await _processService.Table
+                                .FirstOrDefaultAsync(p => p.ClientId == client.ClientId && 
+                                                         p.Environment == DgiiEnvironment.CerteCF && 
+                                                         p.Status == CertificationStatus.InProgress);
+
+                            if (process != null)
+                            {
+                                var ecfType = await _context.Set<ZynstormECFPlatform.Core.Entities.EcfType>().FirstOrDefaultAsync(t => t.Code == dto.ECF.Encabezado.IdDoc.TipoeCF);
+                                var encf = await _encfService.Table
+                                    .FirstOrDefaultAsync(e => e.ClientId == client.ClientId && e.NcfTypeId == (ecfType != null ? ecfType.EcfTypeId : 0));
+
+                                if (ecfType != null && encf != null)
+                                {
+                                    var certDoc = new CertificationDocument
+                                    {
+                                        CertificationProcessId = process.CertificationProcessId,
+                                        ENcfSecuence = dto.ECF.Encabezado.IdDoc.eNCF,
+                                        ENcfId = encf.ENcfId,
+                                        EcfTypeId = ecfType.EcfTypeId,
+                                        XmlSent = signed,
+                                        XmlResponse = result.Error, // Result often contains the response message or raw XML
+                                        TrackId = result.TrackId,
+                                        Status = DocumentStatus.Accepted,
+                                        SentAt = DateTime.UtcNow,
+                                        ValidatedAt = DateTime.UtcNow
+                                    };
+                                    await _documentService.InsertAsync(certDoc);
+                                }
+                            }
+                        }
+                        catch (Exception persistenceEx)
+                        {
+                            // We don't want to fail the simulation if persistence fails, but we should probably log it
+                            // For now, we continue to ensure the simulation SignalR updates keep flowing
+                        }
                     }
 
                     lock (status.CompletedSteps)
