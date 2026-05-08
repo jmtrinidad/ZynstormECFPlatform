@@ -14,6 +14,7 @@ using ZynstormECFPlatform.Common.Utilities;
 using ZynstormECFPlatform.Data;
 using Microsoft.AspNetCore.SignalR;
 using ZynstormECFPlatform.Common.Hubs;
+using System.Xml.Linq;
 
 namespace ZynstormECFPlatform.Services.Certification;
 
@@ -182,6 +183,18 @@ public class CertificationSimulationService : ICertificationSimulationService
 
                     lock (status.CompletedSteps)
                     {
+                        var xDoc = XDocument.Parse(signed);
+                        var securityCode = xDoc.Descendants().FirstOrDefault(d => d.Name.LocalName == "CodigoSeguridadeCF")?.Value;
+                        var signatureValue = xDoc.Descendants().FirstOrDefault(d => d.Name.LocalName == "SignatureValue")?.Value;
+                        var fechaFirma = xDoc.Descendants().FirstOrDefault(d => d.Name.LocalName == "FechaHoraFirma")?.Value;
+
+                        if (string.IsNullOrEmpty(securityCode))
+                        {
+                            securityCode = !string.IsNullOrEmpty(signatureValue) && signatureValue.Length >= 6 
+                                ? signatureValue.Substring(0, 6) 
+                                : "ABC123";
+                        }
+
                         status.CompletedSteps.Add(new CertificationStepResultDto
                         {
                             Ncf = dto.ECF.Encabezado.IdDoc.eNCF,
@@ -189,7 +202,10 @@ public class CertificationSimulationService : ICertificationSimulationService
                             Status = result.Success ? "Aceptado" : "Rechazado",
                             Message = result.Success ? "Simulación exitosa" : result.Error,
                             TrackId = result.TrackId,
-                            Amount = dto.ECF.Encabezado.Totales.MontoTotal
+                            Amount = dto.ECF.Encabezado.Totales.MontoTotal,
+                            SecurityCode = securityCode ?? "",
+                            FechaFirma = fechaFirma ?? "",
+                            BuyerRnc = dto.ECF.Encabezado.Comprador.RNCComprador ?? ""
                         });
                     }
                 }
