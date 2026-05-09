@@ -876,11 +876,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
         if (lineAmount <= 1)
             return;
 
-        var discountAmount = Math.Round(lineAmount * 0.05m, 2);
-        if (discountAmount <= 0 || discountAmount >= lineAmount)
-        {
-            discountAmount = 1;
-        }
+        var discountAmount = 10.00m;
 
         firstItem.Discount = 0;
         firstItem.ManualDescuentoMonto = null;
