@@ -326,6 +326,9 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                             currentDto.ReferenceNcf = reference.Ncf;
                             currentDto.ReferenceIssueDate = reference.IssueDate;
                             currentDto.ReferenceReasonCode = 3;
+                            currentDto.ReferenceReasonDescription = string.IsNullOrWhiteSpace(currentDto.ReferenceReasonDescription)
+                                ? "Ajuste parcial de montos"
+                                : currentDto.ReferenceReasonDescription;
                         }
                         else
                         {
@@ -650,6 +653,8 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                         BuyerRnc = currentDto.CustomerRnc,
                         XmlFileName = xmlFileName
                     });
+
+                    await NotifyUpdate(jobId, status);
 
                     if (!isAccepted)
                         throw new Exception($"Error en NCF {currentDto.Ncf}: {error}");

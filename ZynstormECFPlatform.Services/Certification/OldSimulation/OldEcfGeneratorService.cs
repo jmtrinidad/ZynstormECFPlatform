@@ -473,7 +473,9 @@ public class OldEcfGeneratorService : IOldEcfGeneratorService
                     RNCOtroContribuyente = dto.ReferenceCustomerRnc,
                     FechaNCFModificado = (dto.ReferenceIssueDate ?? DateTime.UtcNow).ToString(DateFormat),
                     CodigoModificacion = dto.ReferenceReasonCode ?? 3,
-                    RazonModificacion = dto.ReferenceReasonDescription
+                    RazonModificacion = string.IsNullOrWhiteSpace(dto.ReferenceReasonDescription)
+                        ? "Ajuste parcial de montos"
+                        : dto.ReferenceReasonDescription
                 } : null,
             FechaHoraFirma = signatureDateTime
         };
