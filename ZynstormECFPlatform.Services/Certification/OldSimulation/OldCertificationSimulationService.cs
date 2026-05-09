@@ -255,6 +255,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                         }
 
                         currentDto.EcfType = item.Type;
+                        currentDto.IssueDate = DateTime.Now.ToDrTime();
                         currentDto.IncomeType ??= "01";
 
                         // Certification usually expects Credit (2) for Type 31 to test payment terms
@@ -325,6 +326,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                             currentDto.CustomerName = reference.Dto.CustomerName;
                             currentDto.ReferenceNcf = reference.Ncf;
                             currentDto.ReferenceIssueDate = reference.IssueDate;
+                            currentDto.ReferenceCustomerRnc = null; // Only use if different from buyer
                             currentDto.ReferenceReasonCode = 3;
                             currentDto.ReferenceReasonDescription = string.IsNullOrWhiteSpace(currentDto.ReferenceReasonDescription)
                                 ? "Ajuste parcial de montos"
@@ -537,8 +539,9 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
                     decimal total = currentDto.ManualMontoTotal ?? CalculateTransmissionTotal(currentDto);
 
-                    for (var sendAttempt = 1; sendAttempt <= 100; sendAttempt++)
-                    {
+                    // DISABLE AUTO-RETRY LOOP AS REQUESTED BY USER
+                    // for (var sendAttempt = 1; sendAttempt <= 100; sendAttempt++)
+                    // {
                         string unsignedXml = _generatorService.GenerateUnsignedXml(currentDto, item.IsSummary);
                         signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
                         securityCode = currentDto.SecurityCodeOverride ?? "";
@@ -554,32 +557,34 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
                         xmlFileName = (item.IsManual ? "SUBIR_DGII_" : "") + $"Paso_{status.CurrentStep}_{currentDto.Ncf}.xml";
 
-                        if (item.IsManual) { isAccepted = true; trackId = "MANUAL"; break; }
-
-                        Console.WriteLine($"[Simulation] Sending ECF Type {item.Type} - NCF {currentDto.Ncf} - Total {total}...");
-                        var result = await _transmissionService.SendEcfAsync(DgiiEnvironment.CerteCF, token, signedXml, item.Type, total, dto.IssuerRnc, currentDto.Ncf, item.IsSummary);
-                        if (result.Success)
+                        if (item.IsManual) { isAccepted = true; trackId = "MANUAL"; }
+                        else 
                         {
-                            if (!string.IsNullOrEmpty(result.TrackId))
+                            Console.WriteLine($"[Simulation] Sending ECF Type {item.Type} - NCF {currentDto.Ncf} - Total {total}...");
+                            var result = await _transmissionService.SendEcfAsync(DgiiEnvironment.CerteCF, token, signedXml, item.Type, total, dto.IssuerRnc, currentDto.Ncf, item.IsSummary);
+                            if (result.Success)
                             {
-                                await Task.Delay(2000);
-                                var finalStatus = await PollDgiiStatusAsync(result.TrackId, dto.IssuerRnc);
-                                isAccepted = finalStatus.Estado == "Aceptado" || (item.IsSummary && finalStatus.Estado == "Generado");
-                                trackId = result.TrackId;
-                                if (!isAccepted) error = BuildDgiiStatusError(finalStatus);
+                                if (!string.IsNullOrEmpty(result.TrackId))
+                                {
+                                    await Task.Delay(2000);
+                                    var finalStatus = await PollDgiiStatusAsync(result.TrackId, dto.IssuerRnc);
+                                    isAccepted = finalStatus.Estado == "Aceptado" || (item.IsSummary && finalStatus.Estado == "Generado");
+                                    trackId = result.TrackId;
+                                    if (!isAccepted) error = BuildDgiiStatusError(finalStatus);
+                                }
+                                else if (item.IsSummary && result.Estado == "Aceptado") { isAccepted = true; trackId = "INMEDIATO"; }
+                                else { isAccepted = false; error = "DGII: No se recibió TrackId."; }
                             }
-                            else if (item.IsSummary && result.Estado == "Aceptado") { isAccepted = true; trackId = "INMEDIATO"; }
-                            else { isAccepted = false; error = "DGII: No se recibió TrackId."; }
+                            else { isAccepted = false; error = result.Error; }
+                            Console.WriteLine($"[Simulation] Result for NCF {currentDto.Ncf}: Success={result.Success}, Accepted={isAccepted}, TrackId={result.TrackId}, Error={error}");
                         }
-                        else { isAccepted = false; error = result.Error; }
-                        Console.WriteLine($"[Simulation] Result for NCF {currentDto.Ncf}: Success={result.Success}, Accepted={isAccepted}, TrackId={result.TrackId}, Error={error}");
 
-                        if (!IsDuplicateSequenceError(error) || skipNcfConsumption)
-                            break;
+                        // if (!IsDuplicateSequenceError(error) || skipNcfConsumption)
+                        //     break;
 
-                        Console.WriteLine($"[Simulation] DGII already consumed NCF {currentDto.Ncf}. Reserving the next sequence and retrying step {status.CurrentStep} (attempt {sendAttempt}/100).");
-                        (encfRecord, currentDto.Ncf) = await ReserveNextNcfAsync(client.ClientId, ecfTypeRecord!, item.Type);
-                    }
+                        // Console.WriteLine($"[Simulation] DGII already consumed NCF {currentDto.Ncf}. Reserving the next sequence and retrying step {status.CurrentStep} (attempt {sendAttempt}/100).");
+                        // (encfRecord, currentDto.Ncf) = await ReserveNextNcfAsync(client.ClientId, ecfTypeRecord!, item.Type);
+                    // }
 
                     simulationXmls[xmlFileName] = signedXml;
 
