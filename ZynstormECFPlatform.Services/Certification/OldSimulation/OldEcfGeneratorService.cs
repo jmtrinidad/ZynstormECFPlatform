@@ -152,9 +152,33 @@ public class OldEcfGeneratorService : IOldEcfGeneratorService
             var referencePaths = GetUniqueElementPaths(referenceDoc);
             var generatedPaths = GetUniqueElementPaths(generatedDoc);
 
+            var skippablePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "ECF/Encabezado/Totales/MontoGravadoTotal",
+                "ECF/Encabezado/Totales/MontoGravadoI1",
+                "ECF/Encabezado/Totales/MontoGravadoI2",
+                "ECF/Encabezado/Totales/MontoGravadoI3",
+                "ECF/Encabezado/Totales/MontoExento",
+                "ECF/Encabezado/Totales/TotalITBIS",
+                "ECF/Encabezado/Totales/TotalITBIS1",
+                "ECF/Encabezado/Totales/TotalITBIS2",
+                "ECF/Encabezado/Totales/TotalITBIS3",
+                "ECF/Encabezado/Totales/MontoTotal",
+                "ECF/Encabezado/Totales/MontoNoFacturable",
+                "ECF/Encabezado/Totales/MontoPeriodo",
+                "ECF/Encabezado/Totales/ValorPagar",
+                "ECF/Encabezado/Totales/TotalITBISRetenido",
+                "ECF/Encabezado/Totales/TotalISRRetencion",
+                "ECF/Encabezado/IdDoc/IndicadorMontoGravado",
+                "ECF/Encabezado/IdDoc/TipoPago",
+                "ECF/Encabezado/IdDoc/FechaLimitePago",
+                "ECF/Encabezado/IdDoc/TerminoPago"
+            };
+
             foreach (var path in referencePaths)
             {
                 if (path.Contains("Signature") || path.Contains("FechaHoraFirma")) continue;
+                if (skippablePaths.Contains(path)) continue;
 
                 if (!generatedPaths.Contains(path))
                 {
@@ -264,7 +288,7 @@ public class OldEcfGeneratorService : IOldEcfGeneratorService
                 DescuentoMonto = itemDiscountTotal > 0 ? itemDiscountTotal : null,
                 RecargoMonto = surchargeAmount > 0 ? surchargeAmount : null,
                 TablaImpuestoAdicional = tablaImpuesto,
-                MontoItem = item.ManualMontoItem ?? (taxableAmount + itbisAmount + iscItemTotal + surchargeAmount),
+                MontoItem = item.ManualMontoItem ?? (taxableAmount + iscItemTotal + surchargeAmount),
                 Retencion = (ecfType is 41 or 47) ? new EcfXmlItemRetencion
                 {
                     Indicador = 1,
@@ -293,32 +317,81 @@ public class OldEcfGeneratorService : IOldEcfGeneratorService
         }
 
         var adjustments = new List<EcfXmlDescuentoORecargo>();
+        var adjustedTaxableG1 = taxableG1;
+        var adjustedTaxableG2 = taxableG2;
+        var adjustedTaxableG3 = taxableG3;
+        var adjustedExempt = totalExempt;
+        var adjustedNoFacturable = totalNoFacturable;
+        var adjustedItbisG1 = itbisG1;
+        var adjustedItbisG2 = itbisG2;
+        var adjustedItbisG3 = itbisG3;
+        var adjustedTotalItbis = totalItbis;
+
         if (dto.GlobalDiscountAmount > 0)
         {
-            adjustments.Add(new EcfXmlDescuentoORecargo { NumeroLinea = 1, TipoAjuste = "D", DescripcionDescuentooRecargo = dto.GlobalDiscountDescription ?? "Descuento Global", TipoValor = "$", MontoDescuentooRecargo = dto.GlobalDiscountAmount });
+            // Deriving indicator: if we have gravado, use 1, else use 4 (Exento)
+            int discountIndicator = (taxableG1 > 0 || taxableG2 > 0 || taxableG3 > 0) ? 1 : 4;
+            var globalDiscount = dto.GlobalDiscountAmount;
+
+            if (taxableG1 > 0)
+            {
+                adjustedTaxableG1 = Math.Max(0, taxableG1 - globalDiscount);
+                adjustedItbisG1 = Math.Round(adjustedTaxableG1 * 0.18m, 2);
+            }
+            else if (taxableG2 > 0)
+            {
+                adjustedTaxableG2 = Math.Max(0, taxableG2 - globalDiscount);
+                adjustedItbisG2 = Math.Round(adjustedTaxableG2 * 0.16m, 2);
+            }
+            else if (taxableG3 > 0)
+            {
+                adjustedTaxableG3 = Math.Max(0, taxableG3 - globalDiscount);
+                adjustedItbisG3 = 0;
+            }
+            else if (totalExempt > 0)
+            {
+                adjustedExempt = Math.Max(0, totalExempt - globalDiscount);
+            }
+            else if (totalNoFacturable > 0)
+            {
+                adjustedNoFacturable = Math.Max(0, totalNoFacturable - globalDiscount);
+            }
+
+            adjustedTotalItbis = adjustedItbisG1 + adjustedItbisG2 + adjustedItbisG3;
+
+            adjustments.Add(new EcfXmlDescuentoORecargo 
+            { 
+                NumeroLinea = 1, 
+                TipoAjuste = "D", 
+                IndicadorFacturacion = discountIndicator,
+                DescripcionDescuentooRecargo = dto.GlobalDiscountDescription ?? "Descuento Global", 
+                TipoValor = "$", 
+                ValorDescuentooRecargo = dto.GlobalDiscountAmount,
+                MontoDescuentooRecargo = dto.GlobalDiscountAmount 
+            });
         }
 
-        var finalTotal = (totalBase - totalItemDiscounts + totalExempt + totalNoFacturable + totalItbis + totalIsc) - dto.GlobalDiscountAmount;
-        decimal taxableGravado = totalBase - totalItemDiscounts - totalExempt;
+        var finalTotal = adjustedTaxableG1 + adjustedTaxableG2 + adjustedTaxableG3 + adjustedExempt + adjustedNoFacturable + adjustedTotalItbis + totalIsc;
+        decimal taxableGravado = adjustedTaxableG1 + adjustedTaxableG2 + adjustedTaxableG3;
 
         var totales = new EcfXmlTotales
         {
             EcfType = ecfType,
             MontoGravadoTotal = dto.ManualMontoGravadoTotal ?? (taxableGravado > 0 ? taxableGravado : null),
-            MontoGravadoI1 = dto.ManualMontoGravadoI1 ?? (taxableG1 > 0 ? taxableG1 : null),
-            MontoGravadoI2 = dto.ManualMontoGravadoI2 ?? (taxableG2 > 0 ? taxableG2 : null),
-            MontoGravadoI3 = dto.ManualMontoGravadoI3 ?? (taxableG3 > 0 ? taxableG3 : null),
-            MontoExento = dto.ManualMontoExento ?? (totalExempt > 0 ? totalExempt : null),
+            MontoGravadoI1 = dto.ManualMontoGravadoI1 ?? (adjustedTaxableG1 > 0 ? adjustedTaxableG1 : null),
+            MontoGravadoI2 = dto.ManualMontoGravadoI2 ?? (adjustedTaxableG2 > 0 ? adjustedTaxableG2 : null),
+            MontoGravadoI3 = dto.ManualMontoGravadoI3 ?? (adjustedTaxableG3 > 0 ? adjustedTaxableG3 : null),
+            MontoExento = dto.ManualMontoExento ?? (adjustedExempt > 0 ? adjustedExempt : null),
             ITBIS1 = (ecfType is 46 or 47) ? null : ((taxableG1 > 0 || dto.ManualTotalITBIS1.HasValue) ? 18 : null),
             ITBIS2 = (ecfType is 46 or 47) ? null : ((taxableG2 > 0 || dto.ManualTotalITBIS2.HasValue) ? 16 : null),
             ITBIS3 = (ecfType is 47) ? null : ((taxableG3 > 0 || dto.ManualTotalITBIS3.HasValue) ? 0 : null),
-            TotalITBIS = dto.ManualTotalITBIS ?? ((totalItbis > 0.00m || (ecfType == 46 && taxableG3 > 0)) ? totalItbis : null),
-            TotalITBIS1 = dto.ManualTotalITBIS1 ?? (taxableG1 > 0.00m ? itbisG1 : null),
-            TotalITBIS2 = dto.ManualTotalITBIS2 ?? (taxableG2 > 0.00m ? itbisG2 : null),
-            TotalITBIS3 = dto.ManualTotalITBIS3 ?? (taxableG3 > 0.00m ? itbisG3 : null),
+            TotalITBIS = dto.ManualTotalITBIS ?? ((adjustedTotalItbis > 0.00m || (ecfType == 46 && adjustedTaxableG3 > 0)) ? adjustedTotalItbis : null),
+            TotalITBIS1 = dto.ManualTotalITBIS1 ?? (adjustedTaxableG1 > 0.00m ? adjustedItbisG1 : null),
+            TotalITBIS2 = dto.ManualTotalITBIS2 ?? (adjustedTaxableG2 > 0.00m ? adjustedItbisG2 : null),
+            TotalITBIS3 = dto.ManualTotalITBIS3 ?? (adjustedTaxableG3 > 0.00m ? adjustedItbisG3 : null),
             MontoImpuestoAdicional = totalIsc > 0 ? totalIsc : null,
             ImpuestosAdicionales = impuestosAdicionales,
-            MontoNoFacturable = dto.ManualMontoNoFacturable ?? (totalNoFacturable > 0 ? totalNoFacturable : null),
+            MontoNoFacturable = dto.ManualMontoNoFacturable ?? (adjustedNoFacturable > 0 ? adjustedNoFacturable : null),
             MontoTotal = dto.ManualMontoTotal ?? finalTotal,
             MontoPeriodo = dto.ManualMontoPeriodo,
             ValorPagar = dto.ManualValorPagar,
@@ -327,10 +400,11 @@ public class OldEcfGeneratorService : IOldEcfGeneratorService
         };
 
         int? derivedIndicador = null;
-        if (totalBase > 0 && totalExempt > 0) derivedIndicador = 3;
-        else if (totalBase > 0) derivedIndicador = 1;
-        else if (totalExempt > 0) derivedIndicador = 2;
-        else if (totalNoFacturable > 0) derivedIndicador = 0;
+        if (ecfType is 31 or 32 or 33 or 34 or 41 or 45 &&
+            (totalBase > 0 || totalExempt > 0 || totalNoFacturable > 0))
+        {
+            derivedIndicador = 0;
+        }
 
         var root = new EcfXmlRoot
         {
@@ -347,7 +421,9 @@ public class OldEcfGeneratorService : IOldEcfGeneratorService
                     PaymentType = dto.PaymentType,
                     FechaLimitePago = dto.PaymentDeadline?.ToString(DateFormat),
                     TerminoPago = dto.PaymentTerms,
-                    IndicadorNotaCredito = dto.ManualIndicadorNotaCredito
+                    NumeroCuentaPago = dto.PaymentAccountNumber,
+                    BancoPago = dto.PaymentBank,
+                    IndicadorNotaCredito = ecfType == 34 ? (dto.ManualIndicadorNotaCredito ?? 0) : null
                 },
                 Emisor = new EcfXmlEmisor
                 {

@@ -91,6 +91,10 @@ public class OldEcfInvoiceRequestDto
 
     public string? IncomeType { get; set; }
 
+    public string? PaymentAccountNumber { get; set; }
+
+    public string? PaymentBank { get; set; }
+
     // ── Items ──────────────────────────────────────────────────────────────────
 
     [Required]

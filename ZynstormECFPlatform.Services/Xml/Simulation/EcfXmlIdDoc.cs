@@ -22,7 +22,7 @@ public class EcfXmlIdDoc
     /// <summary>Type 34 only — required at position 3 in XSD 34, before any optional indicators.</summary>
     [XmlElement("IndicadorNotaCredito", Order = 3)]
     public int? IndicadorNotaCredito { get; set; }
-    public bool ShouldSerializeIndicadorNotaCredito() => EcfType == 34;
+    public bool ShouldSerializeIndicadorNotaCredito() => EcfType == 34 && IndicadorNotaCredito.HasValue;
 
     /// <summary>Present in all types EXCEPT 32 (no expiration) and 34 (IndicadorNotaCredito takes position 3).</summary>
     [XmlElement("FechaVencimientoSecuencia", Order = 4)]

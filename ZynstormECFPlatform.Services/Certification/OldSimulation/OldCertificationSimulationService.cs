@@ -18,6 +18,9 @@ namespace ZynstormECFPlatform.Services.Certification.OldSimulation;
 
 public class OldCertificationSimulationService : IOldCertificationSimulationService
 {
+    private const string CertificationBuyerRnc = "133009889";
+    private const string CertificationBuyerName = "TRANSPORTE NJ SRL";
+
     private readonly IClientService _clientService;
     private readonly IApiKeyService _apiKeyService;
     private readonly IEncryptedService _encryptedService;
@@ -26,6 +29,8 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
     private readonly IDgiiTransmissionService _transmissionService;
     private readonly IOldEcfGeneratorService _generatorService;
     private readonly IXmlSignatureService _signerService;
+    private readonly IEcfTypeService _ecfTypeService;
+    private readonly IENcfService _eNcfService;
     private readonly StorageContext _context;
     private readonly IHubContext<CertificationHub> _hubContext;
 
@@ -40,6 +45,8 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
         IDgiiTransmissionService transmissionService,
         IOldEcfGeneratorService generatorService,
         IXmlSignatureService signerService,
+        IEcfTypeService ecfTypeService,
+        IENcfService eNcfService,
         IHubContext<CertificationHub> hubContext,
         StorageContext context)
     {
@@ -51,6 +58,8 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
         _transmissionService = transmissionService;
         _generatorService = generatorService;
         _signerService = signerService;
+        _ecfTypeService = ecfTypeService;
+        _eNcfService = eNcfService;
         _hubContext = hubContext;
         _context = context;
     }
@@ -115,7 +124,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                     _context.Set<CertificationDocument>().RemoveRange(docsToDelete);
                     await _context.SaveChangesAsync();
                 }
-                Console.WriteLine($"[Simulation] Old documents deleted.");
+                Console.WriteLine($"[Simulation] Old documents deleted. Next eNCF will be reserved from ENcf.Sequence.");
             }
             else
             {
@@ -247,23 +256,47 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
                         currentDto.EcfType = item.Type;
                         currentDto.IncomeType ??= "01";
-                        currentDto.PaymentType ??= 1;
-                        foreach (var itm in currentDto.Items) itm.ItemType ??= 1;
+
+                        // Certification usually expects Credit (2) for Type 31 to test payment terms
+                        if (item.Type == 31) currentDto.PaymentType ??= 2;
+                        else currentDto.PaymentType ??= 1;
+
+                        if (currentDto.PaymentType == 2)
+                        {
+                            currentDto.PaymentDeadline ??= DateTime.Now.AddDays(30);
+                            currentDto.PaymentTerms ??= "30 DIAS";
+                        }
+
+                        // Emisor defaults from reference samples
+                        currentDto.IssuerPhone ??= "809-555-1234";
+                        currentDto.IssuerActivityCode ??= "6201";
+                        currentDto.IssuerAddress ??= dto.IssuerAddress ?? "CALLE PRINCIPAL #1, SANTO DOMINGO";
+
+                        // Comprador defaults from reference samples
+                        if (item.Type is 31 or 32 or 33 or 34 or 41 or 44 or 45)
+                        {
+                            ApplyCertificationBuyer(currentDto);
+                            if (string.IsNullOrEmpty(currentDto.CustomerAddress)) currentDto.CustomerAddress = "AV. CASANDRA DAMIRON #80";
+                            if (string.IsNullOrEmpty(currentDto.CustomerTelephone)) currentDto.CustomerTelephone = "809-233-6060";
+                        }
+
+                        foreach (var itm in currentDto.Items)
+                        {
+                            itm.ItemType ??= 1;
+                            itm.Description ??= itm.Name;
+                            itm.UnitOfMeasure ??= 43; // 'Unidades' - code 43 from dgii_ecf_requirements.md
+                        }
+
                         currentDto.SequenceExpirationDate = new DateTime(DateTime.Now.Year + 2, 12, 31);
 
                         bool isNote = item.Type == 33 || item.Type == 34;
 
-                        // Mixed Scenarios: Inject discounts for complex testing
-                        if (!isNote && item.Type != 43 && currentDto.Items.Any())
+                        currentDto.GlobalDiscountAmount = 0;
+                        currentDto.GlobalDiscountDescription = null;
+                        foreach (var itm in currentDto.Items)
                         {
-                            // 1. Item-level discount (5% on the first item)
-                            var firstItem = currentDto.Items[0];
-                            decimal itemTotalBeforeDiscount = Math.Round(firstItem.UnitPrice * firstItem.Quantity, 2);
-                            firstItem.Discount = Math.Round(itemTotalBeforeDiscount * 0.05m, 2);
-
-                            // 2. Global discount (fixed amount)
-                            currentDto.GlobalDiscountAmount = 100.00m;
-                            currentDto.GlobalDiscountDescription = "Descuento por Certificación";
+                            itm.Discount = 0;
+                            itm.ManualDescuentoMonto = null;
                         }
 
                         // Type 31 logic simplified as we now use validated samples
@@ -282,6 +315,11 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                             }
                             var reference = accepted31Pool[poolIndex];
                             var firstItem = CloneDto(reference.Dto)?.Items.FirstOrDefault();
+                            if (firstItem != null)
+                            {
+                                firstItem.Discount = 0;
+                                firstItem.ManualDescuentoMonto = null;
+                            }
                             currentDto.Items = firstItem != null ? new List<OldEcfItemRequestDto> { firstItem } : new List<OldEcfItemRequestDto>();
                             currentDto.CustomerRnc = reference.Dto.CustomerRnc;
                             currentDto.CustomerName = reference.Dto.CustomerName;
@@ -305,20 +343,24 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
                             if (currentDto.Items.Any()) currentDto.Items[0].UnitPrice += status.CurrentStep;
 
+                            if ((item.Type == 31 || (item.Type == 32 && !item.IsSummary && !item.IsManual)) && i == 0)
+                            {
+                                ApplyCertificationDiscount(currentDto);
+                            }
+
                             switch (item.Type)
                             {
+                                case 31:
+                                    ApplyCertificationBuyer(currentDto);
+                                    break;
+
                                 case 32:
+                                    ApplyCertificationBuyer(currentDto);
                                     currentDto.PaymentType = 1;
-                                    if (item.MinAmount.HasValue && item.MinAmount.Value >= 250000 && string.IsNullOrEmpty(currentDto.CustomerRnc))
-                                    {
-                                        currentDto.CustomerRnc = "131793916";
-                                        currentDto.CustomerName = "CLIENTE PRUEBA CERTIFICACION";
-                                    }
                                     break;
 
                                 case 41:
-                                    currentDto.CustomerRnc = "131793916";
-                                    currentDto.CustomerName = "PROVEEDOR DE SERVICIOS SRL";
+                                    ApplyBuyer(currentDto, "00100325067", "ENRIQUE CAMILO SANTOS TAVAREZ");
                                     currentDto.ManualTotalITBISRetenido = 0;
                                     currentDto.ManualTotalISRRetencion = 0;
                                     foreach (var itm in currentDto.Items) { itm.ManualMontoITBISRetenido = 0; itm.ManualMontoISRRetenido = 0; }
@@ -327,22 +369,57 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                                 case 43:
                                     currentDto.CustomerRnc = null;
                                     currentDto.CustomerName = null;
+                                    currentDto.ManualMontoGravadoTotal = null;
+                                    currentDto.ManualMontoGravadoI1 = null;
+                                    currentDto.ManualMontoGravadoI2 = null;
+                                    currentDto.ManualMontoGravadoI3 = null;
+                                    currentDto.ManualTotalITBIS = null;
+                                    currentDto.ManualTotalITBIS1 = null;
+                                    currentDto.ManualTotalITBIS2 = null;
+                                    currentDto.ManualTotalITBIS3 = null;
+                                    foreach (var itm in currentDto.Items) { itm.BillingIndicator = 4; itm.TaxPercentage = 0; itm.ItbisAmount = 0; }
+                                    currentDto.ManualMontoExento = currentDto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) - itm.Discount);
+                                    currentDto.ManualMontoTotal = currentDto.ManualMontoExento;
+                                    break;
+
+                                case 44:
+                                    ApplyBuyer(currentDto, "131098843", "ZONA FRANCA 6 DE NOVIEMBRE SRL");
+                                    currentDto.ManualMontoGravadoTotal = null;
+                                    currentDto.ManualMontoGravadoI1 = null;
+                                    currentDto.ManualMontoGravadoI2 = null;
+                                    currentDto.ManualMontoGravadoI3 = null;
+                                    currentDto.ManualTotalITBIS = null;
+                                    currentDto.ManualTotalITBIS1 = null;
+                                    currentDto.ManualTotalITBIS2 = null;
+                                    currentDto.ManualTotalITBIS3 = null;
+                                    foreach (var itm in currentDto.Items) { itm.BillingIndicator = 4; itm.TaxPercentage = 0; itm.ItbisAmount = 0; }
+                                    currentDto.ManualMontoExento = currentDto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) - itm.Discount);
+                                    currentDto.ManualMontoTotal = currentDto.ManualMontoExento;
+                                    break;
+
+                                case 45:
+                                    ApplyBuyer(currentDto, "401506459", "PLAN DE ASISTENCIA SOCIAL DE LA PRESIDENCIA");
                                     break;
 
                                 case 46:
-                                    currentDto.CustomerRnc = null;
-                                    currentDto.CustomerForeignId = currentDto.CustomerForeignId ?? $"EX{i + 1:D6}";
-                                    currentDto.CustomerCountry = currentDto.CustomerCountry ?? "USA";
+                                    ApplyExportDefaults(currentDto, i);
                                     foreach (var itm in currentDto.Items) { itm.BillingIndicator = 3; itm.TaxPercentage = 0; itm.ItbisAmount = 0; }
                                     break;
 
                                 case 47:
-                                    currentDto.CustomerRnc = null;
-                                    currentDto.CustomerName = currentDto.CustomerName ?? "FOREIGN SERVICES PROVIDER";
-                                    currentDto.CustomerForeignId = currentDto.CustomerForeignId ?? $"FOREIGN{i + 1:D6}";
-                                    currentDto.ManualTotalITBISRetenido = 0;
-                                    currentDto.ManualTotalISRRetencion = 0;
-                                    foreach (var itm in currentDto.Items) { itm.BillingIndicator = 4; itm.TaxPercentage = 0; itm.ItbisAmount = 0; itm.ManualMontoITBISRetenido = 0; itm.ManualMontoISRRetenido = 0; }
+                                    ApplyForeignPaymentDefaults(currentDto, i);
+                                    currentDto.ManualMontoGravadoTotal = null;
+                                    currentDto.ManualMontoGravadoI1 = null;
+                                    currentDto.ManualMontoGravadoI2 = null;
+                                    currentDto.ManualMontoGravadoI3 = null;
+                                    currentDto.ManualTotalITBIS = null;
+                                    currentDto.ManualTotalITBIS1 = null;
+                                    currentDto.ManualTotalITBIS2 = null;
+                                    currentDto.ManualTotalITBIS3 = null;
+                                    foreach (var itm in currentDto.Items) { itm.BillingIndicator = 4; itm.TaxPercentage = 0; itm.ItbisAmount = 0; itm.ManualMontoITBISRetenido = null; }
+                                    currentDto.ManualMontoExento = currentDto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) - itm.Discount);
+                                    currentDto.ManualMontoTotal = currentDto.ManualMontoExento;
+                                    ApplyForeignPaymentRetentionAndCurrency(currentDto);
                                     break;
                             }
                         }
@@ -415,10 +492,12 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                         if (Directory.Exists(schemasXmlPath))
                         {
                             var referenceFiles = Directory.GetFiles(schemasXmlPath, $"*E{item.Type}*.xml");
+
                             if (referenceFiles.Any())
                             {
-                                // Validate against the first matching reference file
+                                //// Validate against the first matching reference file
                                 var refErrors = _generatorService.ValidateXmlAgainstReference(unsignedXmlTemp, item.Type, referenceFiles[0]);
+
                                 if (refErrors.Any())
                                 {
                                     throw new Exception($"Error de validación contra XML de referencia DGII en Paso {status.CurrentStep} (Tipo {item.Type}): {string.Join(" | ", refErrors)}");
@@ -437,62 +516,43 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                     }
                     // ------------------------------------
 
-                    var ecfTypeRecord = await _context.Set<ZynstormECFPlatform.Core.Entities.EcfType>().FirstOrDefaultAsync(t => t.Code == item.Type.ToString());
+                    var ecfTypeRecord = await _ecfTypeService.GetByAsync(t => t.Code == item.Type.ToString());
                     ENcf? encfRecord = null;
                     if (!skipNcfConsumption)
                     {
-                        encfRecord = await _context.Set<ENcf>().FirstOrDefaultAsync(e => e.NcfTypeId == ecfTypeRecord!.EcfTypeId && e.ClientId == client.ClientId);
-                        if (encfRecord == null)
-                        {
-                            encfRecord = new ENcf { NcfTypeId = ecfTypeRecord!.EcfTypeId, ClientId = client.ClientId, Sequence = 1, RegisteredAt = DateTime.Now };
-                            _context.Set<ENcf>().Add(encfRecord);
-                            await _context.SaveChangesAsync();
-                        }
-
-                        // Robust sequence consumption with uniqueness check
-                        int seqToUse = encfRecord.Sequence;
-                        string ncfCandidate;
-                        while (true)
-                        {
-                            ncfCandidate = $"E{item.Type}{seqToUse:D10}";
-                            var exists = await _context.Set<CertificationDocument>().AnyAsync(d => d.ENcfSecuence == ncfCandidate && d.CertificationProcess.ClientId == client.ClientId);
-                            if (!exists) break;
-                            seqToUse++;
-                        }
-
-                        encfRecord.Sequence = seqToUse + 1;
-                        currentDto.Ncf = ncfCandidate;
-                        _context.Entry(encfRecord).State = EntityState.Modified;
-                        await _context.SaveChangesAsync();
+                        (encfRecord, currentDto.Ncf) = await ReserveNextNcfAsync(client.ClientId, ecfTypeRecord!, item.Type);
 
                         if (item.IsSummary) rfcePool.Add((currentDto.Ncf, currentDto.SecurityCodeOverride ?? "", indDtoForPool ?? CloneDto(currentDto)!));
                     }
 
-                    string unsignedXml = _generatorService.GenerateUnsignedXml(currentDto, item.IsSummary);
-                    string signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
-                    string securityCode = currentDto.SecurityCodeOverride ?? "";
-                    if (string.IsNullOrEmpty(securityCode))
-                    {
-                        string tag = "<SignatureValue>";
-                        int start = signedXml.IndexOf(tag);
-                        if (start != -1)
-                        {
-                            securityCode = signedXml.Substring(start + tag.Length).TrimStart().Substring(0, 6);
-                        }
-                    }
-
-                    string xmlFileName = (item.IsManual ? "SUBIR_DGII_" : "") + $"Paso_{status.CurrentStep}_{currentDto.Ncf}.xml";
-                    simulationXmls[xmlFileName] = signedXml;
-
                     bool isAccepted = false;
                     string? trackId = null;
                     string? error = null;
+                    string signedXml = string.Empty;
+                    string securityCode = string.Empty;
+                    string xmlFileName = string.Empty;
 
-                    decimal total = currentDto.ManualMontoTotal ?? currentDto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) - itm.Discount + itm.ItbisAmount);
+                    decimal total = currentDto.ManualMontoTotal ?? CalculateTransmissionTotal(currentDto);
 
-                    if (item.IsManual) { isAccepted = true; trackId = "MANUAL"; }
-                    else
+                    for (var sendAttempt = 1; sendAttempt <= 100; sendAttempt++)
                     {
+                        string unsignedXml = _generatorService.GenerateUnsignedXml(currentDto, item.IsSummary);
+                        signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
+                        securityCode = currentDto.SecurityCodeOverride ?? "";
+                        if (string.IsNullOrEmpty(securityCode))
+                        {
+                            string tag = "<SignatureValue>";
+                            int start = signedXml.IndexOf(tag);
+                            if (start != -1)
+                            {
+                                securityCode = signedXml.Substring(start + tag.Length).TrimStart().Substring(0, 6);
+                            }
+                        }
+
+                        xmlFileName = (item.IsManual ? "SUBIR_DGII_" : "") + $"Paso_{status.CurrentStep}_{currentDto.Ncf}.xml";
+
+                        if (item.IsManual) { isAccepted = true; trackId = "MANUAL"; break; }
+
                         Console.WriteLine($"[Simulation] Sending ECF Type {item.Type} - NCF {currentDto.Ncf} - Total {total}...");
                         var result = await _transmissionService.SendEcfAsync(DgiiEnvironment.CerteCF, token, signedXml, item.Type, total, dto.IssuerRnc, currentDto.Ncf, item.IsSummary);
                         if (result.Success)
@@ -503,14 +563,22 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                                 var finalStatus = await PollDgiiStatusAsync(result.TrackId, dto.IssuerRnc);
                                 isAccepted = finalStatus.Estado == "Aceptado" || (item.IsSummary && finalStatus.Estado == "Generado");
                                 trackId = result.TrackId;
-                                if (!isAccepted) error = $"DGII: {finalStatus.Estado}";
+                                if (!isAccepted) error = BuildDgiiStatusError(finalStatus);
                             }
                             else if (item.IsSummary && result.Estado == "Aceptado") { isAccepted = true; trackId = "INMEDIATO"; }
                             else { isAccepted = false; error = "DGII: No se recibió TrackId."; }
                         }
                         else { isAccepted = false; error = result.Error; }
                         Console.WriteLine($"[Simulation] Result for NCF {currentDto.Ncf}: Success={result.Success}, Accepted={isAccepted}, TrackId={result.TrackId}, Error={error}");
+
+                        if (!IsDuplicateSequenceError(error) || skipNcfConsumption)
+                            break;
+
+                        Console.WriteLine($"[Simulation] DGII already consumed NCF {currentDto.Ncf}. Reserving the next sequence and retrying step {status.CurrentStep} (attempt {sendAttempt}/100).");
+                        (encfRecord, currentDto.Ncf) = await ReserveNextNcfAsync(client.ClientId, ecfTypeRecord!, item.Type);
                     }
+
+                    simulationXmls[xmlFileName] = signedXml;
 
                     // Save ALL documents for auditability
                     var certDoc = new CertificationDocument
@@ -723,6 +791,230 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
     private async Task NotifyUpdate(string jobId, CertificationJobStatusDto status)
     {
         await _hubContext.Clients.Group($"cert-job:{jobId}").SendAsync("ReceiveJobUpdate", status);
+    }
+
+    private async Task<(ENcf Record, string Ncf)> ReserveNextNcfAsync(int clientId, ZynstormECFPlatform.Core.Entities.EcfType ecfTypeRecord, int ecfType)
+    {
+        var encfRecord = await _eNcfService.GetByAsync(e => e.NcfTypeId == ecfTypeRecord.EcfTypeId && e.ClientId == clientId);
+
+        if (encfRecord == null)
+        {
+            encfRecord = new ENcf { NcfTypeId = ecfTypeRecord.EcfTypeId, ClientId = clientId, Sequence = 1, RegisteredAt = DateTime.Now };
+            _eNcfService.Add(encfRecord);
+            await _context.SaveChangesAsync();
+        }
+
+        var seqToUse = Math.Max(encfRecord.Sequence, 1);
+        while (await _context.Set<CertificationDocument>().AnyAsync(d =>
+                   d.ENcfSecuence == $"E{ecfType}{seqToUse:D10}" &&
+                   d.CertificationProcess.ClientId == clientId))
+        {
+            seqToUse++;
+        }
+
+        var ncfCandidate = $"E{ecfType}{seqToUse:D10}";
+
+        encfRecord.Sequence = seqToUse + 1;
+        _context.Entry(encfRecord).State = EntityState.Modified;
+        await _context.SaveChangesAsync();
+
+        return (encfRecord, ncfCandidate);
+    }
+
+    private static string BuildDgiiStatusError(DgiiStatusResponse status)
+    {
+        var parts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(status.Estado))
+            parts.Add($"DGII: {status.Estado}");
+
+        if (status.SecuenciaUtilizada)
+            parts.Add("SecuenciaUtilizada=true");
+
+        if (!string.IsNullOrWhiteSpace(status.Error))
+            parts.Add(status.Error);
+
+        if (!string.IsNullOrWhiteSpace(status.Mensaje))
+            parts.Add(status.Mensaje);
+
+        if (status.Mensajes.Any())
+            parts.AddRange(status.Mensajes
+                .Where(m => !string.IsNullOrWhiteSpace(m.Valor))
+                .Select(m => m.Valor));
+
+        return parts.Count == 0 ? "DGII: Rechazado" : string.Join(" | ", parts);
+    }
+
+    private static void ApplyCertificationBuyer(OldEcfInvoiceRequestDto dto)
+    {
+        ApplyBuyer(dto, CertificationBuyerRnc, CertificationBuyerName);
+    }
+
+    private static void ApplyBuyer(OldEcfInvoiceRequestDto dto, string rnc, string name)
+    {
+        dto.CustomerRnc = rnc;
+        dto.CustomerName = name;
+    }
+
+    private static void ApplyCertificationDiscount(OldEcfInvoiceRequestDto dto)
+    {
+        var firstItem = dto.Items.FirstOrDefault();
+        if (firstItem == null)
+            return;
+
+        var lineAmount = Math.Round(firstItem.Quantity * firstItem.UnitPrice, 2);
+        if (lineAmount <= 1)
+            return;
+
+        var discountAmount = Math.Round(lineAmount * 0.05m, 2);
+        if (discountAmount <= 0 || discountAmount >= lineAmount)
+        {
+            discountAmount = 1;
+        }
+
+        firstItem.Discount = 0;
+        firstItem.ManualDescuentoMonto = null;
+        dto.GlobalDiscountAmount = discountAmount;
+        dto.GlobalDiscountDescription = "Descuento por certificacion";
+        dto.ManualMontoGravadoTotal = null;
+        dto.ManualMontoGravadoI1 = null;
+        dto.ManualMontoGravadoI2 = null;
+        dto.ManualMontoGravadoI3 = null;
+        dto.ManualMontoExento = null;
+        dto.ManualMontoTotal = null;
+        dto.ManualTotalITBIS = null;
+        dto.ManualTotalITBIS1 = null;
+        dto.ManualTotalITBIS2 = null;
+        dto.ManualTotalITBIS3 = null;
+    }
+
+    private static void ApplyExportDefaults(OldEcfInvoiceRequestDto dto, int index)
+    {
+        dto.CustomerRnc = null;
+        dto.CustomerName = dto.CustomerName ?? "ZONA FRANCA LOI";
+        dto.CustomerForeignId = dto.CustomerForeignId ?? $"EX{index + 1:D6}";
+        dto.CustomerContact ??= "MARCOS LLUBERES";
+        dto.CustomerEmail ??= "MARCOSLLUBERES@KKKK.COM";
+        dto.CustomerAddress ??= "ZONA HAINA";
+        dto.CustomerMunicipality ??= "010100";
+        dto.CustomerProvince ??= "010000";
+        dto.CustomerCountry ??= "PUERTO RICO";
+        dto.DeliveryDate ??= DateTime.Now.AddDays(5);
+        dto.OrderDate ??= DateTime.Now.Date;
+        dto.OrderNumber ??= "4500352230";
+        dto.BuyerInternalCode ??= "10633441";
+        dto.InternalInvoiceNumber ??= "123456789016";
+        dto.InternalOrderNumber ??= "123456789016";
+
+        dto.ExportFechaEmbarque ??= DateTime.Now.AddDays(3).ToString("dd-MM-yyyy");
+        dto.ExportNumeroEmbarque ??= $"10010-1207-{index + 1:D6}";
+        dto.ExportNumeroContenedor ??= $"ERTY{index + 1:D9}";
+        dto.ExportNumeroReferencia ??= $"{1448 + index}";
+        dto.ExportNombrePuertoEmbarque ??= "ZONA HAINA";
+        dto.ExportCondicionesEntrega ??= "FOB";
+        dto.ExportTotalFob ??= 1800.00m;
+        dto.ExportSeguro ??= 250.00m;
+        dto.ExportFlete ??= 22.00m;
+        dto.ExportTotalCif ??= 2000.00m;
+        dto.ExportRegimenAduanero ??= "EXPORTACION NACIONAL";
+        dto.ExportNombrePuertoSalida ??= "DOSDQ";
+        dto.ExportNombrePuertoDesembarque ??= "PTO RICO";
+        dto.ExportPesoBruto ??= 25000.00m;
+        dto.ExportPesoNeto ??= 24878.00m;
+        dto.ExportUnidadPesoBruto ??= "21";
+        dto.ExportUnidadPesoNeto ??= "21";
+        dto.ExportCantidadBulto ??= 250.00m;
+        dto.ExportUnidadBulto ??= "25";
+        dto.ExportVolumenBulto ??= 45.00m;
+        dto.ExportUnidadVolumen ??= "27";
+
+        dto.TranspViaTransporte ??= "02";
+        dto.TranspPaisOrigen ??= "REPUBLICA DOMINICANA";
+        dto.TranspDireccionDestino ??= "CALLE GUALLUBI NO. 09";
+        dto.TranspPaisDestino ??= "PUERTO RICO";
+        dto.TranspNumeroAlbaran ??= $"ALB{index + 1:D6}";
+    }
+
+    private static void ApplyForeignPaymentDefaults(OldEcfInvoiceRequestDto dto, int index)
+    {
+        dto.CustomerRnc = null;
+        dto.CustomerName = dto.CustomerName ?? "ALEJA FERMIN SANTOS";
+        dto.CustomerForeignId = dto.CustomerForeignId ?? $"53344588{index + 8}";
+        dto.PaymentAccountNumber ??= "BB00058745214789635111111111";
+        dto.PaymentBank ??= "BB011111111111111111111111111111111111111111111111111111111111111";
+        dto.InternalInvoiceNumber ??= "123456789016";
+        dto.InternalOrderNumber ??= "123456789016";
+        dto.CurrencyTipoMoneda ??= "USD";
+        dto.CurrencyTipoCambio ??= 60.0000m;
+    }
+
+    private static void ApplyForeignPaymentRetentionAndCurrency(OldEcfInvoiceRequestDto dto)
+    {
+        var subtotal = dto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) - itm.Discount);
+        var retention = Math.Round(subtotal * 0.27m, 2);
+
+        dto.ManualTotalISRRetencion = retention;
+        foreach (var itm in dto.Items)
+        {
+            var lineTotal = Math.Round((itm.Quantity * itm.UnitPrice) - itm.Discount, 2);
+            itm.ManualMontoISRRetenido = Math.Round(lineTotal * 0.27m, 2);
+        }
+
+        if (dto.CurrencyTipoCambio is > 0)
+        {
+            dto.CurrencyMontoExento = Math.Round(subtotal / dto.CurrencyTipoCambio.Value, 2);
+            dto.CurrencyMontoTotal = dto.CurrencyMontoExento;
+        }
+    }
+
+    private static decimal CalculateTransmissionTotal(OldEcfInvoiceRequestDto dto)
+    {
+        var subtotal = 0m;
+        var itbis = 0m;
+
+        foreach (var item in dto.Items)
+        {
+            var baseAmount = Math.Round(item.Quantity * item.UnitPrice, 2);
+            var discount = Math.Round(item.Discount, 2);
+            var taxableAmount = Math.Max(0, baseAmount - discount);
+            var billingIndicator = item.BillingIndicator ?? item.TaxPercentage switch { 18m => 1, 16m => 2, 0m => 3, _ => 4 };
+            var lineItbis = billingIndicator is 4 or 0
+                ? 0
+                : (item.ItbisAmount > 0 ? item.ItbisAmount : Math.Round(taxableAmount * (item.TaxPercentage / 100m), 2));
+
+            subtotal += taxableAmount + item.IscSpecificAmount + item.IscAdvaloremAmount + item.OtherAdditionalTaxAmount + (item.ManualRecargoMonto ?? 0);
+            itbis += lineItbis;
+        }
+
+        if (dto.GlobalDiscountAmount > 0)
+        {
+            subtotal = Math.Max(0, subtotal - dto.GlobalDiscountAmount);
+            if (dto.Items.Any(item => (item.BillingIndicator ?? item.TaxPercentage switch { 18m => 1, 16m => 2, 0m => 3, _ => 4 }) == 1))
+            {
+                var taxableSubtotal = dto.Items
+                    .Where(item => (item.BillingIndicator ?? item.TaxPercentage switch { 18m => 1, 16m => 2, 0m => 3, _ => 4 }) == 1)
+                    .Sum(item => Math.Max(0, Math.Round(item.Quantity * item.UnitPrice, 2) - Math.Round(item.Discount, 2)));
+                itbis = Math.Round(Math.Max(0, taxableSubtotal - dto.GlobalDiscountAmount) * 0.18m, 2);
+            }
+        }
+
+        return Math.Round(subtotal + itbis, 2);
+    }
+
+    private static bool IsDuplicateSequenceError(string? error)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+            return false;
+
+        var mentionsSequence = error.Contains("secuencia", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("SecuenciaUtilizada", StringComparison.OrdinalIgnoreCase);
+
+        var saysAlreadyUsed = error.Contains("utilizado", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("usado", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("existe", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("SecuenciaUtilizada=true", StringComparison.OrdinalIgnoreCase);
+
+        return mentionsSequence && saysAlreadyUsed;
     }
 
     public async Task<CertificationJobStatusDto> GetJobStatusAsync(string jobId)

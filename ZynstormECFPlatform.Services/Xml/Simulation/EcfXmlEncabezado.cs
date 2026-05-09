@@ -22,14 +22,7 @@ public class EcfXmlEncabezado
     [XmlElement("Comprador")]
     public EcfXmlComprador? CompradorStandard
     {
-        get => (Comprador != null && Comprador.EcfType != 46 && Comprador.EcfType != 47 && Comprador.EcfType != 43) ? Comprador : null;
-        set { }
-    }
-
-    [XmlElement("CompradorExp")]
-    public EcfXmlCompradorExportacion? CompradorExportacion
-    {
-        get => (Comprador != null && (Comprador.EcfType == 46 || Comprador.EcfType == 47)) ? new EcfXmlCompradorExportacion(Comprador) : null;
+        get => (Comprador != null && Comprador.EcfType != 43) ? Comprador : null;
         set { }
     }
 
