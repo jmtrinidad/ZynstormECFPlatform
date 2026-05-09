@@ -175,7 +175,8 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
             // Initialize totals in stats
             status.SimulationStats.TotalType31 = matrix.Where(m => m.Type == 31).Sum(m => m.Count);
             status.SimulationStats.TotalType32Rfce = matrix.Where(m => m.Type == 32 && m.IsSummary).Sum(m => m.Count);
-            status.SimulationStats.TotalType32Greater250k = matrix.Where(m => m.Type == 32 && !m.IsSummary).Sum(m => m.Count);
+            status.SimulationStats.TotalType32Greater250k = matrix.Where(m => m.Type == 32 && !m.IsSummary && !m.IsManual).Sum(m => m.Count);
+            status.SimulationStats.TotalType32Manual = matrix.Where(m => m.Type == 32 && m.IsManual).Sum(m => m.Count);
             status.SimulationStats.TotalType33 = matrix.Where(m => m.Type == 33).Sum(m => m.Count);
             status.SimulationStats.TotalType34 = matrix.Where(m => m.Type == 34).Sum(m => m.Count);
             status.SimulationStats.TotalType41 = matrix.Where(m => m.Type == 41).Sum(m => m.Count);
@@ -200,6 +201,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                     else if (item.Type == 32)
                     {
                         if (item.IsSummary) status.SimulationStats.Type32Rfce++;
+                        else if (item.IsManual) status.SimulationStats.Type32Manual++;
                         else status.SimulationStats.Type32Greater250k++;
                     }
                     else if (item.Type == 33) status.SimulationStats.Type33++;
@@ -485,22 +487,34 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                     // --- BLOCKING REFERENCE VALIDATION ---
                     try
                     {
-                        // Locate the Xml references folder relative to base directory
-                        string schemasXmlPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "ZynstormECFPlatform.Schemas", "Xml"));
-
-                        if (!Directory.Exists(schemasXmlPath))
+                        string schemasXmlPath = "";
+                        var currentDir = new DirectoryInfo(AppContext.BaseDirectory);
+                        while (currentDir != null)
                         {
-                            // Fallback for different build structures
-                            schemasXmlPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "Xml"));
+                            var target = Path.Combine(currentDir.FullName, "ZynstormECFPlatform.Schemas", "Xml");
+                            if (Directory.Exists(target)) { schemasXmlPath = target; break; }
+                            currentDir = currentDir.Parent;
+                        }
+
+                        if (string.IsNullOrEmpty(schemasXmlPath))
+                        {
+                            schemasXmlPath = Path.Combine(AppContext.BaseDirectory, "Xml");
                         }
 
                         if (Directory.Exists(schemasXmlPath))
                         {
-                            var referenceFiles = Directory.GetFiles(schemasXmlPath, $"*E{item.Type}*.xml");
+                            // Search by step number first (Paso_8_*.xml) for exact match
+                            var referenceFiles = Directory.GetFiles(schemasXmlPath, $"Paso_{status.CurrentStep}_*.xml");
+
+                            // Fallback: try type-based search if no step-specific file found
+                            if (!referenceFiles.Any())
+                            {
+                                referenceFiles = Directory.GetFiles(schemasXmlPath, $"*E{item.Type}*.xml");
+                            }
 
                             if (referenceFiles.Any())
                             {
-                                //// Validate against the first matching reference file
+                                Console.WriteLine($"[Simulation] Paso {status.CurrentStep} - Validando contra referencia en: {Path.GetFileName(referenceFiles[0])}");
                                 var refErrors = _generatorService.ValidateXmlAgainstReference(unsignedXmlTemp, item.Type, referenceFiles[0]);
 
                                 if (refErrors.Any())

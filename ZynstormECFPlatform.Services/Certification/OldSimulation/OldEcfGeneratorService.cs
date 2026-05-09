@@ -149,6 +149,8 @@ public class OldEcfGeneratorService : IOldEcfGeneratorService
             var referenceDoc = new XmlDocument();
             referenceDoc.Load(referenceXmlPath);
 
+            Console.WriteLine($"[XML Validation] Comparing Generated Root: {generatedDoc.DocumentElement?.Name} vs Reference Root: {referenceDoc.DocumentElement?.Name} (Path: {Path.GetFileName(referenceXmlPath)})");
+
             var referencePaths = GetUniqueElementPaths(referenceDoc);
             var generatedPaths = GetUniqueElementPaths(generatedDoc);
 
@@ -172,7 +174,14 @@ public class OldEcfGeneratorService : IOldEcfGeneratorService
                 "ECF/Encabezado/IdDoc/IndicadorMontoGravado",
                 "ECF/Encabezado/IdDoc/TipoPago",
                 "ECF/Encabezado/IdDoc/FechaLimitePago",
-                "ECF/Encabezado/IdDoc/TerminoPago"
+                "ECF/Encabezado/IdDoc/TerminoPago",
+                "RFCE/Encabezado/Totales/MontoGravadoTotal",
+                "RFCE/Encabezado/Totales/MontoExento",
+                "RFCE/Encabezado/Totales/TotalITBIS",
+                "RFCE/Encabezado/Totales/MontoTotal",
+                "RFCE/Encabezado/Totales/MontoNoFacturable",
+                "RFCE/Encabezado/Totales/MontoPeriodo",
+                "RFCE/Encabezado/CodigoSeguridadeCF"
             };
 
             foreach (var path in referencePaths)

@@ -26,6 +26,7 @@ public class SimulationStatsDto
     public int Type31 { get; set; }
     public int Type32Greater250k { get; set; }
     public int Type32Rfce { get; set; }
+    public int Type32Manual { get; set; }
     public int Type33 { get; set; }
     public int Type34 { get; set; }
     public int Type41 { get; set; }
@@ -39,6 +40,7 @@ public class SimulationStatsDto
     public int TotalType31 { get; set; } = 4;
     public int TotalType32Greater250k { get; set; } = 2;
     public int TotalType32Rfce { get; set; } = 4;
+    public int TotalType32Manual { get; set; } = 4;
     public int TotalType33 { get; set; } = 1;
     public int TotalType34 { get; set; } = 2;
     public int TotalType41 { get; set; } = 2;
