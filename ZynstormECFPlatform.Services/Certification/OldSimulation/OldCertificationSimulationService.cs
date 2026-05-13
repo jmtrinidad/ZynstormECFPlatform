@@ -123,7 +123,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
     private async Task ProcessSimulacionEcfJobInternalAsync(OldEcfInvoiceRequestDto dto, string jobId, string webRootPath, Dictionary<string, string>? samples = null, Dictionary<string, int>? sampleIds = null, int? businessTypeId = null)
     {
         var accepted31Pool = new List<(string Ncf, DateTime IssueDate, string? CustomerRnc, OldEcfInvoiceRequestDto Dto)>();
-        var rfcePool = new List<(string Ncf, string SecurityCode, OldEcfInvoiceRequestDto Dto)>();
+        var rfcePool = new List<(string Ncf, string SecurityCode, OldEcfInvoiceRequestDto Dto, string SignedXml)>();
 
         if (!_jobStatuses.TryGetValue(jobId, out var status))
         {
@@ -380,15 +380,26 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                     decimal total = currentDto.ManualMontoTotal ?? CalculateTransmissionTotal(currentDto);
                     string resultMessage = "Error en transmision";
 
-                    if (item.IsSummary) indDtoForPool = PrepareRfceIndividualDto(currentDto, signatureDate, certBase64, certPass);
+                    string signedIndividualXmlForPool = string.Empty;
+
+                    if (item.IsSummary)
+                    {
+                        indDtoForPool = PrepareRfceIndividualDto(currentDto, signatureDate, certBase64, certPass);
+                        string indUnsignedXml = _generatorService.GenerateUnsignedXml(indDtoForPool, false);
+                        signedIndividualXmlForPool = _signerService.SignXml(indUnsignedXml, certBase64, certPass);
+                        securityCode = ExtractSecurityCodeFromSignature(signedIndividualXmlForPool);
+                        currentDto.SecurityCodeOverride = securityCode;
+                        indDtoForPool.SecurityCodeOverride = securityCode;
+                    }
 
                     string unsignedXml = _generatorService.GenerateUnsignedXml(currentDto, item.IsSummary);
                     LogGeneratedXmlDiagnostics(jobId, status.CurrentStep, currentDto.Ncf, item.Type, xmlFileName, unsignedXml, item.IsSummary);
                     signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
-                    
-                    string tag = "<SignatureValue>";
-                    int start = signedXml.IndexOf(tag);
-                    if (start != -1) securityCode = signedXml.Substring(start + tag.Length).TrimStart().Substring(0, 6);
+
+                    if (string.IsNullOrWhiteSpace(securityCode))
+                    {
+                        securityCode = ExtractSecurityCodeFromSignature(signedXml);
+                    }
 
                     var result = await _transmissionService.SendEcfAsync(DgiiEnvironment.CerteCF, token, signedXml, item.Type, total, dto.IssuerRnc, currentDto.Ncf, item.IsSummary);
                     trackId = result.TrackId;
@@ -421,7 +432,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                     {
                         approvedXmls[xmlFileName] = signedXml;
                         if (item.Type == 31) accepted31Pool.Add((currentDto.Ncf, currentDto.IssueDate, currentDto.CustomerRnc, CloneDto(currentDto)!));
-                        if (item.IsSummary) rfcePool.Add((currentDto.Ncf, securityCode, indDtoForPool ?? CloneDto(currentDto)!));
+                        if (item.IsSummary) rfcePool.Add((currentDto.Ncf, securityCode, indDtoForPool ?? CloneDto(currentDto)!, signedIndividualXmlForPool));
                     }
                     else
                     {
@@ -503,12 +514,13 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                     currentDto.Ncf = pooled.Ncf;
                     currentDto.SecurityCodeOverride = pooled.SecurityCode;
                     currentDto.SignatureDateOverride = signatureDate;
-                    NormalizeRfceIndividualDto(currentDto);
 
                     string xmlFileName = $"SUBIR_DGII_Paso_{status.CurrentStep}_{currentDto.Ncf}.xml";
                     string unsignedXml = _generatorService.GenerateUnsignedXml(currentDto, false);
                     LogGeneratedXmlDiagnostics(jobId, status.CurrentStep, currentDto.Ncf, item.Type, xmlFileName, unsignedXml, false);
-                    string signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
+                    string signedXml = string.IsNullOrWhiteSpace(pooled.SignedXml)
+                        ? _signerService.SignXml(unsignedXml, certBase64, certPass)
+                        : pooled.SignedXml;
 
                     manualUploadXmls[xmlFileName] = signedXml;
 
@@ -814,6 +826,16 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
     private decimal CalculateTransmissionTotal(OldEcfInvoiceRequestDto dto)
     {
         return dto.Items.Sum(itm => (itm.Quantity * itm.UnitPrice) - itm.Discount + itm.ItbisAmount);
+    }
+
+    private static string ExtractSecurityCodeFromSignature(string signedXml)
+    {
+        const string tag = "<SignatureValue>";
+        int start = signedXml.IndexOf(tag, StringComparison.Ordinal);
+        if (start == -1) return string.Empty;
+
+        var content = signedXml[(start + tag.Length)..].TrimStart();
+        return content.Length >= 6 ? content[..6] : string.Empty;
     }
 
     private bool IsDuplicateSequenceError(string? error)
