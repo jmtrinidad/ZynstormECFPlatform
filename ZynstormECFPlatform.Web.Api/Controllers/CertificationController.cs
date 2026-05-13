@@ -36,10 +36,14 @@ public class CertificationController(
         if (client == null)
             return NotFound("Cliente no encontrado.");
 
-        var process = await certificationProcessService.GetByAsync(
-            x => x.ClientId == client.ClientId && x.Status == CertificationStatus.InProgress,
-            cancellationToken
-        );
+        var process = await certificationProcessService.Table
+            .Include(x => x.CertificationStep)
+            .Where(x => x.ClientId == client.ClientId &&
+                        (x.Status == CertificationStatus.InProgress ||
+                         x.Status == CertificationStatus.Pending ||
+                         x.Status == CertificationStatus.Rejected))
+            .OrderByDescending(x => x.RegisteredAt)
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (process == null)
         {
@@ -52,7 +56,7 @@ public class CertificationController(
             });
         }
 
-        var currentStep = process.CurrentStepId ?? 1;
+        var currentStep = process.CertificationStep?.Order ?? process.CurrentStepId ?? 1;
 
         return Ok(new ClientCertificationProgressDto
         {
@@ -209,6 +213,7 @@ public class CertificationController(
         if (status.Status == "NotFound")
             status = await simulationService.GetJobStatusAsync(jobId);
 
+        NormalizeSimulationArtifactUrls(status, jobId);
         return Ok(status);
     }
 
@@ -223,7 +228,7 @@ public class CertificationController(
         if (string.IsNullOrEmpty(status.DownloadUrl))
             return BadRequest("El archivo aún no ha sido generado.");
 
-        string physicalPath = status.DownloadUrl;
+        string physicalPath = ResolveCertificationFilePath(status.DownloadUrl);
 
         if (!System.IO.Path.IsPathRooted(physicalPath))
         {
@@ -247,7 +252,7 @@ public class CertificationController(
         if (string.IsNullOrEmpty(status.DownloadUrl))
             return BadRequest("El archivo aún no ha sido generado.");
 
-        string physicalPath = status.DownloadUrl;
+        string physicalPath = ResolveCertificationFilePath(status.DownloadUrl);
 
         if (!System.IO.Path.IsPathRooted(physicalPath))
         {
@@ -259,6 +264,47 @@ public class CertificationController(
 
         var bytes = await System.IO.File.ReadAllBytesAsync(physicalPath);
         return File(bytes, "application/zip", $"simulacion_{jobId}.zip");
+    }
+
+    [HttpGet("simulation/download/approved/{jobId}")]
+    public async Task<ActionResult> DownloadApprovedSimulationXmls(string jobId)
+    {
+        var status = await oldSimulationService.GetJobStatusAsync(jobId);
+        if (status.Status == "NotFound")
+            status = await simulationService.GetJobStatusAsync(jobId);
+
+        NormalizeSimulationArtifactUrls(status, jobId);
+        return await DownloadSimulationZipAsync(status.ApprovedXmlZipUrl, $"simulacion_aprobados_{jobId}.zip");
+    }
+
+    [HttpGet("simulation/download/manual/{jobId}")]
+    public async Task<ActionResult> DownloadManualSimulationXmls(string jobId)
+    {
+        var status = await oldSimulationService.GetJobStatusAsync(jobId);
+        if (status.Status == "NotFound")
+            status = await simulationService.GetJobStatusAsync(jobId);
+
+        NormalizeSimulationArtifactUrls(status, jobId);
+        return await DownloadSimulationZipAsync(status.ManualXmlZipUrl, $"simulacion_subir_dgii_{jobId}.zip");
+    }
+
+    [HttpGet("simulation/qr-validation/{jobId}")]
+    public async Task<ActionResult<List<CertificationStepResultDto>>> GetSimulationQrValidationItems(string jobId)
+    {
+        var status = await oldSimulationService.GetJobStatusAsync(jobId);
+        if (status.Status == "NotFound")
+            status = await simulationService.GetJobStatusAsync(jobId);
+
+        var items = status.CompletedSteps
+            .Where(x => !string.IsNullOrWhiteSpace(x.Ncf) &&
+                        !string.IsNullOrWhiteSpace(x.SecurityCode) &&
+                        !string.IsNullOrWhiteSpace(x.FechaFirma) &&
+                        (x.Status.Equals("Aceptado", StringComparison.OrdinalIgnoreCase) ||
+                         x.Status.Equals("GeneradoManual", StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(x => x.Index)
+            .ToList();
+
+        return Ok(items);
     }
 
     [HttpGet("download-xml/{jobId}/{ncf}")]
@@ -399,6 +445,61 @@ public class CertificationController(
         {
             return BadRequest(ex.Message);
         }
+    }
+
+    private void NormalizeSimulationArtifactUrls(CertificationJobStatusDto status, string jobId)
+    {
+        status.ApprovedXmlZipUrl = FirstNonEmpty(
+            status.ApprovedXmlZipUrl,
+            status.DownloadUrl,
+            BuildExistingCertificationFileUrl($"simulacion_aprobados_{jobId}.zip"));
+
+        status.ManualXmlZipUrl = FirstNonEmpty(
+            status.ManualXmlZipUrl,
+            status.JsonDownloadUrl,
+            BuildExistingCertificationFileUrl($"simulacion_subir_dgii_{jobId}.zip"));
+
+        status.DownloadUrl = status.ApprovedXmlZipUrl;
+        status.JsonDownloadUrl = status.ManualXmlZipUrl;
+    }
+
+    private async Task<ActionResult> DownloadSimulationZipAsync(string zipUrl, string downloadFileName)
+    {
+        if (string.IsNullOrEmpty(zipUrl))
+            return BadRequest("El archivo aun no ha sido generado.");
+
+        string physicalPath = ResolveCertificationFilePath(zipUrl);
+
+        if (!System.IO.File.Exists(physicalPath))
+            return BadRequest($"El archivo no se encontro en la ruta: {physicalPath}");
+
+        var bytes = await System.IO.File.ReadAllBytesAsync(physicalPath);
+        return File(bytes, "application/zip", downloadFileName);
+    }
+
+    private string? BuildExistingCertificationFileUrl(string fileName)
+    {
+        var path = System.IO.Path.Combine(env.WebRootPath, "certification_files", fileName);
+        return System.IO.File.Exists(path) ? $"/certification_files/{fileName}" : null;
+    }
+
+    private string ResolveCertificationFilePath(string urlOrPath)
+    {
+        if (System.IO.Path.IsPathRooted(urlOrPath))
+            return urlOrPath;
+
+        var relativePath = urlOrPath.TrimStart('/', '\\');
+        const string staticPrefix = "certification_files/";
+
+        if (relativePath.StartsWith(staticPrefix, StringComparison.OrdinalIgnoreCase))
+            return System.IO.Path.Combine(env.WebRootPath, relativePath);
+
+        return System.IO.Path.Combine(env.WebRootPath, "certification_files", relativePath);
+    }
+
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? string.Empty;
     }
 }
 

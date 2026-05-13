@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using ZynstormECFPlatform.Abstractions.Services;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Core.Enums;
 
@@ -15,11 +16,13 @@ public class DgiiTransmissionService : IDgiiTransmissionService
 {
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<DgiiTransmissionService> _logger;
 
-    public DgiiTransmissionService(HttpClient httpClient, IConfiguration configuration)
+    public DgiiTransmissionService(HttpClient httpClient, IConfiguration configuration, ILogger<DgiiTransmissionService> logger)
     {
         _httpClient = httpClient;
         _configuration = configuration;
+        _logger = logger;
     }
 
     public async Task<DgiiTransmissionResult> SendEcfAsync(DgiiEnvironment environment, string token, string signedXml, int ecfType, decimal totalAmount, string rncEmisor, string eNcf, bool isSummary = false)
@@ -85,6 +88,7 @@ public class DgiiTransmissionService : IDgiiTransmissionService
 
         var response = await _httpClient.SendAsync(request);
         var responseString = await response.Content.ReadAsStringAsync();
+        LogDgiiRawResponse("SendEcf", environment, endpointUrl, ecfType, eNcf, isSummary, response, responseString);
 
         try
         {
@@ -93,6 +97,8 @@ public class DgiiTransmissionService : IDgiiTransmissionService
             
             if (result != null)
             {
+                LogDgiiParsedResponse("SendEcf", eNcf, isSummary, result);
+
                 // Mapping success based on RFCE fields if present
                 if (result.Estado != null || result.Codigo.HasValue)
                 {
@@ -117,6 +123,12 @@ public class DgiiTransmissionService : IDgiiTransmissionService
         }
         catch (JsonException)
         {
+            _logger.LogWarning(
+                "DGII SendEcf parse failed. ENcf={ENcf} IsRfce={IsRfce} RawResponse={RawResponse}",
+                eNcf,
+                isSummary,
+                responseString);
+
             // If it's not JSON, might be a raw TrackId or an error message
             if (response.IsSuccessStatusCode && responseString.Length > 5 && responseString.Length < 50 && !responseString.Contains('<'))
             {
@@ -165,10 +177,25 @@ public class DgiiTransmissionService : IDgiiTransmissionService
 
         var response = await _httpClient.SendAsync(request);
         var responseString = await response.Content.ReadAsStringAsync();
+        LogDgiiRawResponse("GetStatus", environment, url, ecfType: null, eNcf: trackId, isRfce: false, response, responseString);
 
         if (response.IsSuccessStatusCode)
         {
             var result = JsonSerializer.Deserialize<DgiiStatusResponse>(responseString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (result != null)
+            {
+                _logger.LogInformation(
+                    "DGII parsed status response. TrackId={TrackId} Codigo={Codigo} Estado={Estado} ENcf={ENcf} SecuenciaUtilizada={SecuenciaUtilizada} Error={Error} Mensaje={Mensaje} Mensajes={Mensajes}",
+                    result.TrackId,
+                    result.Codigo,
+                    result.Estado,
+                    result.ENcf,
+                    result.SecuenciaUtilizada,
+                    result.Error,
+                    result.Mensaje,
+                    result.Mensajes == null ? null : JsonSerializer.Serialize(result.Mensajes));
+            }
+
             return result ?? new DgiiStatusResponse { Estado = "ParseError", TrackId = trackId, Error = "Error deserializing DGII response" };
         }
 
@@ -204,6 +231,7 @@ public class DgiiTransmissionService : IDgiiTransmissionService
 
         var response = await _httpClient.SendAsync(request);
         var responseString = await response.Content.ReadAsStringAsync();
+        LogDgiiRawResponse("SendArecf", environment, endpointUrl, ecfType: null, eNcf, isRfce: false, response, responseString);
 
         try
         {
@@ -223,6 +251,8 @@ public class DgiiTransmissionService : IDgiiTransmissionService
                     result.Codigo = codInt;
                 }
 
+                LogDgiiParsedResponse("SendArecf", eNcf, isRfce: false, result);
+
                 if (!response.IsSuccessStatusCode || (result.Codigo != 0 && result.Codigo != 1))
                 {
                     result.Error = $"{result.Estado}: {result.Mensaje}";
@@ -233,6 +263,11 @@ public class DgiiTransmissionService : IDgiiTransmissionService
         }
         catch (JsonException)
         {
+            _logger.LogWarning(
+                "DGII SendArecf parse failed. ENcf={ENcf} RawResponse={RawResponse}",
+                eNcf,
+                responseString);
+
             if (response.IsSuccessStatusCode && responseString.Length > 5 && responseString.Length < 50 && !responseString.Contains('<'))
             {
                 return new DgiiTransmissionResult { TrackId = responseString.Trim('"') };
@@ -251,5 +286,44 @@ public class DgiiTransmissionService : IDgiiTransmissionService
         public string? Codigo { get; set; }
         public string? Estado { get; set; }
         public List<string>? Mensaje { get; set; }
+    }
+
+    private void LogDgiiRawResponse(
+        string operation,
+        DgiiEnvironment environment,
+        string endpointUrl,
+        int? ecfType,
+        string eNcf,
+        bool isRfce,
+        HttpResponseMessage response,
+        string responseString)
+    {
+        _logger.LogInformation(
+            "DGII raw response. Operation={Operation} Environment={Environment} Endpoint={Endpoint} EcfType={EcfType} ENcf={ENcf} IsRfce={IsRfce} HttpStatus={HttpStatus} Reason={Reason} RawResponse={RawResponse}",
+            operation,
+            environment,
+            endpointUrl,
+            ecfType,
+            eNcf,
+            isRfce,
+            (int)response.StatusCode,
+            response.ReasonPhrase,
+            responseString);
+    }
+
+    private void LogDgiiParsedResponse(string operation, string eNcf, bool isRfce, DgiiTransmissionResult result)
+    {
+        _logger.LogInformation(
+            "DGII parsed response. Operation={Operation} ENcf={ENcf} IsRfce={IsRfce} Success={Success} TrackId={TrackId} Codigo={Codigo} Estado={Estado} Error={Error} Mensaje={Mensaje} Mensajes={Mensajes}",
+            operation,
+            eNcf,
+            isRfce,
+            result.Success,
+            result.TrackId,
+            result.Codigo,
+            result.Estado,
+            result.Error,
+            result.Mensaje,
+            result.Mensajes == null ? null : JsonSerializer.Serialize(result.Mensajes));
     }
 }

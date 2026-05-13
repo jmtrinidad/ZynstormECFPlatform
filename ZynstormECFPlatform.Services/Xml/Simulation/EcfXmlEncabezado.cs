@@ -7,38 +7,38 @@ namespace ZynstormECFPlatform.Services.Xml.Simulation;
 /// </summary>
 public class EcfXmlEncabezado
 {
-    [XmlElement("Version")]
+    [XmlElement("Version", Order = 1)]
     public decimal Version { get; set; } = 1.0m;
 
-    [XmlElement("IdDoc")]
+    [XmlElement("IdDoc", Order = 2)]
     public EcfXmlIdDoc IdDoc { get; set; } = null!;
 
-    [XmlElement("Emisor")]
+    [XmlElement("Emisor", Order = 3)]
     public EcfXmlEmisor Emisor { get; set; } = null!;
 
     [XmlIgnore]
     public EcfXmlComprador? Comprador { get; set; }
 
-    [XmlElement("Comprador")]
+    [XmlElement("Comprador", Order = 4)]
     public EcfXmlComprador? CompradorStandard
     {
         get => (Comprador != null && Comprador.EcfType != 43) ? Comprador : null;
         set { }
     }
 
-    [XmlElement("InformacionesAdicionales")]
+    [XmlElement("InformacionesAdicionales", Order = 5)]
     public EcfXmlInformacionesAdicionales? InformacionesAdicionales { get; set; }
     public bool ShouldSerializeInformacionesAdicionales() => InformacionesAdicionales != null;
 
-    [XmlElement("Transporte")]
+    [XmlElement("Transporte", Order = 6)]
     public EcfXmlTransporte? Transporte { get; set; }
     public bool ShouldSerializeTransporte() => Transporte != null;
 
-    [XmlElement("OtraMoneda")]
+    [XmlElement("Totales", Order = 7)]
+    public EcfXmlTotales Totales { get; set; } = null!;
+
+    [XmlElement("OtraMoneda", Order = 8)]
     public EcfXmlOtraMoneda? OtraMoneda { get; set; }
     public bool ShouldSerializeOtraMoneda() => OtraMoneda != null;
-
-    [XmlElement("Totales")]
-    public EcfXmlTotales Totales { get; set; } = null!;
 }
 

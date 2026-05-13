@@ -18,6 +18,8 @@ public class CertificationJobStatusDto
     public int HighestCompletedStep { get; set; }
     public string DownloadUrl { get; set; } = string.Empty;
     public string JsonDownloadUrl { get; set; } = string.Empty;
+    public string ApprovedXmlZipUrl { get; set; } = string.Empty;
+    public string ManualXmlZipUrl { get; set; } = string.Empty;
     public SimulationStatsDto SimulationStats { get; set; } = new();
 }
 

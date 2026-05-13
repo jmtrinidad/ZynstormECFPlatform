@@ -61,28 +61,28 @@ public class EcfXmlIdDoc
     // ── Payment ───────────────────────────────────────────────────────────────────────────
     [XmlElement("TipoPago", Order = 9)]
     public int? PaymentType { get; set; }
-    public bool ShouldSerializePaymentType() => PaymentType.HasValue;
+    public bool ShouldSerializePaymentType() => AllowsPaymentFields() && PaymentType.HasValue;
 
 
     [XmlElement("FechaLimitePago", Order = 10)]
     public string? FechaLimitePago { get; set; }
-    public bool ShouldSerializeFechaLimitePago() => PaymentType == 2 && !string.IsNullOrWhiteSpace(FechaLimitePago);
+    public bool ShouldSerializeFechaLimitePago() => AllowsPaymentFields() && PaymentType == 2 && !string.IsNullOrWhiteSpace(FechaLimitePago);
 
     [XmlElement("TerminoPago", Order = 11)]
     public string? TerminoPago { get; set; }
-    public bool ShouldSerializeTerminoPago() => !string.IsNullOrWhiteSpace(TerminoPago);
+    public bool ShouldSerializeTerminoPago() => AllowsPaymentFields() && !string.IsNullOrWhiteSpace(TerminoPago);
 
     [XmlElement("TipoCuentaPago", Order = 12)]
     public string? TipoCuentaPago { get; set; }
-    public bool ShouldSerializeTipoCuentaPago() => !string.IsNullOrWhiteSpace(TipoCuentaPago);
+    public bool ShouldSerializeTipoCuentaPago() => AllowsPaymentFields() && !string.IsNullOrWhiteSpace(TipoCuentaPago);
 
     [XmlElement("NumeroCuentaPago", Order = 13)]
     public string? NumeroCuentaPago { get; set; }
-    public bool ShouldSerializeNumeroCuentaPago() => !string.IsNullOrWhiteSpace(NumeroCuentaPago);
+    public bool ShouldSerializeNumeroCuentaPago() => AllowsPaymentFields() && !string.IsNullOrWhiteSpace(NumeroCuentaPago);
 
     [XmlElement("BancoPago", Order = 14)]
     public string? BancoPago { get; set; }
-    public bool ShouldSerializeBancoPago() => !string.IsNullOrWhiteSpace(BancoPago);
+    public bool ShouldSerializeBancoPago() => AllowsPaymentFields() && !string.IsNullOrWhiteSpace(BancoPago);
 
     [XmlElement("FechaDesde", Order = 15)]
     public string? FechaDesde { get; set; }
@@ -95,5 +95,7 @@ public class EcfXmlIdDoc
     [XmlElement("TotalPaginas", Order = 17)]
     public int? TotalPaginas { get; set; }
     public bool ShouldSerializeTotalPaginas() => TotalPaginas.HasValue;
+
+    private bool AllowsPaymentFields() => EcfType is 31 or 32 or 33 or 34 or 41 or 44 or 45 or 46;
 }
 
