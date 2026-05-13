@@ -125,7 +125,7 @@ else
 {
     builder.Services.AddSwaggerGen(c =>
     {
-        c.SwaggerDoc("v1", new OpenApiInfo { Title = "EasyInvoice API", Version = "v1" });
+        c.SwaggerDoc("v1", new OpenApiInfo { Title = "Zynstorm ECF Platform API", Version = "v1" });
         c.ResolveConflictingActions(r => r.First());
     });
 
@@ -178,7 +178,7 @@ app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
     // Se utiliza ruta relativa './v1/swagger.json' para evitar problemas con reverse proxies (como Dokploy/Nginx)
-    options.SwaggerEndpoint("./v1/swagger.json", "Zynstorm ECF API v1");
+    options.SwaggerEndpoint("./v1/swagger.json", "Zynstorm ECF Platform API v1");
     options.EnablePersistAuthorization();
 });
 // }

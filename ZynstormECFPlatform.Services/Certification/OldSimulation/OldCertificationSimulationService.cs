@@ -439,6 +439,23 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                         hasRejectedDocuments = true;
                     }
 
+                    // PERSISTENCE: Save to CertificationDocument table
+                    var certDoc = new CertificationDocument
+                    {
+                        CertificationProcessId = process.CertificationProcessId,
+                        ENcfSecuence = currentDto.Ncf,
+                        ENcfId = encfRecord.ENcfId,
+                        EcfTypeId = ecfTypeRecord.EcfTypeId,
+                        XmlSent = signedXml,
+                        TrackId = trackId,
+                        Status = isAccepted ? DocumentStatus.Accepted : DocumentStatus.Rejected,
+                        SentAt = DateTimeExtensions.DrNow,
+                        RegisteredAt = DateTimeExtensions.DrNow,
+                        GuidId = Guid.NewGuid().ToString()
+                    };
+                    _context.Set<CertificationDocument>().Add(certDoc);
+                    await _context.SaveChangesAsync();
+
                     var existingLog = status.CompletedSteps.FirstOrDefault(l => l.Index == status.CurrentStep);
                     if (existingLog != null) status.CompletedSteps.Remove(existingLog);
 
@@ -524,6 +541,26 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
                     manualUploadXmls[xmlFileName] = signedXml;
 
+                    // PERSISTENCE: Save manual documents too
+                    var ecfTypeRecordManual = await _ecfTypeService.GetByAsync(t => t.Code == item.Type.ToString());
+                    var encfRecordManual = await _context.Set<ENcf>().FirstOrDefaultAsync(e => e.ClientId == client.ClientId && e.NcfTypeId == ecfTypeRecordManual!.EcfTypeId);
+                    
+                    var certDocManual = new CertificationDocument
+                    {
+                        CertificationProcessId = process.CertificationProcessId,
+                        ENcfSecuence = currentDto.Ncf,
+                        ENcfId = encfRecordManual?.ENcfId ?? 0,
+                        EcfTypeId = ecfTypeRecordManual?.EcfTypeId ?? 0,
+                        XmlSent = signedXml,
+                        TrackId = "MANUAL",
+                        Status = DocumentStatus.Accepted,
+                        SentAt = DateTimeExtensions.DrNow,
+                        RegisteredAt = DateTimeExtensions.DrNow,
+                        GuidId = Guid.NewGuid().ToString()
+                    };
+                    _context.Set<CertificationDocument>().Add(certDocManual);
+                    await _context.SaveChangesAsync();
+
                     var existingLog = status.CompletedSteps.FirstOrDefault(l => l.Index == status.CurrentStep);
                     if (existingLog != null) status.CompletedSteps.Remove(existingLog);
 
@@ -602,6 +639,99 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
         {
             Console.WriteLine($"[Simulation] Error creating ZIP for job {jobId}: {ex.Message}");
         }
+    }
+
+    public async Task<CertificationJobStatusDto> GetLastSimulationResultsByClientAsync(string clientGuidId)
+    {
+        var client = await _clientService.GetByAsync(c => c.GuidId == clientGuidId);
+        if (client == null) 
+        {
+            Console.WriteLine($"[Simulation] Client not found: {clientGuidId}");
+            return new CertificationJobStatusDto { Status = "NotFound" };
+        }
+
+        Console.WriteLine($"[Simulation] Searching last results for ClientId: {client.ClientId}");
+
+        var processes = await _context.Set<CertificationProcess>()
+            .Include(p => p.CertificationDocuments)
+                .ThenInclude(d => d.EcfType)
+            .Where(p => p.ClientId == client.ClientId)
+            .OrderByDescending(p => p.RegisteredAt)
+            .ToListAsync();
+
+        Console.WriteLine($"[Simulation] Found {processes.Count} processes for client.");
+
+        var process = processes.FirstOrDefault(p => p.CertificationDocuments.Any());
+        
+        if (process == null)
+        {
+            Console.WriteLine("[Simulation] No process found with documents.");
+            return new CertificationJobStatusDto { Status = "NotFound" };
+        }
+
+        Console.WriteLine($"[Simulation] Using process {process.CertificationProcessId} (Step {process.CurrentStepId}) with {process.CertificationDocuments.Count} documents.");
+
+        var completedSteps = new List<CertificationStepResultDto>();
+        foreach (var d in process.CertificationDocuments)
+        {
+            try 
+            {
+                var doc = XDocument.Parse(d.XmlSent);
+                var total = GetDecimal(doc, "Encabezado", "Totales", "MontoTotal") ?? 0m;
+                var securityCode = ExtractSecurityCodeFromSignature(d.XmlSent);
+                var signatureDateStr = doc.Descendants().FirstOrDefault(x => x.Name.LocalName == "FechaHoraFirma")?.Value;
+                var issueDateStr = doc.Descendants().FirstOrDefault(x => x.Name.LocalName == "FechaEmision")?.Value;
+                var buyerRnc = doc.Descendants().FirstOrDefault(x => x.Name.LocalName == "RNCComprador")?.Value;
+
+                completedSteps.Add(new CertificationStepResultDto
+                {
+                    Index = completedSteps.Count + 1,
+                    Ncf = d.ENcfSecuence,
+                    Step = d.EcfType?.Code ?? "Unknown",
+                    Status = d.TrackId == "MANUAL" ? "GeneradoManual" : (d.Status == DocumentStatus.Accepted ? "Aceptado" : "Rechazado"),
+                    Message = d.TrackId == "MANUAL" ? "Manual" : $"TrackId: {d.TrackId}",
+                    XmlFileName = d.TrackId == "MANUAL" ? $"SUBIR_DGII_{d.ENcfSecuence}.xml" : $"{d.ENcfSecuence}.xml",
+                    Amount = total,
+                    SecurityCode = securityCode,
+                    FechaFirma = signatureDateStr,
+                    FechaEmision = issueDateStr,
+                    BuyerRnc = buyerRnc
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Simulation] Error parsing historical document {d.ENcfSecuence}: {ex.Message}");
+            }
+        }
+
+        if (!completedSteps.Any())
+            return new CertificationJobStatusDto { Status = "NotFound" };
+
+        var status = new CertificationJobStatusDto
+        {
+            JobId = $"DB_{process.CertificationProcessId}",
+            Status = "Completed", // If it has documents in DB, we consider it completed or at least partially done
+            TotalSteps = 29,
+            CurrentStep = completedSteps.Count,
+            CompletedSteps = completedSteps.OrderBy(x => x.Index).ToList(),
+            SimulationStats = new SimulationStatsDto
+            {
+                Type31 = completedSteps.Count(x => x.Step == "31"),
+                Type32Greater250k = completedSteps.Count(x => x.Step == "32" && x.Amount >= 250000),
+                Type32Rfce = completedSteps.Count(x => x.Step == "32" && x.Amount < 250000 && x.Message != "Manual"),
+                Type32Manual = completedSteps.Count(x => x.Step == "32" && x.Message == "Manual"),
+                Type33 = completedSteps.Count(x => x.Step == "33"),
+                Type34 = completedSteps.Count(x => x.Step == "34"),
+                Type41 = completedSteps.Count(x => x.Step == "41"),
+                Type43 = completedSteps.Count(x => x.Step == "43"),
+                Type44 = completedSteps.Count(x => x.Step == "44"),
+                Type45 = completedSteps.Count(x => x.Step == "45"),
+                Type46 = completedSteps.Count(x => x.Step == "46"),
+                Type47 = completedSteps.Count(x => x.Step == "47")
+            }
+        };
+
+        return status;
     }
 
     public async Task<CertificationJobStatusDto> GetJobStatusAsync(string jobId)

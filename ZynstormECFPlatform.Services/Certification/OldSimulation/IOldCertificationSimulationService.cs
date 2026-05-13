@@ -14,5 +14,6 @@ public interface IOldCertificationSimulationService
     [AutomaticRetry(Attempts = 0)]
     Task ProcessBusinessSimulationJobAsync(string businessTypeGuidId, string clientGuidId, string jobId, string webRootPath);
     Task<CertificationJobStatusDto> GetJobStatusAsync(string jobId);
+    Task<CertificationJobStatusDto> GetLastSimulationResultsByClientAsync(string clientGuidId);
     Task<List<CertificationStepResultDto>> GetJobLogsAsync(string jobId);
 }

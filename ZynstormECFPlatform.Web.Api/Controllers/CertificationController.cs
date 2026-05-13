@@ -217,6 +217,13 @@ public class CertificationController(
         return Ok(status);
     }
 
+    [HttpGet("simulation/last-results/{clientGuidId}")]
+    public async Task<ActionResult<CertificationJobStatusDto>> GetLastSimulationResults(string clientGuidId)
+    {
+        var status = await oldSimulationService.GetLastSimulationResultsByClientAsync(clientGuidId);
+        return Ok(status);
+    }
+
     [HttpGet("download/{jobId}")]
     public async Task<ActionResult> DownloadStep4Results(string jobId)
     {
