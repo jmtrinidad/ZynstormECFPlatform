@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Xml;
 using System.Xml.Schema;
+using Microsoft.Extensions.Configuration;
+using QRCoder;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Dtos;
 using static ZynstormECFPlatform.Services.Validation.EcfXmlStructuralValidator;
@@ -14,6 +16,13 @@ namespace ZynstormECFPlatform.Services.Validation;
 /// </summary>
 public class EcfXmlValidationService : IEcfXmlValidationService
 {
+    private readonly IConfiguration _configuration;
+
+    public EcfXmlValidationService(IConfiguration configuration)
+    {
+        _configuration = configuration;
+    }
+
     // ── Schema assembly (Schemas project) ──
     private static readonly Assembly SchemasAssembly =
         AppDomain.CurrentDomain.GetAssemblies()
@@ -103,7 +112,7 @@ public class EcfXmlValidationService : IEcfXmlValidationService
     // XSD Validation (Layer 2)
     // ═══════════════════════════════════════════════════════════════
 
-    private static List<string> ValidateAgainstXsd(string xml, int ecfType)
+    private List<string> ValidateAgainstXsd(string xml, int ecfType)
     {
         var errors = new List<string>();
 
@@ -142,7 +151,7 @@ public class EcfXmlValidationService : IEcfXmlValidationService
         return errors;
     }
 
-    private static XmlSchemaSet? LoadSchemaSetForType(int ecfType)
+    private XmlSchemaSet? LoadSchemaSetForType(int ecfType)
     {
         var resourceName = SchemasAssembly
             .GetManifestResourceNames()
@@ -164,7 +173,7 @@ public class EcfXmlValidationService : IEcfXmlValidationService
     // Extract Verification Info (for caching)
     // ═══════════════════════════════════════════════════════════════
 
-    private static EcfVerificacionInfo ExtractVerificacionInfo(XmlDocument doc, int ecfType, string eNcf)
+    private EcfVerificacionInfo ExtractVerificacionInfo(XmlDocument doc, int ecfType, string eNcf)
     {
         var root = doc.DocumentElement!;
         var encabezado = GetChild(root, "Encabezado")!;
@@ -190,7 +199,6 @@ public class EcfXmlValidationService : IEcfXmlValidationService
 
         if (comprador != null)
         {
-            // Use RNCComprador or IdentificadorExtranjero
             info.RncComprador = GetChildText(comprador, "RNCComprador")
                                 ?? GetChildText(comprador, "IdentificadorExtranjero");
             info.RazonSocialComprador = GetChildText(comprador, "RazonSocialComprador");
@@ -203,6 +211,71 @@ public class EcfXmlValidationService : IEcfXmlValidationService
             info.MontoTotal = GetChildText(totales, "MontoTotal") ?? "0.00";
         }
 
+        // --- Extraer Datos de Firma para el QR ---
+        var nsManager = new XmlNamespaceManager(doc.NameTable);
+        nsManager.AddNamespace("ds", "http://www.w3.org/2000/09/xmldsig#");
+        var sigValueNode = doc.SelectSingleNode("//ds:SignatureValue", nsManager);
+        var signingTimeNode = doc.SelectSingleNode("//*[local-name()='SigningTime']", nsManager);
+        
+        string? sigValue = sigValueNode?.InnerText?.Trim();
+        info.FechaFirma = signingTimeNode?.InnerText?.Trim() ?? DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
+
+        // --- Generar QR ---
+        info.QrCodeBase64 = GenerateQrCode(info, sigValue);
+
         return info;
+    }
+
+    private string GenerateQrCode(EcfVerificacionInfo info, string? signatureValue)
+    {
+        try
+        {
+            // 1. Codigo de Seguridad (6 chars del SignatureValue o fallback SHA256)
+            string codigoSeguridad = "";
+            if (!string.IsNullOrEmpty(signatureValue))
+            {
+                codigoSeguridad = signatureValue.Length >= 6 ? signatureValue.Substring(0, 6) : signatureValue;
+            }
+            else
+            {
+                using var sha256 = System.Security.Cryptography.SHA256.Create();
+                var hash = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(info.ENcf));
+                codigoSeguridad = BitConverter.ToString(hash).Replace("-", "").Substring(0, 6);
+            }
+            info.CodigoSeguridad = codigoSeguridad;
+
+            // 2. Determinar URL Base (Nuestra URL en lugar de la DGII)
+            string platformUrl = _configuration["AppSettings:PlatformUrl"] ?? "http://localhost:5000";
+            string baseUrl = $"{platformUrl.TrimEnd('/')}/api/v1/EcfXmlValidation/verificacion?";
+
+            // 3. Construir Query String (Replicando parámetros DGII pero a nuestra URL)
+            var queryParams = new List<string>
+            {
+                $"rncEmisor={info.RncEmisor}",
+                $"eNcf={info.ENcf}",
+                $"montoTotal={info.MontoTotal}",
+                $"codigoSeguridad={Uri.EscapeDataString(codigoSeguridad)}"
+            };
+
+            // Solo agregamos opcionales si existen para mantener URL limpia
+            if (!string.IsNullOrEmpty(info.RncComprador)) queryParams.Add($"rncComprador={info.RncComprador}");
+            if (!string.IsNullOrEmpty(info.FechaEmision)) queryParams.Add($"fechaEmision={info.FechaEmision}");
+            if (!string.IsNullOrEmpty(info.FechaFirma)) queryParams.Add($"fechaFirma={Uri.EscapeDataString(info.FechaFirma).Replace("%3A", ":")}");
+
+            string fullUrl = baseUrl + string.Join("&", queryParams);
+            info.VerificationUrl = fullUrl;
+
+            // 4. Generar QR Localmente
+            using var qrGenerator = new QRCodeGenerator();
+            using var qrCodeData = qrGenerator.CreateQrCode(fullUrl, QRCodeGenerator.ECCLevel.Q);
+            using var qrCode = new PngByteQRCode(qrCodeData);
+            byte[] qrCodeImage = qrCode.GetGraphic(20);
+            
+            return Convert.ToBase64String(qrCodeImage);
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
     }
 }

@@ -41,4 +41,10 @@ public class EcfVerificacionInfo
     public int EcfType { get; set; }
     public string TipoDocumento { get; set; } = string.Empty;
     public DateTime ValidadoEnUtc { get; set; } = DateTime.UtcNow;
+
+    // --- Campos de Validación DGII / QR ---
+    public string? CodigoSeguridad { get; set; }
+    public string? FechaFirma { get; set; }
+    public string? VerificationUrl { get; set; }
+    public string? QrCodeBase64 { get; set; }
 }
