@@ -37,6 +37,7 @@ public static class ServiceCollectionExtensions
         // --- Production ---
         services.AddTransient<IEcfProductionGeneratorService, Production.EcfProductionGeneratorService>();
         services.AddTransient<IEcfProductionService, Production.EcfProductionService>();
+        services.AddTransient<Production.IReceivedEcfProductionService, Production.ReceivedEcfProductionService>();
 
         services.AddTransient<Jobs.EcfTrackingJob>();
 

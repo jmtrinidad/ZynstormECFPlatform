@@ -190,14 +190,14 @@ public class CertificationController(
         }
         catch (Exception ex)
         {
-            return BadRequest(new { 
-                Message = ex.Message, 
+            return BadRequest(new
+            {
+                Message = ex.Message,
                 StackTrace = ex.StackTrace,
-                InnerException = ex.InnerException?.Message 
+                InnerException = ex.InnerException?.Message
             });
         }
     }
-
 
     [HttpGet("job-status/{jobId}")]
     public async Task<ActionResult<CertificationJobStatusDto>> GetJobStatus(string jobId)

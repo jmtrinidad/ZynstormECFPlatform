@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Common.Utilities;
+using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
+using ZynstormECFPlatform.Services.Production;
 using ZynstormECFPlatform.Web.Api.Filters;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers
@@ -11,9 +13,12 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
     [Route("v{version:apiVersion}/[controller]")]
     [ApiController]
     [ApiKeyAuth]
-    public class EcfController(IEcfGeneratorService ecfGeneratorService) : ControllerBase
+    public class EcfController(
+        IEcfGeneratorService ecfGeneratorService,
+        IReceivedEcfProductionService receivedEcfProductionService) : ControllerBase
     {
         private readonly IEcfGeneratorService _ecfGeneratorService = ecfGeneratorService;
+        private readonly IReceivedEcfProductionService _receivedEcfProductionService = receivedEcfProductionService;
 
         /// <summary>
         /// Genera un XML de e-CF a partir del DTO de factura y lo valida contra el esquema XSD de la DGII.
@@ -67,6 +72,38 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 {
                     success = false,
                     message = "Error inesperado durante la generación del XML.",
+                    detail = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Recibe un e-CF con el modelo de simulacion legacy, genera el XML, valida XSD/XmlProd, firma, envia a DGII y
+        /// consulta el estado inicial.
+        /// </summary>
+        [HttpPost("emit")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> EmitEcf([FromBody] EcfInvoiceRequestDto dto, [FromQuery] DgiiEnvironment environment = DgiiEnvironment.Production)
+        {
+            if (dto == null)
+                return BadRequest(new { success = false, message = "Debe proporcionar el objeto e-CF." });
+
+            try
+            {
+                var result = await _receivedEcfProductionService.ProcessAsync(dto, environment);
+
+                if (result.DtoErrors.Count > 0 || result.XsdErrors.Count > 0 || result.XmlProdErrors.Count > 0)
+                    return BadRequest(result);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new
+                {
+                    success = false,
+                    message = "Error inesperado durante la emision del e-CF.",
                     detail = ex.Message
                 });
             }

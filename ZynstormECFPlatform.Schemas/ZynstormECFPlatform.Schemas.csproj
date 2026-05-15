@@ -10,6 +10,7 @@
     <!-- Embed all XSD schemas as resources so they can be loaded at runtime
          via Assembly.GetManifestResourceStream -->
     <EmbeddedResource Include="XSD\*.xsd" />
+    <EmbeddedResource Include="XmlProd\*.xml" />
   </ItemGroup>
 
 </Project>

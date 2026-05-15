@@ -4,6 +4,7 @@ using Asp.Versioning;
 using System.Text;
 using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Abstractions.Services;
+using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers;
@@ -14,6 +15,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers;
 [ApiController]
 public class FeController : ControllerBase
 {
+    private const string LastValidatedClientCacheKey = "Fe_LastValidatedClient";
+    private static readonly TimeSpan ValidatedClientCacheExpiration = TimeSpan.FromHours(2);
+
     private readonly ICacheService _cacheService;
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IInboundEcfService _inboundEcfService;
@@ -139,9 +143,18 @@ public class FeController : ControllerBase
             estado = "1";
             motivoXml = "<CodigoMotivoNoRecibido>4</CodigoMotivoNoRecibido>";
 
-            // Usar el primer cliente disponible como fallback para firmar la respuesta
-            var allClients = await _clientService.GetAllAsync();
-            client = allClients.FirstOrDefault();
+            client = await GetLastValidatedClientAsync();
+
+            if (client == null)
+            {
+                // Ultimo fallback de compatibilidad para no dejar la respuesta sin firma si no hay cache.
+                var allClients = await _clientService.GetAllAsync();
+                client = allClients.FirstOrDefault();
+            }
+        }
+        else
+        {
+            CacheValidatedClient(client);
         }
 
         string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?><ARECF><DetalleAcusedeRecibo><Version>1.0</Version><RNCEmisor>{rncEmisor}</RNCEmisor><RNCComprador>{rncComprador}</RNCComprador><eNCF>{eNcf}</eNCF><Estado>{estado}</Estado>{motivoXml}<FechaHoraAcuseRecibo>{fecha}</FechaHoraAcuseRecibo></DetalleAcusedeRecibo></ARECF>";
@@ -258,6 +271,8 @@ public class FeController : ControllerBase
             var client = await _clientService.GetByAsync(x => x.Rnc == rncEmisor);
             if (client != null)
             {
+                CacheValidatedClient(client);
+
                 var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
                 if (certificate != null)
                 {
@@ -344,6 +359,34 @@ public class FeController : ControllerBase
         }
 
         return string.Empty;
+    }
+
+    private void CacheValidatedClient(Client client)
+    {
+        var cachedClient = new FeValidatedClient(client.ClientId, NormalizeRnc(client.Rnc));
+
+        _cacheService.Set(LastValidatedClientCacheKey, cachedClient, ValidatedClientCacheExpiration);
+        _cacheService.Set(GetValidatedClientCacheKey(cachedClient.Rnc), cachedClient, ValidatedClientCacheExpiration);
+    }
+
+    private async Task<Client?> GetLastValidatedClientAsync()
+    {
+        var cachedClient = _cacheService.Get<FeValidatedClient>(LastValidatedClientCacheKey);
+
+        if (cachedClient == null)
+            return null;
+
+        return await _clientService.GetByAsync(x => x.ClientId == cachedClient.ClientId);
+    }
+
+    private static string GetValidatedClientCacheKey(string rnc)
+    {
+        return $"Fe_ValidatedClient_{NormalizeRnc(rnc)}";
+    }
+
+    private static string NormalizeRnc(string? rnc)
+    {
+        return rnc?.Replace("-", "").Trim() ?? string.Empty;
     }
 
     /// <summary>
@@ -511,4 +554,6 @@ public class FeController : ControllerBase
 
         return errors;
     }
+
+    private sealed record FeValidatedClient(int ClientId, string Rnc);
 }
