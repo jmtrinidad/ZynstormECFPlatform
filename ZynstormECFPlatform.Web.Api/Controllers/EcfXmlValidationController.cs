@@ -1,3 +1,4 @@
+using Hangfire;
 using Microsoft.AspNetCore.Mvc;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Dtos;
@@ -20,25 +21,23 @@ public class EcfXmlValidationController : ControllerBase
     }
 
     /// <summary>
-    /// Recibe un XML (e-CF) ya sea de forma cruda (Raw Body) o como un archivo (form-data). Ejecuta las 4 capas de
-    /// validación y almacena en caché si es válido.
+    /// Recibe un XML (e-CF) ya sea de forma cruda (Raw Body) o como un archivo (form-data). Responde con TrackId y
+    /// ejecuta la validacion en segundo plano para replicar el flujo DGII.
     /// </summary>
     [HttpPost("validate")]
     [Consumes("application/xml", "text/xml", "multipart/form-data")]
     [Produces("application/json")]
-    public async Task<ActionResult<EcfXmlValidationResult>> ValidateXml(IFormFile? xml)
+    public async Task<ActionResult<EcfXmlValidationReceipt>> ValidateXml(IFormFile? xml)
     {
         try
         {
             string xmlContent;
 
-            // 1. Intentar leer desde un archivo subido (form-data)
             if (xml != null)
             {
                 using var reader = new StreamReader(xml.OpenReadStream());
                 xmlContent = await reader.ReadToEndAsync();
             }
-            // 2. Intentar leer desde el cuerpo de la petición (Raw)
             else
             {
                 using var reader = new StreamReader(Request.Body);
@@ -47,22 +46,57 @@ public class EcfXmlValidationController : ControllerBase
 
             if (string.IsNullOrWhiteSpace(xmlContent))
             {
-                return BadRequest(new { error = "No se proporcionó contenido XML. Envíe el XML en el body o como un archivo en el campo 'xmlFile'." });
+                return BadRequest(new { error = "No se proporciono contenido XML. Envie el XML en el body o como un archivo en el campo 'xml'." });
             }
 
-            var result = _validationService.Validate(xmlContent);
+            var trackId = $"VAL-{Guid.NewGuid():N}".ToUpperInvariant();
+            var receipt = _validationService.RegisterReceived(trackId);
 
-            if (result.IsValid)
-            {
-                return Ok(result);
-            }
+            BackgroundJob.Enqueue<IEcfXmlValidationService>(x => x.ProcessValidationJobAsync(trackId, xmlContent));
 
-            return BadRequest(result);
+            return Accepted(receipt);
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { error = "Error interno durante la validación.", details = ex.Message });
+            return StatusCode(500, new { error = "Error interno recibiendo el XML.", details = ex.Message });
         }
+    }
+
+    /// <summary>
+    /// Consulta el estado de una validacion asincrona por TrackId.
+    /// </summary>
+    [HttpGet("estado/{trackId}")]
+    [Produces("application/json")]
+    public ActionResult<EcfXmlValidationTrackStatus> GetEstadoByRoute(string trackId)
+    {
+        return GetEstado(trackId);
+    }
+
+    /// <summary>
+    /// Consulta el estado de una validacion asincrona por TrackId, compatible con consultas tipo DGII.
+    /// </summary>
+    [HttpGet("estado")]
+    [Produces("application/json")]
+    public ActionResult<EcfXmlValidationTrackStatus> GetEstado([FromQuery] string? trackId)
+    {
+        if (string.IsNullOrWhiteSpace(trackId))
+            return BadRequest(new { error = "Debe proporcionar el TrackId." });
+
+        var status = _validationService.GetStatus(trackId.Trim().ToUpperInvariant());
+        if (status == null)
+            return NotFound(new { error = $"El TrackId '{trackId}' no existe o expiro del cache." });
+
+        return Ok(status);
+    }
+
+    /// <summary>
+    /// Alias de consulta por TrackId para clientes que usan rutas similares a DGII.
+    /// </summary>
+    [HttpGet("trackid/{trackId}")]
+    [Produces("application/json")]
+    public ActionResult<EcfXmlValidationTrackStatus> GetTrackId(string trackId)
+    {
+        return GetEstado(trackId);
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
+using System.Text.Json.Serialization;
 
 namespace ZynstormECFPlatform.Services.Production;
 
@@ -24,6 +25,10 @@ public class ReceivedEcfEmissionResultDto
     public string SecurityCode { get; set; } = string.Empty;
     public string SignatureDate { get; set; } = string.Empty;
     public string QrUrl { get; set; } = string.Empty;
+
+    public string UrlQr => QrUrl;
+
+    [JsonIgnore]
     public string QrImageUrl { get; set; } = string.Empty;
     public string? HangfireJobId { get; set; }
     public EcfXmlValidationResult? XmlValidation { get; set; }

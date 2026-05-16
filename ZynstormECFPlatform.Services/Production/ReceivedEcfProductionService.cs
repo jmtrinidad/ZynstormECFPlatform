@@ -6,7 +6,6 @@ using System.Xml.Linq;
 using Hangfire;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using QRCoder;
 using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Common;
@@ -170,7 +169,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         var signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
         resultDto.SignedXml = signedXml;
         ApplyQrMetadata(resultDto, dto, signedXml, ecfType);
-        resultDto.XmlValidation = BuildAcceptedValidationResult(dto, signedXml, ecfType, resultDto.QrUrl, resultDto.SecurityCode, resultDto.SignatureDate, resultDto.QrImageUrl);
+        resultDto.XmlValidation = BuildAcceptedValidationResult(dto, signedXml, ecfType, resultDto.QrUrl, resultDto.SecurityCode, resultDto.SignatureDate);
 
         await _ecfXmlDocumentService.InsertAsync(new EcfXmlDocument
         {
@@ -182,7 +181,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
         if (ShouldUseStagingXmlValidation())
         {
-            return await ProcessWithStagingValidationAsync(resultDto, ecfDocument, client.ClientId, signedXml);
+            return await ProcessWithStagingValidationAsync(resultDto, ecfDocument, client.ClientId, signedXml, statusDelayMilliseconds);
         }
 
         var token = await _authService.GetTokenAsync(issuerRnc, environment, certBase64, certPass);
@@ -208,8 +207,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         {
             await SaveTransmissionAsync(ecfDocument, transmission, statusId: 9, signedXml);
             await MarkDocumentAsync(ecfDocument, 9, $"DGII recibio el e-CF. TrackId: {transmission.TrackId}");
-            await Task.Delay(Math.Max(statusDelayMilliseconds, 0));
-            var status = await _transmissionService.GetStatusAsync(environment, token, transmission.TrackId);
+            var status = await PollInitialDgiiStatusAsync(environment, token, transmission.TrackId);
             resultDto.Status = status;
             resultDto.Success = string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase);
             var statusId = MapDgiiStatusToEcfStatus(status);
@@ -259,7 +257,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         ReceivedEcfEmissionResultDto resultDto,
         EcfDocument ecfDocument,
         int clientId,
-        string signedXml)
+        string signedXml,
+        int statusDelayMilliseconds)
     {
         var validationUrl = _configuration["EcfXmlValidation:DevStagingUrl"]
             ?? "https://ecfstaging.zynstorm.com/api/v1/EcfXmlValidation/validate";
@@ -272,63 +271,101 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             using var content = new StringContent(signedXml, Encoding.UTF8, "application/xml");
             using var response = await client.PostAsync(validationUrl, content);
             var responseBody = await response.Content.ReadAsStringAsync();
-            var validation = DeserializeValidationResult(responseBody);
+            var receipt = DeserializeValidationReceipt(responseBody);
 
+            if (receipt == null || string.IsNullOrWhiteSpace(receipt.TrackId))
+            {
+                resultDto.Success = false;
+                resultDto.Message = $"El validador interno no retorno TrackId. HTTP {(int)response.StatusCode}.";
+                await SaveValidationTransmissionAsync(ecfDocument, new DgiiTransmissionResult
+                {
+                    Estado = "ValidationReceiveFailed",
+                    Error = resultDto.Message,
+                    Mensaje = responseBody
+                }, statusId: 3, signedXml, responseBody);
+                await MarkDocumentAsync(ecfDocument, 3, resultDto.Message);
+                await AddLogAsync(ecfDocument, clientId, "Warning", resultDto.Message, responseBody);
+                return resultDto;
+            }
+
+            resultDto.TrackId = receipt.TrackId;
+            await AddLogAsync(ecfDocument, clientId, "Information", $"XML recibido por validador interno. TrackId: {receipt.TrackId}.", responseBody);
+
+            await Task.Delay(Math.Max(0, statusDelayMilliseconds));
+
+            var statusUrl = BuildValidationStatusUrl(validationUrl, receipt.TrackId);
+            using var statusResponse = await client.GetAsync(statusUrl);
+            var statusBody = await statusResponse.Content.ReadAsStringAsync();
+            var status = DeserializeValidationStatus(statusBody);
+
+            if (status == null)
+            {
+                resultDto.Success = false;
+                resultDto.IsPending = true;
+                resultDto.Message = $"El validador interno recibio el XML, pero aun no retorno estado reconocible. TrackId: {receipt.TrackId}";
+                await SaveValidationTransmissionAsync(ecfDocument, new DgiiTransmissionResult
+                {
+                    TrackId = receipt.TrackId,
+                    Estado = "EnProceso",
+                    Mensaje = statusBody
+                }, statusId: 9, signedXml, statusBody);
+                await MarkDocumentAsync(ecfDocument, 9, resultDto.Message);
+                await AddLogAsync(ecfDocument, clientId, "Information", resultDto.Message, statusBody);
+                return resultDto;
+            }
+
+            var validation = BuildValidationResult(status);
             resultDto.XmlValidation = validation;
 
-            if (validation?.IsValid == true)
+            if (status.IsValid == true || string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase))
             {
                 resultDto.Success = true;
                 resultDto.IsPending = false;
-                resultDto.TrackId = $"VAL-{Guid.NewGuid():N}";
-                resultDto.Message = $"XML validado correctamente en {_hostEnvironment.EnvironmentName}. TrackId: {resultDto.TrackId}";
+                resultDto.Message = $"XML validado correctamente en {_hostEnvironment.EnvironmentName}. TrackId: {receipt.TrackId}";
 
-                if (validation.Verificacion != null)
+                if (status.Verificacion != null)
                 {
-                    resultDto.SecurityCode = validation.Verificacion.CodigoSeguridad ?? resultDto.SecurityCode;
-                    resultDto.SignatureDate = validation.Verificacion.FechaFirma ?? resultDto.SignatureDate;
-                    resultDto.QrUrl = validation.Verificacion.VerificationUrl ?? resultDto.QrUrl;
-                    resultDto.QrImageUrl = !string.IsNullOrWhiteSpace(validation.Verificacion.QrCodeBase64)
-                        ? $"data:image/png;base64,{validation.Verificacion.QrCodeBase64}"
-                        : resultDto.QrImageUrl;
+                    resultDto.SecurityCode = status.Verificacion.CodigoSeguridad ?? resultDto.SecurityCode;
+                    resultDto.SignatureDate = status.Verificacion.FechaFirma ?? resultDto.SignatureDate;
+                    resultDto.QrUrl = status.Verificacion.VerificationUrl ?? resultDto.QrUrl;
+                    resultDto.QrImageUrl = string.Empty;
                 }
 
                 var transmission = new DgiiTransmissionResult
                 {
-                    TrackId = resultDto.TrackId,
+                    TrackId = receipt.TrackId,
                     Estado = "Aceptado",
                     Mensaje = "Validado por Zynstorm XML Validation"
                 };
                 resultDto.Transmission = transmission;
 
-                await SaveValidationTransmissionAsync(ecfDocument, transmission, statusId: 10, signedXml, responseBody);
+                await SaveValidationTransmissionAsync(ecfDocument, transmission, statusId: 10, signedXml, statusBody);
                 await MarkDocumentAsync(ecfDocument, 10, resultDto.Message);
-                await AddLogAsync(ecfDocument, clientId, "Information", $"XML validado y aceptado por endpoint interno. QR: {resultDto.QrUrl}", responseBody);
+                await AddLogAsync(ecfDocument, clientId, "Information", $"XML validado y aceptado por endpoint interno. QR: {resultDto.QrUrl}", statusBody);
                 return resultDto;
             }
 
             resultDto.Success = false;
-            resultDto.Message = validation == null
-                ? $"El validador interno retorno una respuesta no reconocida. HTTP {(int)response.StatusCode}."
+            resultDto.IsPending = string.Equals(status.Estado, "Recibido", StringComparison.OrdinalIgnoreCase)
+                                  || string.Equals(status.Estado, "EnProceso", StringComparison.OrdinalIgnoreCase);
+            resultDto.Message = resultDto.IsPending
+                ? $"El validador interno aun procesa el XML. TrackId: {receipt.TrackId}"
                 : "El XML generado no paso la validacion interna de dev/staging.";
-
-            if (validation != null)
-            {
-                resultDto.XsdErrors = validation.XsdErrors;
-                resultDto.XmlProdErrors = validation.StructuralErrors
-                    .Concat(validation.BusinessRuleErrors)
-                    .Concat(validation.ArithmeticErrors)
-                    .ToList();
-            }
+            resultDto.XsdErrors = status.XsdErrors;
+            resultDto.XmlProdErrors = status.StructuralErrors
+                .Concat(status.BusinessRuleErrors)
+                .Concat(status.ArithmeticErrors)
+                .ToList();
 
             await SaveValidationTransmissionAsync(ecfDocument, new DgiiTransmissionResult
             {
-                Estado = "ValidationFailed",
-                Error = resultDto.Message,
-                Mensaje = responseBody
-            }, statusId: 3, signedXml, responseBody);
-            await MarkDocumentAsync(ecfDocument, 3, resultDto.Message);
-            await AddLogAsync(ecfDocument, clientId, "Warning", resultDto.Message, responseBody);
+                TrackId = receipt.TrackId,
+                Estado = status.Estado,
+                Error = resultDto.IsPending ? null : resultDto.Message,
+                Mensaje = statusBody
+            }, statusId: resultDto.IsPending ? 9 : 3, signedXml, statusBody);
+            await MarkDocumentAsync(ecfDocument, resultDto.IsPending ? 9 : 3, resultDto.Message);
+            await AddLogAsync(ecfDocument, clientId, resultDto.IsPending ? "Information" : "Warning", resultDto.Message, statusBody);
             return resultDto;
         }
         catch (Exception ex)
@@ -347,13 +384,13 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             || _hostEnvironment.IsStaging();
     }
 
-    private static EcfXmlValidationResult? DeserializeValidationResult(string responseBody)
+    private static EcfXmlValidationReceipt? DeserializeValidationReceipt(string responseBody)
     {
         if (string.IsNullOrWhiteSpace(responseBody)) return null;
 
         try
         {
-            return JsonSerializer.Deserialize<EcfXmlValidationResult>(
+            return JsonSerializer.Deserialize<EcfXmlValidationReceipt>(
                 responseBody,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
@@ -361,6 +398,45 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         {
             return null;
         }
+    }
+
+    private static EcfXmlValidationTrackStatus? DeserializeValidationStatus(string responseBody)
+    {
+        if (string.IsNullOrWhiteSpace(responseBody)) return null;
+
+        try
+        {
+            return JsonSerializer.Deserialize<EcfXmlValidationTrackStatus>(
+                responseBody,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static EcfXmlValidationResult BuildValidationResult(EcfXmlValidationTrackStatus status)
+    {
+        return new EcfXmlValidationResult
+        {
+            EcfType = status.EcfType,
+            ENcf = status.ENcf,
+            StructuralErrors = status.StructuralErrors,
+            XsdErrors = status.XsdErrors,
+            BusinessRuleErrors = status.BusinessRuleErrors,
+            ArithmeticErrors = status.ArithmeticErrors,
+            Verificacion = status.Verificacion
+        };
+    }
+
+    private static string BuildValidationStatusUrl(string validationUrl, string trackId)
+    {
+        var baseUrl = validationUrl.TrimEnd('/');
+        if (baseUrl.EndsWith("/validate", StringComparison.OrdinalIgnoreCase))
+            baseUrl = baseUrl[..^"/validate".Length];
+
+        return $"{baseUrl}/estado/{Uri.EscapeDataString(trackId)}";
     }
 
     private async Task<EcfDocument> CreateEcfDocumentAsync(
@@ -525,6 +601,41 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             || status.Estado.Equals("Pendiente", StringComparison.OrdinalIgnoreCase);
     }
 
+    private async Task<DgiiStatusResponse> PollInitialDgiiStatusAsync(
+        DgiiEnvironment environment,
+        string token,
+        string trackId)
+    {
+        const int firstDelayMilliseconds = 300;
+        const int totalWindowMilliseconds = 2000;
+        const int retryDelayMilliseconds = 300;
+
+        var startedAt = DateTime.UtcNow;
+        await Task.Delay(firstDelayMilliseconds);
+
+        DgiiStatusResponse? lastStatus = null;
+        while ((DateTime.UtcNow - startedAt).TotalMilliseconds <= totalWindowMilliseconds)
+        {
+            lastStatus = await _transmissionService.GetStatusAsync(environment, token, trackId);
+            if (!IsPendingDgiiStatus(lastStatus))
+                return lastStatus;
+
+            var elapsed = (DateTime.UtcNow - startedAt).TotalMilliseconds;
+            var remaining = totalWindowMilliseconds - elapsed;
+            if (remaining <= 0)
+                break;
+
+            await Task.Delay((int)Math.Min(retryDelayMilliseconds, remaining));
+        }
+
+        return lastStatus ?? new DgiiStatusResponse
+        {
+            TrackId = trackId,
+            Estado = "Pendiente",
+            Mensaje = "DGII aun procesa el e-CF."
+        };
+    }
+
     internal static QrMetadata BuildQrMetadata(EcfDocument ecfDocument, string signedXml, string rncEmisor)
     {
         var securityCode = ExtractSecurityCode(signedXml);
@@ -545,7 +656,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             fechaFirma: signatureDate,
             securityCode: securityCode);
 
-        return new QrMetadata(securityCode, signatureDate, qrUrl, BuildQrImageUrl(qrUrl));
+        return new QrMetadata(securityCode, signatureDate, qrUrl);
     }
 
     private static void ApplyQrMetadata(ReceivedEcfEmissionResultDto resultDto, EcfInvoiceRequestDto dto, string signedXml, int ecfType)
@@ -571,7 +682,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         resultDto.SecurityCode = securityCode;
         resultDto.SignatureDate = signatureDate;
         resultDto.QrUrl = qrUrl;
-        resultDto.QrImageUrl = BuildQrImageUrl(qrUrl);
+        resultDto.QrImageUrl = string.Empty;
     }
 
     private static EcfXmlValidationResult BuildAcceptedValidationResult(
@@ -580,13 +691,9 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         int ecfType,
         string qrUrl,
         string securityCode,
-        string signatureDate,
-        string qrImageUrl)
+        string signatureDate)
     {
         var header = dto.ECF.Encabezado;
-        var qrBase64 = qrImageUrl.StartsWith("data:image/png;base64,", StringComparison.OrdinalIgnoreCase)
-            ? qrImageUrl["data:image/png;base64,".Length..]
-            : qrImageUrl;
 
         return new EcfXmlValidationResult
         {
@@ -608,8 +715,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
                 ValidadoEnUtc = DateTime.UtcNow,
                 CodigoSeguridad = securityCode,
                 FechaFirma = signatureDate,
-                VerificationUrl = qrUrl,
-                QrCodeBase64 = qrBase64
+                VerificationUrl = qrUrl
             }
         };
     }
@@ -645,30 +751,6 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         }
 
         return $"https://ecf.dgii.gov.do/ConsultaTimbre?RncEmisor={rncEmisor}&RncComprador={rncComprador}&ENCF={encf}&FechaEmision={fechaEmisionUrl}&MontoTotal={montoTotalUrl}&FechaFirma={fechaFirmaUrl}&CodigoSeguridad={Uri.EscapeDataString(securityCode)}";
-    }
-
-    private static string BuildQrImageUrl(string qrUrl)
-    {
-        var qrBase64 = GenerateQrCodeBase64(qrUrl);
-        return string.IsNullOrWhiteSpace(qrBase64)
-            ? string.Empty
-            : $"data:image/png;base64,{qrBase64}";
-    }
-
-    private static string GenerateQrCodeBase64(string qrUrl)
-    {
-        try
-        {
-            using var qrGenerator = new QRCodeGenerator();
-            using var qrCodeData = qrGenerator.CreateQrCode(qrUrl, QRCodeGenerator.ECCLevel.Q);
-            using var qrCode = new PngByteQRCode(qrCodeData);
-            var qrCodeImage = qrCode.GetGraphic(20);
-            return Convert.ToBase64String(qrCodeImage);
-        }
-        catch
-        {
-            return string.Empty;
-        }
     }
 
     private static string GetEcfTypeName(int ecfType)
@@ -895,4 +977,4 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     }
 }
 
-public record QrMetadata(string SecurityCode, string SignatureDate, string QrUrl, string QrImageUrl);
+public record QrMetadata(string SecurityCode, string SignatureDate, string QrUrl);

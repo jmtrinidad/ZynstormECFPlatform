@@ -15,6 +15,21 @@ public interface IEcfXmlValidationService
     EcfXmlValidationResult Validate(string xml);
 
     /// <summary>
+    /// Registers a received XML validation request by TrackId before the background validation starts.
+    /// </summary>
+    EcfXmlValidationReceipt RegisterReceived(string trackId);
+
+    /// <summary>
+    /// Processes a previously received XML in background and stores the result by TrackId.
+    /// </summary>
+    Task ProcessValidationJobAsync(string trackId, string xml);
+
+    /// <summary>
+    /// Retrieves validation status by TrackId.
+    /// </summary>
+    EcfXmlValidationTrackStatus? GetStatus(string trackId);
+
+    /// <summary>
     /// Retrieves cached verification info for a previously validated e-NCF.
     /// Returns null if the eNCF was never validated or has expired from cache.
     /// </summary>

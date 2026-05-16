@@ -3,7 +3,6 @@ using System.Reflection;
 using System.Xml;
 using System.Xml.Schema;
 using Microsoft.Extensions.Configuration;
-using QRCoder;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Dtos;
 using static ZynstormECFPlatform.Services.Validation.EcfXmlStructuralValidator;
@@ -34,6 +33,8 @@ public class EcfXmlValidationService : IEcfXmlValidationService
     /// Key = eNCF, Value = verification info.
     /// </summary>
     private static readonly ConcurrentDictionary<string, EcfVerificacionInfo> _verificacionCache = new();
+
+    private static readonly ConcurrentDictionary<string, EcfXmlValidationTrackStatus> _trackStatusCache = new();
 
     /// <summary>
     /// Maps TipoeCF to document type name.
@@ -91,6 +92,106 @@ public class EcfXmlValidationService : IEcfXmlValidationService
         }
 
         return result;
+    }
+
+    /// <inheritdoc />
+    public EcfXmlValidationReceipt RegisterReceived(string trackId)
+    {
+        var receipt = new EcfXmlValidationReceipt
+        {
+            TrackId = trackId,
+            Estado = "Recibido",
+            Mensaje = "XML recibido correctamente. Consulte el estado con el TrackId.",
+            RecibidoEnUtc = DateTime.UtcNow
+        };
+
+        _trackStatusCache[trackId] = new EcfXmlValidationTrackStatus
+        {
+            TrackId = trackId,
+            Estado = "Recibido",
+            Mensaje = receipt.Mensaje,
+            RecibidoEnUtc = receipt.RecibidoEnUtc
+        };
+
+        return receipt;
+    }
+
+    /// <inheritdoc />
+    public Task ProcessValidationJobAsync(string trackId, string xml)
+    {
+        _trackStatusCache.AddOrUpdate(
+            trackId,
+            _ => new EcfXmlValidationTrackStatus
+            {
+                TrackId = trackId,
+                Estado = "EnProceso",
+                Mensaje = "Validacion en proceso.",
+                RecibidoEnUtc = DateTime.UtcNow
+            },
+            (_, current) =>
+            {
+                current.Estado = "EnProceso";
+                current.Mensaje = "Validacion en proceso.";
+                return current;
+            });
+
+        try
+        {
+            var result = Validate(xml);
+            var status = new EcfXmlValidationTrackStatus
+            {
+                TrackId = trackId,
+                Estado = result.IsValid ? "Aceptado" : "Rechazado",
+                Mensaje = result.IsValid
+                    ? "XML validado correctamente."
+                    : "El XML no paso la validacion.",
+                RecibidoEnUtc = _trackStatusCache.TryGetValue(trackId, out var current)
+                    ? current.RecibidoEnUtc
+                    : DateTime.UtcNow,
+                ProcesadoEnUtc = DateTime.UtcNow,
+                IsValid = result.IsValid,
+                EcfType = result.EcfType,
+                ENcf = result.ENcf,
+                StructuralErrors = result.StructuralErrors,
+                XsdErrors = result.XsdErrors,
+                BusinessRuleErrors = result.BusinessRuleErrors,
+                ArithmeticErrors = result.ArithmeticErrors,
+                Verificacion = result.Verificacion
+            };
+
+            _trackStatusCache[trackId] = status;
+        }
+        catch (Exception ex)
+        {
+            _trackStatusCache.AddOrUpdate(
+                trackId,
+                _ => new EcfXmlValidationTrackStatus
+                {
+                    TrackId = trackId,
+                    Estado = "Error",
+                    Mensaje = $"Error interno durante la validacion: {ex.Message}",
+                    RecibidoEnUtc = DateTime.UtcNow,
+                    ProcesadoEnUtc = DateTime.UtcNow,
+                    IsValid = false
+                },
+                (_, current) =>
+                {
+                    current.Estado = "Error";
+                    current.Mensaje = $"Error interno durante la validacion: {ex.Message}";
+                    current.ProcesadoEnUtc = DateTime.UtcNow;
+                    current.IsValid = false;
+                    return current;
+                });
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public EcfXmlValidationTrackStatus? GetStatus(string trackId)
+    {
+        _trackStatusCache.TryGetValue(trackId, out var status);
+        return status;
     }
 
     /// <inheritdoc />
@@ -220,13 +321,12 @@ public class EcfXmlValidationService : IEcfXmlValidationService
         string? sigValue = sigValueNode?.InnerText?.Trim();
         info.FechaFirma = signingTimeNode?.InnerText?.Trim() ?? DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
 
-        // --- Generar QR ---
-        info.QrCodeBase64 = GenerateQrCode(info, sigValue);
+        ApplyQrUrlMetadata(info, sigValue);
 
         return info;
     }
 
-    private string GenerateQrCode(EcfVerificacionInfo info, string? signatureValue)
+    private void ApplyQrUrlMetadata(EcfVerificacionInfo info, string? signatureValue)
     {
         try
         {
@@ -264,18 +364,10 @@ public class EcfXmlValidationService : IEcfXmlValidationService
 
             string fullUrl = baseUrl + string.Join("&", queryParams);
             info.VerificationUrl = fullUrl;
-
-            // 4. Generar QR Localmente
-            using var qrGenerator = new QRCodeGenerator();
-            using var qrCodeData = qrGenerator.CreateQrCode(fullUrl, QRCodeGenerator.ECCLevel.Q);
-            using var qrCode = new PngByteQRCode(qrCodeData);
-            byte[] qrCodeImage = qrCode.GetGraphic(20);
-            
-            return Convert.ToBase64String(qrCodeImage);
         }
         catch (Exception)
         {
-            return string.Empty;
+            info.VerificationUrl = string.Empty;
         }
     }
 }
