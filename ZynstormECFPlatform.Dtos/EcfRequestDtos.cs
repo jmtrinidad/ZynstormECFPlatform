@@ -37,6 +37,24 @@ public class EcfInvoiceRequestDto : IValidatableObject
             yield break;
         }
 
+        if (e.IdDoc == null)
+        {
+            yield return new ValidationResult("El objeto ECF.Encabezado.IdDoc es obligatorio.", new[] { "ECF.Encabezado.IdDoc" });
+            yield break;
+        }
+
+        if (e.Emisor == null)
+        {
+            yield return new ValidationResult("El objeto ECF.Encabezado.Emisor es obligatorio.", new[] { "ECF.Encabezado.Emisor" });
+            yield break;
+        }
+
+        if (e.Totales == null)
+        {
+            yield return new ValidationResult("El objeto ECF.Encabezado.Totales es obligatorio.", new[] { "ECF.Encabezado.Totales" });
+            yield break;
+        }
+
         var tipoEcfStr = e.IdDoc?.TipoeCF;
         if (string.IsNullOrWhiteSpace(tipoEcfStr) && !string.IsNullOrWhiteSpace(e.IdDoc?.eNCF) && e.IdDoc.eNCF.Length >= 3)
         {
@@ -49,19 +67,41 @@ public class EcfInvoiceRequestDto : IValidatableObject
             yield break;
         }
 
-        // 1. Validaciones Comunes
+        if (string.IsNullOrWhiteSpace(e.IdDoc?.TipoeCF))
+            yield return new ValidationResult("El TipoeCF es obligatorio.", new[] { "ECF.Encabezado.IdDoc.TipoeCF" });
+
+        if (string.IsNullOrWhiteSpace(e.IdDoc?.eNCF))
+            yield return new ValidationResult("El eNCF es obligatorio.", new[] { "ECF.Encabezado.IdDoc.eNCF" });
+        else if (!e.IdDoc.eNCF.StartsWith("E", StringComparison.OrdinalIgnoreCase) || e.IdDoc.eNCF.Length != 13)
+            yield return new ValidationResult("El eNCF debe tener el formato E + 2 digitos de tipo + 10 digitos de secuencia.", new[] { "ECF.Encabezado.IdDoc.eNCF" });
+
         if (string.IsNullOrWhiteSpace(e.Emisor?.RNCEmisor))
             yield return new ValidationResult("El RNC del Emisor es obligatorio.", new[] { "ECF.Encabezado.Emisor.RNCEmisor" });
 
-        if (e.IdDoc?.TipoPago == "2" && string.IsNullOrWhiteSpace(e.IdDoc.FechaLimitePago))
-            yield return new ValidationResult("Para pagos a crédito (TipoPago = 2), la FechaLimitePago es obligatoria.", new[] { "ECF.Encabezado.IdDoc.FechaLimitePago" });
+        if (string.IsNullOrWhiteSpace(e.Emisor?.RazonSocialEmisor))
+            yield return new ValidationResult("La RazonSocialEmisor es obligatoria.", new[] { "ECF.Encabezado.Emisor.RazonSocialEmisor" });
 
-        // 2. Validaciones Específicas por TipoeCF
+        if (string.IsNullOrWhiteSpace(e.Emisor?.DireccionEmisor))
+            yield return new ValidationResult("La DireccionEmisor es obligatoria.", new[] { "ECF.Encabezado.Emisor.DireccionEmisor" });
+
+        if (string.IsNullOrWhiteSpace(e.Emisor?.FechaEmision))
+            yield return new ValidationResult("La FechaEmision es obligatoria.", new[] { "ECF.Encabezado.Emisor.FechaEmision" });
+
+        if (e.Totales?.MontoTotal == null)
+            yield return new ValidationResult("El MontoTotal es obligatorio.", new[] { "ECF.Encabezado.Totales.MontoTotal" });
+
+        int[] tiposRequierenIngresos = { 31, 32, 33, 34, 44, 45, 46 };
+        if (tiposRequierenIngresos.Contains(tipoEcf) && string.IsNullOrWhiteSpace(e.IdDoc?.TipoIngresos))
+            yield return new ValidationResult($"Para el comprobante tipo {tipoEcf}, el TipoIngresos es obligatorio.", new[] { "ECF.Encabezado.IdDoc.TipoIngresos" });
+
+        if (e.IdDoc?.TipoPago == "2" && string.IsNullOrWhiteSpace(e.IdDoc.FechaLimitePago))
+            yield return new ValidationResult("Para pagos a credito (TipoPago = 2), la FechaLimitePago es obligatoria.", new[] { "ECF.Encabezado.IdDoc.FechaLimitePago" });
+
         switch (tipoEcf)
         {
             case 31:
             case 41:
-            case 43:
+            case 44:
             case 45:
                 if (string.IsNullOrWhiteSpace(e.Comprador?.RNCComprador))
                     yield return new ValidationResult($"Para el comprobante tipo {tipoEcf}, el RNCComprador es obligatorio.", new[] { "ECF.Encabezado.Comprador.RNCComprador" });
@@ -84,20 +124,74 @@ public class EcfInvoiceRequestDto : IValidatableObject
                         yield return new ValidationResult("Debe proveer el NCFModificado.", new[] { "ECF.InformacionReferencia.NCFModificado" });
                     if (string.IsNullOrWhiteSpace(ECF.InformacionReferencia.FechaNCFModificado))
                         yield return new ValidationResult("Debe proveer la FechaNCFModificado.", new[] { "ECF.InformacionReferencia.FechaNCFModificado" });
+                    if (string.IsNullOrWhiteSpace(ECF.InformacionReferencia.CodigoModificacion))
+                        yield return new ValidationResult("Debe proveer el CodigoModificacion.", new[] { "ECF.InformacionReferencia.CodigoModificacion" });
                 }
                 break;
 
             case 46:
+                if (string.IsNullOrWhiteSpace(e.Comprador?.IdentificadorExtranjero) && string.IsNullOrWhiteSpace(e.Comprador?.RNCComprador))
+                    yield return new ValidationResult("Para Exportacion (46), debe proveer IdentificadorExtranjero o RNCComprador.", new[] { "ECF.Encabezado.Comprador" });
+                if (string.IsNullOrWhiteSpace(e.Comprador?.RazonSocialComprador))
+                    yield return new ValidationResult("Para Exportacion (46), la RazonSocialComprador es obligatoria.", new[] { "ECF.Encabezado.Comprador.RazonSocialComprador" });
+                if (string.IsNullOrWhiteSpace(e.Comprador?.PaisComprador))
+                    yield return new ValidationResult("Para Exportacion (46), el PaisComprador es obligatorio.", new[] { "ECF.Encabezado.Comprador.PaisComprador" });
+                break;
+
             case 47:
                 if (string.IsNullOrWhiteSpace(e.Comprador?.IdentificadorExtranjero))
-                    yield return new ValidationResult($"Para el comprobante {tipoEcf}, el IdentificadorExtranjero es obligatorio.", new[] { "ECF.Encabezado.Comprador.IdentificadorExtranjero" });
-                if (tipoEcf == 46 && string.IsNullOrWhiteSpace(e.Comprador?.PaisComprador))
-                    yield return new ValidationResult("Para Exportación (46), el PaisComprador es obligatorio.", new[] { "ECF.Encabezado.Comprador.PaisComprador" });
+                    yield return new ValidationResult("Para Pagos al Exterior (47), el IdentificadorExtranjero es obligatorio.", new[] { "ECF.Encabezado.Comprador.IdentificadorExtranjero" });
+                if (string.IsNullOrWhiteSpace(e.Comprador?.RazonSocialComprador))
+                    yield return new ValidationResult("Para Pagos al Exterior (47), la RazonSocialComprador es obligatoria.", new[] { "ECF.Encabezado.Comprador.RazonSocialComprador" });
                 break;
         }
 
         if (ECF?.DetallesItems?.Item == null || !ECF.DetallesItems.Item.Any())
-            yield return new ValidationResult("El documento debe contener al menos un ítem.", new[] { "ECF.DetallesItems.Item" });
+        {
+            yield return new ValidationResult("El documento debe contener al menos un item.", new[] { "ECF.DetallesItems.Item" });
+            yield break;
+        }
+
+        for (var i = 0; i < ECF.DetallesItems.Item.Count; i++)
+        {
+            var item = ECF.DetallesItems.Item[i];
+            var prefix = $"ECF.DetallesItems.Item[{i}]";
+
+            if (string.IsNullOrWhiteSpace(item.NumeroLinea))
+                yield return new ValidationResult($"Item {i + 1}: el NumeroLinea es obligatorio.", new[] { $"{prefix}.NumeroLinea" });
+            if (string.IsNullOrWhiteSpace(item.IndicadorFacturacion))
+                yield return new ValidationResult($"Item {i + 1}: el IndicadorFacturacion es obligatorio.", new[] { $"{prefix}.IndicadorFacturacion" });
+            if (string.IsNullOrWhiteSpace(item.NombreItem))
+                yield return new ValidationResult($"Item {i + 1}: el NombreItem es obligatorio.", new[] { $"{prefix}.NombreItem" });
+            if (item.CantidadItem <= 0)
+                yield return new ValidationResult($"Item {i + 1}: la CantidadItem debe ser mayor que cero.", new[] { $"{prefix}.CantidadItem" });
+            if (item.PrecioUnitarioItem < 0)
+                yield return new ValidationResult($"Item {i + 1}: el PrecioUnitarioItem no puede ser negativo.", new[] { $"{prefix}.PrecioUnitarioItem" });
+            if (item.MontoItem <= 0)
+                yield return new ValidationResult($"Item {i + 1}: el MontoItem debe ser mayor que cero.", new[] { $"{prefix}.MontoItem" });
+            if (!string.IsNullOrWhiteSpace(item.IscType) && item.AdditionalTaxRate <= 0)
+                yield return new ValidationResult($"Item {i + 1}: AdditionalTaxRate es obligatorio cuando se especifica IscType.", new[] { $"{prefix}.AdditionalTaxRate" });
+        }
+
+        if (ECF?.DescuentosORecargos?.DescuentoORecargo?.Any() == true)
+        {
+            for (var i = 0; i < ECF.DescuentosORecargos.DescuentoORecargo.Count; i++)
+            {
+                var ajuste = ECF.DescuentosORecargos.DescuentoORecargo[i];
+                var prefix = $"ECF.DescuentosORecargos.DescuentoORecargo[{i}]";
+
+                if (string.IsNullOrWhiteSpace(ajuste.NumeroLinea))
+                    yield return new ValidationResult($"DescuentoORecargo {i + 1}: el NumeroLinea es obligatorio.", new[] { $"{prefix}.NumeroLinea" });
+                if (ajuste.TipoAjuste != "D" && ajuste.TipoAjuste != "R")
+                    yield return new ValidationResult($"DescuentoORecargo {i + 1}: TipoAjuste debe ser D o R.", new[] { $"{prefix}.TipoAjuste" });
+                if (ajuste.TipoValor != null && ajuste.TipoValor != "$" && ajuste.TipoValor != "%")
+                    yield return new ValidationResult($"DescuentoORecargo {i + 1}: TipoValor debe ser $ o %.", new[] { $"{prefix}.TipoValor" });
+                if (ajuste.MontoDescuentooRecargo < 0)
+                    yield return new ValidationResult($"DescuentoORecargo {i + 1}: MontoDescuentooRecargo no puede ser negativo.", new[] { $"{prefix}.MontoDescuentooRecargo" });
+                if (ajuste.IndicadorFacturacionDescuentooRecargo != null && !new[] { "1", "2", "3", "4" }.Contains(ajuste.IndicadorFacturacionDescuentooRecargo))
+                    yield return new ValidationResult($"DescuentoORecargo {i + 1}: IndicadorFacturacionDescuentooRecargo debe ser 1, 2, 3 o 4.", new[] { $"{prefix}.IndicadorFacturacionDescuentooRecargo" });
+            }
+        }
     }
 }
 
@@ -105,6 +199,7 @@ public class EcfRequest
 {
     public EcfEncabezadoRequest Encabezado { get; set; } = new();
     public EcfDetallesItemsRequest DetallesItems { get; set; } = new();
+    public EcfDescuentosORecargosRequest? DescuentosORecargos { get; set; }
     public EcfPaginacionRequest? Paginacion { get; set; }
     public string? FechaHoraFirma { get; set; }
     public EcfInformacionReferenciaRequest? InformacionReferencia { get; set; }
@@ -261,6 +356,22 @@ public class EcfSubRecargoRequest
     public string? TipoSubRecargo { get; set; }
     public decimal? SubRecargoPorcentaje { get; set; }
     public decimal? MontoSubRecargo { get; set; }
+}
+
+public class EcfDescuentosORecargosRequest
+{
+    public List<EcfDescuentoORecargoRequest> DescuentoORecargo { get; set; } = new();
+}
+
+public class EcfDescuentoORecargoRequest
+{
+    public string? NumeroLinea { get; set; }
+    public string TipoAjuste { get; set; } = "D";
+    public string? DescripcionDescuentooRecargo { get; set; }
+    public string? TipoValor { get; set; }
+    public decimal? ValorDescuentooRecargo { get; set; }
+    public decimal? MontoDescuentooRecargo { get; set; }
+    public string? IndicadorFacturacionDescuentooRecargo { get; set; }
 }
 
 public class EcfPaginacionRequest

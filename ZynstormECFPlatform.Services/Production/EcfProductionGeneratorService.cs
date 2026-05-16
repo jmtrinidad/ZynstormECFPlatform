@@ -160,66 +160,168 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
     public List<string> ValidateDto(EcfInvoiceRequestDto dto)
     {
         var errors = new List<string>();
-        var ecfType = int.Parse(dto.ECF.Encabezado.IdDoc.TipoeCF ?? (string.IsNullOrWhiteSpace(dto.ECF.Encabezado.IdDoc.eNCF) ? "0" : NcfHelper.ExtractEcfType(dto.ECF.Encabezado.IdDoc.eNCF).ToString()));
+        var header = dto.ECF?.Encabezado;
+        var idDoc = header?.IdDoc;
+        var issuer = header?.Emisor;
+        var buyer = header?.Comprador;
+        var totals = header?.Totales;
+        var items = dto.ECF?.DetallesItems?.Item;
 
-        // NCF format validation
-        if (string.IsNullOrWhiteSpace(dto.ECF.Encabezado.IdDoc.eNCF))
+        if (header == null)
+        {
+            errors.Add("El objeto ECF.Encabezado es requerido.");
+            return errors;
+        }
+
+        if (idDoc == null)
+        {
+            errors.Add("El objeto ECF.Encabezado.IdDoc es requerido.");
+            return errors;
+        }
+
+        if (issuer == null)
+        {
+            errors.Add("El objeto ECF.Encabezado.Emisor es requerido.");
+            return errors;
+        }
+
+        if (totals == null)
+        {
+            errors.Add("El objeto ECF.Encabezado.Totales es requerido.");
+            return errors;
+        }
+
+        var ecfType = 0;
+        if (!string.IsNullOrWhiteSpace(idDoc.TipoeCF))
+        {
+            _ = int.TryParse(idDoc.TipoeCF, out ecfType);
+        }
+        else if (!string.IsNullOrWhiteSpace(idDoc.eNCF) && NcfHelper.TryExtractEcfType(idDoc.eNCF, out var extractedType))
+        {
+            ecfType = extractedType;
+        }
+
+        if (ecfType == 0)
+            errors.Add("No se pudo determinar el TipoeCF. Verifique TipoeCF o eNCF.");
+
+        if (string.IsNullOrWhiteSpace(idDoc.TipoeCF))
+            errors.Add("El TipoeCF es requerido.");
+
+        if (string.IsNullOrWhiteSpace(idDoc.eNCF))
         {
             errors.Add("El eNCF es requerido.");
         }
-        else if (!NcfHelper.TryExtractEcfType(dto.ECF.Encabezado.IdDoc.eNCF, out _))
+        else if (!NcfHelper.TryExtractEcfType(idDoc.eNCF, out _))
         {
-            errors.Add($"El eNCF '{dto.ECF.Encabezado.IdDoc.eNCF}' no tiene el formato correcto (E + 2 dígitos de tipo + 10 dígitos).");
+            errors.Add($"El eNCF '{idDoc.eNCF}' no tiene el formato correcto (E + 2 digitos de tipo + 10 digitos).");
         }
 
-        if (string.IsNullOrWhiteSpace(dto.ECF.Encabezado.Emisor.RNCEmisor))
+        if (string.IsNullOrWhiteSpace(issuer.RNCEmisor))
             errors.Add("El RNC del emisor es requerido.");
 
-        if (string.IsNullOrWhiteSpace(dto.ECF.Encabezado.Emisor.RazonSocialEmisor))
-            errors.Add("La razón social del emisor es requerida.");
+        if (string.IsNullOrWhiteSpace(issuer.RazonSocialEmisor))
+            errors.Add("La razon social del emisor es requerida.");
 
-        if (string.IsNullOrWhiteSpace(dto.ECF.Encabezado.Emisor.DireccionEmisor))
-            errors.Add("La dirección del emisor es requerida.");
+        if (string.IsNullOrWhiteSpace(issuer.DireccionEmisor))
+            errors.Add("La direccion del emisor es requerida.");
 
-        // For type 47 (Pagos al Exterior): IdentificadorExtranjero replaces CustomerRnc
-        // For type 32 (Consumo): buyer data is optional
-        bool buyerRncRequired = ecfType != 47 && ecfType != 32;
-        if (buyerRncRequired && string.IsNullOrWhiteSpace(dto.ECF.Encabezado.Comprador.RNCComprador) && string.IsNullOrWhiteSpace(dto.ECF.Encabezado.Comprador.IdentificadorExtranjero))
-            errors.Add("El RNC/Cédula del comprador es requerido.");
+        if (string.IsNullOrWhiteSpace(issuer.FechaEmision))
+            errors.Add("La fecha de emision es requerida.");
 
-        bool buyerNameRequired = ecfType != 32;
-        if (buyerNameRequired && string.IsNullOrWhiteSpace(dto.ECF.Encabezado.Comprador.RazonSocialComprador))
-            errors.Add("El nombre del comprador es requerido.");
+        if (totals.MontoTotal == null)
+            errors.Add("El monto total es requerido.");
 
-        if (dto.ECF.DetallesItems.Item.Count == 0)
+        if (new[] { 31, 32, 33, 34, 44, 45, 46 }.Contains(ecfType) && string.IsNullOrWhiteSpace(idDoc.TipoIngresos))
+            errors.Add($"El TipoIngresos es requerido para el comprobante tipo {ecfType}.");
+
+        if (idDoc.TipoPago == "2" && string.IsNullOrWhiteSpace(idDoc.FechaLimitePago))
+            errors.Add("La fecha limite de pago es requerida cuando el tipo de pago es Credito (2).");
+
+        var buyerRncRequired = ecfType is 31 or 41 or 44 or 45;
+        if (buyerRncRequired && string.IsNullOrWhiteSpace(buyer?.RNCComprador))
+            errors.Add($"El RNC/Cedula del comprador es requerido para el comprobante tipo {ecfType}.");
+
+        var buyerNameRequired = ecfType is 31 or 41 or 44 or 45;
+        if (buyerNameRequired && string.IsNullOrWhiteSpace(buyer?.RazonSocialComprador))
+            errors.Add($"El nombre del comprador es requerido para el comprobante tipo {ecfType}.");
+
+        if (ecfType == 32 && totals.MontoTotal >= 250000m && string.IsNullOrWhiteSpace(buyer?.RNCComprador) && string.IsNullOrWhiteSpace(buyer?.IdentificadorExtranjero))
+            errors.Add("Para Facturas de Consumo >= 250,000, debe especificar RNCComprador o IdentificadorExtranjero.");
+
+        if (ecfType is 33 or 34)
         {
-            errors.Add("El documento debe contener al menos un ítem.");
-        }
-        else
-        {
-            for (int i = 0; i < dto.ECF.DetallesItems.Item.Count; i++)
+            if (dto.ECF?.InformacionReferencia == null)
             {
-                var itm = dto.ECF.DetallesItems.Item[i];
-                if (string.IsNullOrWhiteSpace(itm.NombreItem)) errors.Add($"Item {i + 1}: El nombre es requerido.");
-                if (itm.CantidadItem <= 0) errors.Add($"Item {i + 1}: La cantidad debe ser mayor a cero.");
-                if (itm.PrecioUnitarioItem < 0) errors.Add($"Item {i + 1}: El precio unitario no puede ser negativo.");
-
-                // ISC validation
-                if (!string.IsNullOrWhiteSpace(itm.IscType))
-                {
-                    if (itm.AdditionalTaxRate <= 0)
-                        errors.Add($"Item {i + 1}: El campo AdditionalTaxRate es requerido cuando se especifica un IscType.");
-                }
+                errors.Add($"Para el comprobante tipo {ecfType}, el nodo InformacionReferencia es requerido.");
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(dto.ECF.InformacionReferencia.NCFModificado))
+                    errors.Add("Debe proveer el NCFModificado.");
+                if (string.IsNullOrWhiteSpace(dto.ECF.InformacionReferencia.FechaNCFModificado))
+                    errors.Add("Debe proveer la FechaNCFModificado.");
+                if (string.IsNullOrWhiteSpace(dto.ECF.InformacionReferencia.CodigoModificacion))
+                    errors.Add("Debe proveer el CodigoModificacion.");
             }
         }
 
-        if (dto.ECF.Encabezado.IdDoc.TipoPago == "2" && string.IsNullOrWhiteSpace(dto.ECF.Encabezado.IdDoc.FechaLimitePago))
-            errors.Add("La fecha límite de pago es requerida cuando el tipo de pago es Crédito (2).");
+        if (ecfType == 46)
+        {
+            if (string.IsNullOrWhiteSpace(buyer?.IdentificadorExtranjero) && string.IsNullOrWhiteSpace(buyer?.RNCComprador))
+                errors.Add("Para Exportacion (46), debe proveer IdentificadorExtranjero o RNCComprador.");
+            if (string.IsNullOrWhiteSpace(buyer?.RazonSocialComprador))
+                errors.Add("Para Exportacion (46), el nombre del comprador es requerido.");
+            if (string.IsNullOrWhiteSpace(buyer?.PaisComprador))
+                errors.Add("Para Exportacion (46), el pais del comprador es requerido.");
+        }
+
+        if (ecfType == 47)
+        {
+            if (string.IsNullOrWhiteSpace(buyer?.IdentificadorExtranjero))
+                errors.Add("Para Pagos al Exterior (47), el IdentificadorExtranjero es requerido.");
+            if (string.IsNullOrWhiteSpace(buyer?.RazonSocialComprador))
+                errors.Add("Para Pagos al Exterior (47), el nombre del comprador es requerido.");
+        }
+
+        if (items == null || items.Count == 0)
+        {
+            errors.Add("El documento debe contener al menos un item.");
+        }
+        else
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                var itm = items[i];
+                if (string.IsNullOrWhiteSpace(itm.NumeroLinea)) errors.Add($"Item {i + 1}: El numero de linea es requerido.");
+                if (string.IsNullOrWhiteSpace(itm.IndicadorFacturacion)) errors.Add($"Item {i + 1}: El indicador de facturacion es requerido.");
+                if (string.IsNullOrWhiteSpace(itm.NombreItem)) errors.Add($"Item {i + 1}: El nombre es requerido.");
+                if (itm.CantidadItem <= 0) errors.Add($"Item {i + 1}: La cantidad debe ser mayor a cero.");
+                if (itm.PrecioUnitarioItem < 0) errors.Add($"Item {i + 1}: El precio unitario no puede ser negativo.");
+                if (itm.MontoItem <= 0) errors.Add($"Item {i + 1}: El monto del item debe ser mayor a cero.");
+
+                if (!string.IsNullOrWhiteSpace(itm.IscType) && itm.AdditionalTaxRate <= 0)
+                    errors.Add($"Item {i + 1}: El campo AdditionalTaxRate es requerido cuando se especifica un IscType.");
+            }
+        }
+
+        var adjustments = dto.ECF?.DescuentosORecargos?.DescuentoORecargo;
+        if (adjustments?.Count > 0)
+        {
+            for (int i = 0; i < adjustments.Count; i++)
+            {
+                var adjustment = adjustments[i];
+                if (string.IsNullOrWhiteSpace(adjustment.NumeroLinea)) errors.Add($"DescuentoORecargo {i + 1}: El numero de linea es requerido.");
+                if (adjustment.TipoAjuste != "D" && adjustment.TipoAjuste != "R") errors.Add($"DescuentoORecargo {i + 1}: TipoAjuste debe ser D o R.");
+                if (adjustment.TipoValor != null && adjustment.TipoValor != "$" && adjustment.TipoValor != "%") errors.Add($"DescuentoORecargo {i + 1}: TipoValor debe ser $ o %.");
+                if (adjustment.MontoDescuentooRecargo < 0) errors.Add($"DescuentoORecargo {i + 1}: MontoDescuentooRecargo no puede ser negativo.");
+                if (adjustment.IndicadorFacturacionDescuentooRecargo != null && !new[] { "1", "2", "3", "4" }.Contains(adjustment.IndicadorFacturacionDescuentooRecargo))
+                    errors.Add($"DescuentoORecargo {i + 1}: IndicadorFacturacionDescuentooRecargo debe ser 1, 2, 3 o 4.");
+            }
+        }
 
         return errors;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // XML Mapping
     // ═══════════════════════════════════════════════════════════════════════════
 
@@ -373,6 +475,19 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
             ImpuestosAdicionales = impuestosAdicionales
         };
 
+        var adjustments = dto.ECF.DescuentosORecargos?.DescuentoORecargo?
+            .Select(a => new EcfXmlDescuentoORecargo
+            {
+                NumeroLinea = int.TryParse(a.NumeroLinea, out var numeroLinea) ? numeroLinea : 1,
+                TipoAjuste = string.IsNullOrWhiteSpace(a.TipoAjuste) ? "D" : a.TipoAjuste,
+                DescripcionDescuentooRecargo = a.DescripcionDescuentooRecargo,
+                TipoValor = a.TipoValor,
+                ValorDescuentooRecargo = a.ValorDescuentooRecargo,
+                MontoDescuentooRecargo = a.MontoDescuentooRecargo,
+                IndicadorFacturacionDescuentooRecargo = int.TryParse(a.IndicadorFacturacionDescuentooRecargo, out var indicadorDr) ? indicadorDr : null
+            })
+            .ToList() ?? [];
+
         var root = new EcfXmlRoot
         {
             Encabezado = new EcfXmlEncabezado
@@ -439,6 +554,7 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
                 Totales = totales
             },
             Items = xmlItems,
+            Adjustments = adjustments,
             
             InformacionReferencia = dto.ECF.InformacionReferencia != null ? new EcfXmlInformacionReferencia
             {

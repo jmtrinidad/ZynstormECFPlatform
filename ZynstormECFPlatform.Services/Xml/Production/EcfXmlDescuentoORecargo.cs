@@ -21,7 +21,13 @@ public class EcfXmlDescuentoORecargo
     public string? TipoValor { get; set; }
     public bool ShouldSerializeTipoValor() => TipoValor != null;
 
+    public decimal? ValorDescuentooRecargo { get; set; }
+    public bool ShouldSerializeValorDescuentooRecargo() => ValorDescuentooRecargo.HasValue;
+
     public decimal? MontoDescuentooRecargo { get; set; }
     public bool ShouldSerializeMontoDescuentooRecargo() => MontoDescuentooRecargo.HasValue;
+
+    public int? IndicadorFacturacionDescuentooRecargo { get; set; }
+    public bool ShouldSerializeIndicadorFacturacionDescuentooRecargo() => IndicadorFacturacionDescuentooRecargo.HasValue;
 }
 
