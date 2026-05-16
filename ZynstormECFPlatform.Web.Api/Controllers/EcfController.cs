@@ -93,7 +93,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 var result = await _receivedEcfProductionService.ProcessAsync(dto, environment);
 
-                if (result.DtoErrors.Count > 0 || result.XsdErrors.Count > 0 || result.XmlProdErrors.Count > 0)
+                if (result.DtoErrors.Count > 0 || result.XsdErrors.Count > 0 || result.XmlProdErrors.Count > 0 || result.XmlValidation?.IsValid == false)
                     return BadRequest(result);
 
                 return Ok(result);

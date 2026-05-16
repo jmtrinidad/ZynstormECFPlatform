@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Dtos;
-using ZynstormECFPlatform.Web.Api.Filters;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers;
 
