@@ -97,6 +97,32 @@ public class EcfInvoiceRequestDto : IValidatableObject
         if (e.IdDoc?.TipoPago == "2" && string.IsNullOrWhiteSpace(e.IdDoc.FechaLimitePago))
             yield return new ValidationResult("Para pagos a credito (TipoPago = 2), la FechaLimitePago es obligatoria.", new[] { "ECF.Encabezado.IdDoc.FechaLimitePago" });
 
+        var formasPago = e.IdDoc?.TablaFormasPago?.FormaDePago;
+        var hasFormaPagoShortcut = !string.IsNullOrWhiteSpace(e.IdDoc?.FormaPago);
+        if (!string.IsNullOrWhiteSpace(e.IdDoc?.TipoPago) && formasPago?.Any() != true && !hasFormaPagoShortcut)
+            yield return new ValidationResult("Debe proveer al menos una FormaPago en ECF.Encabezado.IdDoc.TablaFormasPago.FormaDePago.", new[] { "ECF.Encabezado.IdDoc.TablaFormasPago.FormaDePago" });
+
+        if (hasFormaPagoShortcut)
+        {
+            if (!IsValidPaymentForm(e.IdDoc!.FormaPago))
+                yield return new ValidationResult("FormaPago debe estar entre 1 y 8.", new[] { "ECF.Encabezado.IdDoc.FormaPago" });
+            if (e.IdDoc.MontoPago == null || e.IdDoc.MontoPago < 0)
+                yield return new ValidationResult("MontoPago es obligatorio y no puede ser negativo cuando se usa FormaPago.", new[] { "ECF.Encabezado.IdDoc.MontoPago" });
+        }
+
+        if (formasPago?.Any() == true)
+        {
+            for (var i = 0; i < formasPago.Count; i++)
+            {
+                var formaPago = formasPago[i];
+                var prefix = $"ECF.Encabezado.IdDoc.TablaFormasPago.FormaDePago[{i}]";
+                if (!IsValidPaymentForm(formaPago.FormaPago))
+                    yield return new ValidationResult($"FormaDePago {i + 1}: FormaPago debe estar entre 1 y 8.", new[] { $"{prefix}.FormaPago" });
+                if (formaPago.MontoPago < 0)
+                    yield return new ValidationResult($"FormaDePago {i + 1}: MontoPago no puede ser negativo.", new[] { $"{prefix}.MontoPago" });
+            }
+        }
+
         switch (tipoEcf)
         {
             case 31:
@@ -193,6 +219,9 @@ public class EcfInvoiceRequestDto : IValidatableObject
             }
         }
     }
+
+    private static bool IsValidPaymentForm(string? value) =>
+        int.TryParse(value, out var formaPago) && formaPago is >= 1 and <= 8;
 }
 
 public class EcfRequest
@@ -224,6 +253,9 @@ public class EcfIdDocRequest
     public string? TipoIngresos { get; set; }
     public string? TipoPago { get; set; }
     public string? FechaLimitePago { get; set; }
+    public string? FormaPago { get; set; }
+    public decimal? MontoPago { get; set; }
+    public EcfTablaFormasPagoRequest? TablaFormasPago { get; set; }
     public int? TotalPaginas { get; set; }
     public string? IndicadorNotaCredito { get; set; }
     public string? TerminoPago { get; set; }
@@ -232,6 +264,17 @@ public class EcfIdDocRequest
     public string? BancoPago { get; set; }
     public string? FechaDesde { get; set; }
     public string? FechaHasta { get; set; }
+}
+
+public class EcfTablaFormasPagoRequest
+{
+    public List<EcfFormaDePagoRequest> FormaDePago { get; set; } = new();
+}
+
+public class EcfFormaDePagoRequest
+{
+    public string? FormaPago { get; set; }
+    public decimal MontoPago { get; set; }
 }
 
 public class EcfEmisorRequest

@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Guía de Llenado: EcfInvoiceRequestDto</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: auto; padding: 40px; }
+        h1 { color: #003366; border-bottom: 3px solid #003366; padding-bottom: 10px; font-size: 28px; }
+        h2 { color: #004d99; border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 30px; }
+        h3 { color: #0066cc; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; page-break-inside: avoid; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; color: #003366; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        code { background-color: #f4f4f4; padding: 2px 6px; font-family: 'Courier New', Courier, monospace; border-radius: 4px; font-size: 13px; }
+        pre { background-color: #f8f9fa; border: 1px solid #e9ecef; padding: 15px; border-radius: 6px; overflow-x: auto; font-family: 'Courier New', Courier, monospace; font-size: 13px; page-break-inside: avoid; margin-bottom: 20px; }
+        .blockquote { background-color: #fff3cd; border-left: 5px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 0 6px 6px 0; }
+        .formula { background-color: #e2e3e5; text-align: center; font-weight: bold; padding: 12px; margin: 15px 0; border-radius: 6px; font-family: 'Courier New', sans-serif; }
+        .page-break { page-break-before: always; }
+    </style>
+</head>
+<body>
+
+    <h1>Guía de Llenado: <code>EcfInvoiceRequestDto</code></h1>
+    <p>Esta guía aplica al objeto nuevo que recibe <code>EmitEcf</code> en producción. Todos los tipos de comprobante usan la misma raíz:</p>
+<pre>{
+  "externalReference": "INV-2026-0001",
+  "ECF": {
+    "Encabezado": {
+      "Version": "1.0",
+      "IdDoc": {},
+      "Emisor": {},
+      "Comprador": {},
+      "Totales": {}
+    },
+    "DetallesItems": {
+      "Item": []
+    },
+    "DescuentosORecargos": null,
+    "InformacionReferencia": null
+  }
+}</pre>
+
+    <h2>Campos comunes obligatorios</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Campo</th>
+                <th>Regla</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td><code>ECF.Encabezado.IdDoc.TipoeCF</code></td><td>Tipo de comprobante: <code>31</code>, <code>32</code>, <code>33</code>, <code>34</code>, <code>41</code>, <code>43</code>, <code>44</code>, <code>45</code>, <code>46</code> o <code>47</code>.</td></tr>
+            <tr><td><code>ECF.Encabezado.IdDoc.eNCF</code></td><td>Debe tener formato <code>E</code> + tipo de 2 dígitos + secuencia de 10 dígitos. Ejemplo: <code>E310000000001</code>.</td></tr>
+            <tr><td><code>ECF.Encabezado.IdDoc.TipoIngresos</code></td><td>Obligatorio para tipos <code>31</code>, <code>32</code>, <code>33</code>, <code>34</code>, <code>44</code>, <code>45</code> y <code>46</code>. No aplica para <code>41</code>, <code>43</code> y <code>47</code>.</td></tr>
+            <tr><td><code>ECF.Encabezado.IdDoc.TipoPago</code></td><td>Use <code>1</code> contado o <code>2</code> crédito.</td></tr>
+            <tr><td><code>ECF.Encabezado.IdDoc.FechaLimitePago</code></td><td>Obligatorio cuando <code>TipoPago</code> es <code>2</code>. Formato recomendado: <code>dd-MM-yyyy</code>.</td></tr>
+            <tr><td><code>ECF.Encabezado.IdDoc.TablaFormasPago.FormaDePago</code></td><td>Obligatorio cuando se envia <code>TipoPago</code>. Cada forma debe incluir <code>FormaPago</code> y <code>MontoPago</code>. Para un solo pago tambien puede usar el atajo <code>FormaPago</code> y <code>MontoPago</code> dentro de <code>IdDoc</code>.</td></tr>
+            <tr><td><code>ECF.Encabezado.Emisor.RNCEmisor</code></td><td>RNC del emisor, solo dígitos.</td></tr>
+            <tr><td><code>ECF.Encabezado.Emisor.RazonSocialEmisor</code></td><td>Nombre legal del emisor.</td></tr>
+            <tr><td><code>ECF.Encabezado.Emisor.DireccionEmisor</code></td><td>Dirección fiscal del emisor.</td></tr>
+            <tr><td><code>ECF.Encabezado.Emisor.Telefono</code></td><td>Telefono del emisor. Si <code>Comprador.TelefonoAdicional</code> no viene informado, se usa este mismo valor para generar <code>&lt;TelefonoAdicional&gt;</code> cuando la estructura de referencia lo incluye.</td></tr>
+            <tr><td><code>ECF.Encabezado.Emisor.FechaEmision</code></td><td>Fecha del comprobante. Formato recomendado: <code>dd-MM-yyyy</code>.</td></tr>
+            <tr><td><code>ECF.Encabezado.Totales.MontoTotal</code></td><td>Total del comprobante.</td></tr>
+            <tr><td><code>ECF.DetallesItems.Item</code></td><td>Debe contener al menos un ítem.</td></tr>
+        </tbody>
+    </table>
+
+    <p>Cada ítem debe traer:</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Campo</th>
+                <th>Regla</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td><code>NumeroLinea</code></td><td>Número de línea como texto o número serializado. Ejemplo: <code>1</code>.</td></tr>
+            <tr><td><code>IndicadorFacturacion</code></td><td>Indicador DGII. Ejemplo: <code>1</code> para gravado ITBIS 18%, <code>4</code> para exento.</td></tr>
+            <tr><td><code>NombreItem</code></td><td>Nombre del producto o servicio.</td></tr>
+            <tr><td><code>IndicadorBienoServicio</code></td><td>Use <code>1</code> para bien y <code>2</code> para servicio.</td></tr>
+            <tr><td><code>DescripcionItem</code></td><td>Descripcion del producto o servicio. Se genera en el XML como <code>&lt;DescripcionItem&gt;</code>.</td></tr>
+            <tr><td><code>CantidadItem</code></td><td>Mayor que cero.</td></tr>
+            <tr><td><code>UnidadMedida</code></td><td>Obligatorio. Use <code>43</code> como unidad basica cuando no aplique una unidad mas especifica.</td></tr>
+            <tr><td><code>PrecioUnitarioItem</code></td><td>Cero o mayor.</td></tr>
+            <tr><td><code>MontoItem</code></td><td>Mayor que cero. Debe representar el monto neto de la línea luego de aplicar descuentos o recargos.</td></tr>
+            <tr><td><code>AdditionalTaxRate</code></td><td>Obligatorio solo si se envía <code>IscType</code>.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Unidades de medida basicas</h2>
+    <p>El campo <code>UnidadMedida</code> debe enviarse con uno de los codigos DGII siguientes. Cuando no aplique una unidad mas especifica, use <code>43</code> (<strong>Unidad</strong>).</p>
+    <table>
+        <thead>
+            <tr><th>Codigo</th><th>Descripcion</th><th>Codigo</th><th>Descripcion</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>1</code></td><td>Barril</td><td><code>32</code></td><td>Par</td></tr>
+            <tr><td><code>2</code></td><td>Bolsa</td><td><code>33</code></td><td>Pie</td></tr>
+            <tr><td><code>3</code></td><td>Bote</td><td><code>34</code></td><td>Pieza</td></tr>
+            <tr><td><code>4</code></td><td>Bultos</td><td><code>35</code></td><td>Rollo</td></tr>
+            <tr><td><code>5</code></td><td>Botella</td><td><code>36</code></td><td>Sobre</td></tr>
+            <tr><td><code>6</code></td><td>Caja/Cajon</td><td><code>37</code></td><td>Segundo</td></tr>
+            <tr><td><code>7</code></td><td>Cajetilla</td><td><code>38</code></td><td>Tanque</td></tr>
+            <tr><td><code>8</code></td><td>Centimetro</td><td><code>39</code></td><td>Tonelada</td></tr>
+            <tr><td><code>9</code></td><td>Cilindro</td><td><code>40</code></td><td>Tubo</td></tr>
+            <tr><td><code>10</code></td><td>Conjunto</td><td><code>41</code></td><td>Yarda</td></tr>
+            <tr><td><code>11</code></td><td>Contenedor</td><td><code>42</code></td><td>Yarda cuadrada</td></tr>
+            <tr><td><code>12</code></td><td>Dia</td><td><code>43</code></td><td>Unidad</td></tr>
+            <tr><td><code>13</code></td><td>Docena</td><td><code>44</code></td><td>Elemento</td></tr>
+            <tr><td><code>14</code></td><td>Fardo</td><td><code>45</code></td><td>Millar</td></tr>
+            <tr><td><code>15</code></td><td>Galones</td><td><code>46</code></td><td>Saco</td></tr>
+            <tr><td><code>16</code></td><td>Grado</td><td><code>47</code></td><td>Lata</td></tr>
+            <tr><td><code>17</code></td><td>Gramo</td><td><code>48</code></td><td>Display</td></tr>
+            <tr><td><code>18</code></td><td>Granel</td><td><code>49</code></td><td>Bidon</td></tr>
+            <tr><td><code>19</code></td><td>Hora</td><td><code>50</code></td><td>Racion</td></tr>
+            <tr><td><code>20</code></td><td>Huacal</td><td><code>51</code></td><td>Quintal</td></tr>
+            <tr><td><code>21</code></td><td>Kilogramo</td><td><code>52</code></td><td>Toneladas registro bruto</td></tr>
+            <tr><td><code>22</code></td><td>Kilovatio hora</td><td><code>53</code></td><td>Pie cuadrado</td></tr>
+            <tr><td><code>23</code></td><td>Libra</td><td><code>54</code></td><td>Pasajero</td></tr>
+            <tr><td><code>24</code></td><td>Litro</td><td><code>55</code></td><td>Pulgadas</td></tr>
+            <tr><td><code>25</code></td><td>Lote</td><td><code>56</code></td><td>Parqueo barcos muelle</td></tr>
+            <tr><td><code>26</code></td><td>Metro</td><td><code>57</code></td><td>Bandeja</td></tr>
+            <tr><td><code>27</code></td><td>Metro cuadrado</td><td><code>58</code></td><td>Hectarea</td></tr>
+            <tr><td><code>28</code></td><td>Metro cubico</td><td><code>59</code></td><td>Mililitro</td></tr>
+            <tr><td><code>29</code></td><td>Millones unidades termicas</td><td><code>60</code></td><td>Miligramo</td></tr>
+            <tr><td><code>30</code></td><td>Minuto</td><td><code>61</code></td><td>Onzas</td></tr>
+            <tr><td><code>31</code></td><td>Paquete</td><td><code>62</code></td><td>Onzas troy</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Catalogos de EcfEnums</h2>
+    <p>Los siguientes catalogos salen de <code>EcfEnums.cs</code>. No todos son obligatorios en todos los comprobantes; use el codigo cuando el campo correspondiente aplique.</p>
+
+    <h3>TipoPago - <code>ECF.Encabezado.IdDoc.TipoPago</code></h3>
+    <table>
+        <thead>
+            <tr><th>Codigo</th><th>Descripcion</th><th>Ejemplo</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>1</code></td><td>Pago al contado</td><td><code>"TipoPago": "1"</code></td></tr>
+            <tr><td><code>2</code></td><td>Venta a credito</td><td><code>"TipoPago": "2", "FechaLimitePago": "30-05-2026"</code></td></tr>
+            <tr><td><code>3</code></td><td>Entrega gratuita</td><td><code>"TipoPago": "3"</code></td></tr>
+        </tbody>
+    </table>
+
+    <h3>FormaPago - <code>ECF.Encabezado.IdDoc.TablaFormasPago.FormaDePago[].FormaPago</code></h3>
+    <p>El XML se genera como <code>&lt;TablaFormasPago&gt;&lt;FormaDePago&gt;&lt;FormaPago&gt;</code> y <code>&lt;MontoPago&gt;</code>. El <code>MontoPago</code> debe ser el monto cubierto por esa forma de pago; si solo hay una forma, normalmente coincide con <code>MontoTotal</code>.</p>
+    <table>
+        <thead>
+            <tr><th>Codigo</th><th>Descripcion</th><th>Ejemplo</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>1</code></td><td>Efectivo</td><td><code>"FormaPago": "1"</code></td></tr>
+            <tr><td><code>2</code></td><td>Cheque/Transferencia/Deposito</td><td><code>"FormaPago": "2"</code></td></tr>
+            <tr><td><code>3</code></td><td>Tarjeta de Debito/Credito</td><td><code>"FormaPago": "3"</code></td></tr>
+            <tr><td><code>4</code></td><td>Venta a Credito</td><td><code>"FormaPago": "4"</code></td></tr>
+            <tr><td><code>5</code></td><td>Bonos o certificados de regalo</td><td><code>"FormaPago": "5"</code></td></tr>
+            <tr><td><code>6</code></td><td>Permuta</td><td><code>"FormaPago": "6"</code></td></tr>
+            <tr><td><code>7</code></td><td>Nota de credito</td><td><code>"FormaPago": "7"</code></td></tr>
+            <tr><td><code>8</code></td><td>Otras formas de pago</td><td><code>"FormaPago": "8"</code></td></tr>
+        </tbody>
+    </table>
+
+    <h3>TipoIngresos - <code>ECF.Encabezado.IdDoc.TipoIngresos</code></h3>
+    <table>
+        <thead>
+            <tr><th>Codigo</th><th>Descripcion</th><th>Ejemplo</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>1</code></td><td>Ingresos por operaciones no financieros</td><td><code>"TipoIngresos": "01"</code></td></tr>
+            <tr><td><code>2</code></td><td>Ingresos financieros</td><td><code>"TipoIngresos": "02"</code></td></tr>
+            <tr><td><code>3</code></td><td>Ingresos extraordinarios</td><td><code>"TipoIngresos": "03"</code></td></tr>
+            <tr><td><code>4</code></td><td>Ingresos por arrendamientos</td><td><code>"TipoIngresos": "04"</code></td></tr>
+            <tr><td><code>5</code></td><td>Ingresos por venta de activo depreciable</td><td><code>"TipoIngresos": "05"</code></td></tr>
+            <tr><td><code>6</code></td><td>Otros ingresos</td><td><code>"TipoIngresos": "06"</code></td></tr>
+        </tbody>
+    </table>
+
+    <h3>IndicadorFacturacion - <code>Item[].IndicadorFacturacion</code></h3>
+    <table>
+        <thead>
+            <tr><th>Codigo</th><th>Descripcion</th><th>Ejemplo</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>0</code></td><td>No facturable (18%)</td><td><code>"IndicadorFacturacion": "0"</code></td></tr>
+            <tr><td><code>1</code></td><td>ITBIS 1 (18%)</td><td><code>"IndicadorFacturacion": "1"</code></td></tr>
+            <tr><td><code>2</code></td><td>ITBIS 2 (16%)</td><td><code>"IndicadorFacturacion": "2"</code></td></tr>
+            <tr><td><code>3</code></td><td>ITBIS 3 (0%)</td><td><code>"IndicadorFacturacion": "3"</code></td></tr>
+            <tr><td><code>4</code></td><td>Exento</td><td><code>"IndicadorFacturacion": "4"</code></td></tr>
+        </tbody>
+    </table>
+
+    <h3>IndicadorBienoServicio - <code>Item[].IndicadorBienoServicio</code></h3>
+    <table>
+        <thead>
+            <tr><th>Codigo</th><th>Descripcion</th><th>Ejemplo</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>1</code></td><td>Producto fisico o mercancia</td><td><code>"IndicadorBienoServicio": "1"</code></td></tr>
+            <tr><td><code>2</code></td><td>Prestacion de servicios</td><td><code>"IndicadorBienoServicio": "2"</code></td></tr>
+        </tbody>
+    </table>
+
+    <h3>CodigoModificacion - <code>ECF.InformacionReferencia.CodigoModificacion</code></h3>
+    <table>
+        <thead>
+            <tr><th>Codigo</th><th>Descripcion</th><th>Ejemplo</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>1</code></td><td>Anula el NCF modificado</td><td><code>"CodigoModificacion": "1"</code></td></tr>
+            <tr><td><code>2</code></td><td>Corrige texto del comprobante fiscal modificado</td><td><code>"CodigoModificacion": "2"</code></td></tr>
+            <tr><td><code>3</code></td><td>Corrige montos del NCF modificado</td><td><code>"CodigoModificacion": "3"</code></td></tr>
+            <tr><td><code>4</code></td><td>Reemplazo NCF emitido en contingencia</td><td><code>"CodigoModificacion": "4"</code></td></tr>
+            <tr><td><code>5</code></td><td>Referencia factura consumo electronica</td><td><code>"CodigoModificacion": "5"</code></td></tr>
+        </tbody>
+    </table>
+
+    <h3>ActividadEconomica - <code>ECF.Encabezado.Emisor.ActividadEconomica</code></h3>
+    <table>
+        <thead>
+            <tr><th>Codigo</th><th>Descripcion</th><th>Ejemplo</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>471100</code></td><td>Venta al por menor en supermercados</td><td><code>"ActividadEconomica": "471100"</code></td></tr>
+            <tr><td><code>492310</code></td><td>Transporte de carga</td><td><code>"ActividadEconomica": "492310"</code></td></tr>
+            <tr><td><code>620200</code></td><td>Consultoria informatica</td><td><code>"ActividadEconomica": "620200"</code></td></tr>
+            <tr><td><code>691000</code></td><td>Servicios juridicos</td><td><code>"ActividadEconomica": "691000"</code></td></tr>
+            <tr><td><code>692020</code></td><td>Servicios de contabilidad</td><td><code>"ActividadEconomica": "692020"</code></td></tr>
+            <tr><td><code>749000</code></td><td>Otras actividades profesionales</td><td><code>"ActividadEconomica": "749000"</code></td></tr>
+        </tbody>
+    </table>
+
+    <div class="page-break"></div>
+
+    <h2>Productos exentos</h2>
+    <p>Cuando el producto o servicio es exento:</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Campo</th>
+                <th>Valor esperado</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td><code>Item[].IndicadorFacturacion</code></td><td><code>4</code>.</td></tr>
+            <tr><td><code>ECF.Encabezado.Totales.MontoExento</code></td><td>Suma de los <code>MontoItem</code> exentos.</td></tr>
+            <tr><td><code>ECF.Encabezado.Totales.MontoGravadoTotal</code></td><td>No incluya los ítems exentos en este total.</td></tr>
+            <tr><td><code>ECF.Encabezado.Totales.TotalITBIS</code></td><td>No debe sumar ITBIS por ítems exentos.</td></tr>
+            <tr><td><code>ECF.Encabezado.Totales.MontoTotal</code></td><td>Total final incluyendo gravados, exentos, impuestos, descuentos y recargos.</td></tr>
+        </tbody>
+    </table>
+
+    <p>Ejemplo de ítem exento:</p>
+<pre>{
+  "NumeroLinea": "1",
+  "IndicadorFacturacion": "4",
+  "NombreItem": "Producto exento",
+  "IndicadorBienoServicio": "1",
+  "DescripcionItem": "Producto exento",
+  "CantidadItem": 2,
+  "UnidadMedida": "43",
+  "PrecioUnitarioItem": 500,
+  "MontoItem": 1000
+}</pre>
+
+    <h2>Descuentos por ítem</h2>
+    <p>Los descuentos de línea se informan dentro del ítem. El <code>MontoItem</code> debe quedar neto, es decir:</p>
+    <div class="formula">MontoItem = (CantidadItem * PrecioUnitarioItem) - DescuentoMonto + RecargoMonto</div>
+
+    <p>Si el descuento es simple, puede enviar solo <code>DescuentoMonto</code>:</p>
+<pre>{
+  "NumeroLinea": "1",
+  "IndicadorFacturacion": "1",
+  "NombreItem": "Servicio con descuento",
+  "IndicadorBienoServicio": "2",
+  "DescripcionItem": "Servicio con descuento",
+  "CantidadItem": 1,
+  "UnidadMedida": "43",
+  "PrecioUnitarioItem": 1000,
+  "DescuentoMonto": 100,
+  "MontoItem": 900
+}</pre>
+
+    <p>Si necesita detallar el descuento, use <code>TablaSubDescuento.SubDescuento</code>. La suma de los subdescuentos debe coincidir con <code>DescuentoMonto</code>.</p>
+<pre>{
+  "NumeroLinea": "1",
+  "IndicadorFacturacion": "1",
+  "NombreItem": "Servicio con subdescuento",
+  "IndicadorBienoServicio": "2",
+  "DescripcionItem": "Servicio con subdescuento",
+  "CantidadItem": 1,
+  "UnidadMedida": "43",
+  "PrecioUnitarioItem": 1000,
+  "DescuentoMonto": 100,
+  "TablaSubDescuento": {
+    "SubDescuento": [
+      {
+        "TipoSubDescuento": "$",
+        "MontoSubDescuento": 100
+      }
+    ]
+  },
+  "MontoItem": 900
+}</pre>
+
+    <p>En los totales, refleje el descuento en el monto gravado o exento según el indicador del ítem. Por ejemplo, una línea gravada de <code>1000.00</code> con descuento de <code>100.00</code> queda con base gravada <code>900.00</code>; si aplica ITBIS 18%, el <code>TotalITBIS</code> sería <code>162.00</code> y el <code>MontoTotal</code> sería <code>1062.00</code>.</p>
+
+    <div class="page-break"></div>
+
+    <h2>Descuento global o recargo global</h2>
+    <p>Cuando el descuento no pertenece a una línea específica del ítem, use el nodo <code>ECF.DescuentosORecargos</code>. Este nodo se genera en el XML como <code>DescuentosORecargos/DescuentoORecargo</code>, igual que en los ejemplos de <code>ZynstormECFPlatform.Schemas/XmlProd</code>, por ejemplo <code>Paso_1_E310000000140.xml</code>.</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Campo</th>
+                <th>Regla</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td><code>NumeroLinea</code></td><td>Número secuencial del ajuste global. En los XML de referencia se usa <code>1</code>.</td></tr>
+            <tr><td><code>TipoAjuste</code></td><td><code>D</code> para descuento o <code>R</code> para recargo.</td></tr>
+            <tr><td><code>DescripcionDescuentooRecargo</code></td><td>Descripción corta del descuento o recargo.</td></tr>
+            <tr><td><code>TipoValor</code></td><td><code>$</code> cuando el valor es monto fijo, <code>%</code> cuando es porcentaje.</td></tr>
+            <tr><td><code>ValorDescuentooRecargo</code></td><td>Valor del descuento o recargo. En monto fijo normalmente coincide con <code>MontoDescuentooRecargo</code>.</td></tr>
+            <tr><td><code>MontoDescuentooRecargo</code></td><td>Monto real aplicado. No puede ser negativo.</td></tr>
+            <tr><td><code>IndicadorFacturacionDescuentooRecargo</code></td><td>Indicador al que aplica el ajuste: <code>1</code>, <code>2</code>, <code>3</code> o <code>4</code>. Use <code>4</code> si el ajuste aplica a monto exento.</td></tr>
+        </tbody>
+    </table>
+
+    <p>Ejemplo de descuento global de RD$75.05 sobre monto gravado ITBIS 18%:</p>
+<pre>{
+  "DescuentosORecargos": {
+    "DescuentoORecargo": [
+      {
+        "NumeroLinea": "1",
+        "TipoAjuste": "D",
+        "DescripcionDescuentooRecargo": "Descuento por certificacion",
+        "TipoValor": "$",
+        "ValorDescuentooRecargo": 75.05,
+        "MontoDescuentooRecargo": 75.05,
+        "IndicadorFacturacionDescuentooRecargo": "1"
+      }
+    ]
+  }
+}</pre>
+
+    <p>En un descuento global, los <code>Item[].MontoItem</code> pueden quedar con su valor bruto original y el ajuste se informa en <code>DescuentosORecargos</code>. Los totales deben cuadrar con el resultado final después del descuento o recargo global. Por ejemplo, si las líneas suman <code>2302.00</code> gravadas y se aplica un descuento global de <code>75.05</code>, el <code>MontoGravadoTotal</code> debe quedar en <code>2226.95</code>, el <code>TotalITBIS</code> en <code>400.85</code> y el <code>MontoTotal</code> en <code>2627.80</code>.</p>
+    <p>No mezcle el mismo descuento en ambos lugares. Use <code>DescuentoMonto</code> cuando el descuento pertenece a una línea. Use <code>DescuentosORecargos</code> cuando el descuento aplica al comprobante completo o no se quiere asociar al ítem.</p>
+
+    <div class="page-break"></div>
+
+    <h2>Reglas por tipo</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Tipo</th>
+                <th>Nombre común</th>
+                <th>Campos adicionales</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td><code>31</code></td><td>Factura de crédito fiscal</td><td><code>Comprador.RNCComprador</code> y <code>Comprador.RazonSocialComprador</code>.</td></tr>
+            <tr><td><code>32</code></td><td>Factura de consumo</td><td>Si <code>MontoTotal >= 250000</code>, enviar <code>Comprador.RNCComprador</code> o <code>Comprador.IdentificadorExtranjero</code>. Si es menor, el comprador puede ir vacío.</td></tr>
+            <tr><td><code>33</code></td><td>Nota de débito</td><td><code>InformacionReferencia.NCFModificado</code>, <code>FechaNCFModificado</code> y <code>CodigoModificacion</code>.</td></tr>
+            <tr><td><code>34</code></td><td>Nota de crédito</td><td><code>InformacionReferencia.NCFModificado</code>, <code>FechaNCFModificado</code> y <code>CodigoModificacion</code>.</td></tr>
+            <tr><td><code>41</code></td><td>Compras</td><td><code>Comprador.RNCComprador</code> y <code>Comprador.RazonSocialComprador</code>.</td></tr>
+            <tr><td><code>43</code></td><td>Gastos menores</td><td>No requiere datos del comprador.</td></tr>
+            <tr><td><code>44</code></td><td>Regímenes especiales</td><td><code>Comprador.RNCComprador</code> y <code>Comprador.RazonSocialComprador</code>.</td></tr>
+            <tr><td><code>45</code></td><td>Gubernamental</td><td><code>Comprador.RNCComprador</code> y <code>Comprador.RazonSocialComprador</code>.</td></tr>
+            <tr><td><code>46</code></td><td>Exportación</td><td><code>Comprador.RazonSocialComprador</code>, <code>Comprador.PaisComprador</code>, y <code>Comprador.IdentificadorExtranjero</code> o <code>Comprador.RNCComprador</code>.</td></tr>
+            <tr><td><code>47</code></td><td>Pagos al exterior</td><td><code>Comprador.IdentificadorExtranjero</code> y <code>Comprador.RazonSocialComprador</code>.</td></tr>
+        </tbody>
+    </table>
+    <p>Para <code>46</code>, el validador XML también puede exigir nodos propios de exportación según el XSD DGII. El DTO actual cubre los datos del comprador, pero si el caso productivo necesita transporte/exportación extendida hay que agregar esos campos al contrato antes de enviarlos a DGII.</p>
+
+    <div class="page-break"></div>
+
+    <h2>Ejemplo base tipo 31</h2>
+<pre>{
+  "externalReference": "INV-31-0001",
+  "ECF": {
+    "Encabezado": {
+      "Version": "1.0",
+      "IdDoc": {
+        "TipoeCF": "31",
+        "eNCF": "E310000000001",
+        "FechaVencimientoSecuencia": "31-12-2028",
+        "TipoIngresos": "01",
+        "TipoPago": "1",
+        "TablaFormasPago": {
+          "FormaDePago": [
+            {
+              "FormaPago": 1,
+              "MontoPago": "1180.00"
+            }
+          ]
+        }
+      },
+      "Emisor": {
+        "RNCEmisor": "131880681",
+        "RazonSocialEmisor": "ZYNSTORM SRL",
+        "DireccionEmisor": "Av. Principal 1",
+        "FechaEmision": "15-05-2026"
+      },
+      "Comprador": {
+        "RNCComprador": "130862346",
+        "RazonSocialComprador": "CLIENTE SRL"
+      },
+      "Totales": {
+        "MontoGravadoTotal": 1000,
+        "ITBIS1": 18,
+        "TotalITBIS": 180,
+        "MontoTotal": 1180
+      }
+    },
+    "DetallesItems": {
+      "Item": [
+        {
+          "NumeroLinea": "1",
+          "IndicadorFacturacion": "1",
+          "NombreItem": "Servicio profesional",
+          "IndicadorBienoServicio": "2",
+          "DescripcionItem": "Servicio profesional",
+          "CantidadItem": 1,
+          "UnidadMedida": "43",
+          "PrecioUnitarioItem": 1000,
+          "MontoItem": 1000
+        }
+      ]
+    }
+  }
+}</pre>
+
+    <div class="page-break"></div>
+
+    <h2>Ejemplos por tipo</h2>
+
+    <h3>Tipo 32 menor a RD$250,000</h3>
+<pre>{
+  "externalReference": "INV-32-0001",
+  "ECF": {
+    "Encabezado": {
+      "Version": "1.0",
+      "IdDoc": {
+        "TipoeCF": "32",
+        "eNCF": "E320000000001",
+        "TipoIngresos": "01",
+        "TipoPago": "1",
+        "TablaFormasPago": {
+          "FormaDePago": [
+            {
+              "FormaPago": 1,
+              "MontoPago": "1500.00"
+            }
+          ]
+        }
+      },
+      "Emisor": {
+        "RNCEmisor": "131880681",
+        "RazonSocialEmisor": "ZYNSTORM SRL",
+        "DireccionEmisor": "Av. Principal 1",
+        "FechaEmision": "15-05-2026"
+      },
+      "Comprador": {},
+      "Totales": {
+        "MontoExento": 1500,
+        "MontoTotal": 1500
+      }
+    },
+    "DetallesItems": {
+      "Item": [
+        {
+          "NumeroLinea": "1",
+          "IndicadorFacturacion": "4",
+          "NombreItem": "Producto exento",
+          "DescripcionItem": "Producto exento",
+          "CantidadItem": 1,
+          "UnidadMedida": "43",
+          "PrecioUnitarioItem": 1500,
+          "MontoItem": 1500
+        }
+      ]
+    }
+  }
+}</pre>
+
+    <h3>Tipo 32 con producto exento y descuento</h3>
+<pre>{
+  "externalReference": "INV-32-DESC-EXENTO",
+  "ECF": {
+    "Encabezado": {
+      "Version": "1.0",
+      "IdDoc": {
+        "TipoeCF": "32",
+        "eNCF": "E320000000003",
+        "TipoIngresos": "01",
+        "TipoPago": "1",
+        "TablaFormasPago": {
+          "FormaDePago": [
+            {
+              "FormaPago": 1,
+              "MontoPago": "900.00"
+            }
+          ]
+        }
+      },
+      "Emisor": {
+        "RNCEmisor": "131880681",
+        "RazonSocialEmisor": "ZYNSTORM SRL",
+        "DireccionEmisor": "Av. Principal 1",
+        "FechaEmision": "15-05-2026"
+      },
+      "Comprador": {},
+      "Totales": {
+        "MontoExento": 900,
+        "MontoTotal": 900
+      }
+    },
+    "DetallesItems": {
+      "Item": [
+        {
+          "NumeroLinea": "1",
+          "IndicadorFacturacion": "4",
+          "NombreItem": "Producto exento con descuento",
+          "IndicadorBienoServicio": "1",
+          "DescripcionItem": "Producto exento con descuento",
+          "CantidadItem": 1,
+          "UnidadMedida": "43",
+          "PrecioUnitarioItem": 1000,
+          "DescuentoMonto": 100,
+          "TablaSubDescuento": {
+            "SubDescuento": [
+              {
+                "TipoSubDescuento": "$",
+                "MontoSubDescuento": 100
+              }
+            ]
+          },
+          "MontoItem": 900
+        }
+      ]
+    }
+  }
+}</pre>
+
+    <div class="page-break"></div>
+
+    <h3>Tipo 31 con descuento global</h3>
+<pre>{
+  "externalReference": "INV-31-DESC-GLOBAL",
+  "ECF": {
+    "Encabezado": {
+      "Version": "1.0",
+      "IdDoc": {
+        "TipoeCF": "31",
+        "eNCF": "E310000000140",
+        "FechaVencimientoSecuencia": "31-12-2028",
+        "IndicadorMontoGravado": "0",
+        "TipoIngresos": "01",
+        "TipoPago": "2",
+        "FechaLimitePago": "07-06-2026",
+        "TerminoPago": "30 DIAS",
+        "TablaFormasPago": {
+          "FormaDePago": [
+            {
+              "FormaPago": 2,
+              "MontoPago": "2627.80"
+            }
+          ]
+        }
+      },
+      "Emisor": {
+        "RNCEmisor": "132878191",
+        "RazonSocialEmisor": "CESAR Y JULIO AUTO SERVICIOS SRL",
+        "DireccionEmisor": "CALLE PRINCIPAL #1",
+        "FechaEmision": "12-05-2026"
+      },
+      "Comprador": {
+        "RNCComprador": "133009889",
+        "RazonSocialComprador": "TRANSPORTE NJ SRL",
+        "DireccionComprador": "AV. CASANDRA DAMIRON #80"
+      },
+      "Totales": {
+        "MontoGravadoTotal": 2226.95,
+        "MontoGravadoI1": 2226.95,
+        "ITBIS1": 18,
+        "TotalITBIS": 400.85,
+        "TotalITBIS1": 400.85,
+        "MontoTotal": 2627.8
+      }
+    },
+    "DetallesItems": {
+      "Item": [
+        {
+          "NumeroLinea": "1",
+          "IndicadorFacturacion": "1",
+          "NombreItem": "Cambio de Aceite (Labor)",
+          "IndicadorBienoServicio": "1",
+          "DescripcionItem": "Cambio de Aceite (Labor)",
+          "CantidadItem": 1,
+          "UnidadMedida": "43",
+          "PrecioUnitarioItem": 1502,
+          "MontoItem": 1502
+        },
+        {
+          "NumeroLinea": "2",
+          "IndicadorFacturacion": "1",
+          "NombreItem": "Revision de Frenos",
+          "IndicadorBienoServicio": "1",
+          "DescripcionItem": "Revision de Frenos",
+          "CantidadItem": 1,
+          "UnidadMedida": "43",
+          "PrecioUnitarioItem": 800,
+          "MontoItem": 800
+        }
+      ]
+    },
+    "DescuentosORecargos": {
+      "DescuentoORecargo": [
+        {
+          "NumeroLinea": "1",
+          "TipoAjuste": "D",
+          "DescripcionDescuentooRecargo": "Descuento por certificacion",
+          "TipoValor": "$",
+          "ValorDescuentooRecargo": 75.05,
+          "MontoDescuentooRecargo": 75.05,
+          "IndicadorFacturacionDescuentooRecargo": "1"
+        }
+      ]
+    }
+  }
+}</pre>
+
+    <h3>Tipo 32 igual o mayor a RD$250,000</h3>
+<pre>{
+  "externalReference": "INV-32-250K",
+  "ECF": {
+    "Encabezado": {
+      "Version": "1.0",
+      "IdDoc": {
+        "TipoeCF": "32",
+        "eNCF": "E320000000002",
+        "TipoIngresos": "01",
+        "TipoPago": "1",
+        "TablaFormasPago": {
+          "FormaDePago": [
+            {
+              "FormaPago": 1,
+              "MontoPago": "250000.00"
+            }
+          ]
+        }
+      },
+      "Emisor": {
+        "RNCEmisor": "131880681",
+        "RazonSocialEmisor": "ZYNSTORM SRL",
+        "DireccionEmisor": "Av. Principal 1",
+        "FechaEmision": "15-05-2026"
+      },
+      "Comprador": {
+        "RNCComprador": "00112345678",
+        "RazonSocialComprador": "JUAN PEREZ"
+      },
+      "Totales": {
+        "MontoExento": 250000,
+        "MontoTotal": 250000
+      }
+    },
+    "DetallesItems": {
+      "Item": [
+        {
+          "NumeroLinea": "1",
+          "IndicadorFacturacion": "4",
+          "NombreItem": "Equipo",
+          "DescripcionItem": "Equipo",
+          "CantidadItem": 1,
+          "UnidadMedida": "43",
+          "PrecioUnitarioItem": 250000,
+          "MontoItem": 250000
+        }
+      ]
+    }
+  }
+}</pre>
+
+    <div class="page-break"></div>
+
+    <h3>Tipo 33 nota de debito</h3>
+<pre>{
+  "externalReference": "ND-33-0001",
+  "ECF": {
+    "Encabezado": {
+      "Version": "1.0",
+      "IdDoc": {
+        "TipoeCF": "33",
+        "eNCF": "E330000000001",
+        "TipoIngresos": "01",
+        "TipoPago": "1",
+        "TablaFormasPago": {
+          "FormaDePago": [
+            {
+              "FormaPago": 1,
+              "MontoPago": "500.00"
+            }
+          ]
+        }
+      },
+      "Emisor": {
+        "RNCEmisor": "131880681",
+        "RazonSocialEmisor": "ZYNSTORM SRL",
+        "DireccionEmisor": "Av. Principal 1",
+        "FechaEmision": "15-05-2026"
+      },
+      "Comprador": {
+        "RNCComprador": "130862346",
+        "RazonSocialComprador": "CLIENTE SRL"
+      },
+      "Totales": {
+        "MontoExento": 500,
+        "MontoTotal": 500
+      }
+    },
+    "DetallesItems": {
+      "Item": [
+        {
+          "NumeroLinea": "1",
+          "IndicadorFacturacion": "4",
+          "NombreItem": "Ajuste por diferencia",
+          "DescripcionItem": "Ajuste por diferencia",
+          "CantidadItem": 1,
+          "UnidadMedida": "43",
+          "PrecioUnitarioItem": 500,
+          "MontoItem": 500
+        }
+      ]
+    },
+    "InformacionReferencia": {
+      "NCFModificado": "E310000000001",
+      "FechaNCFModificado": "14-05-2026",
+      "CodigoModificacion": "3"
+    }
+  }
+}</pre>
+
+    <h3>Tipo 34 nota de credito</h3>
+<pre>{
+  "externalReference": "NC-34-0001",
+  "ECF": {
+    "Encabezado": {
+      "Version": "1.0",
+      "IdDoc": {
+        "TipoeCF": "34",
+        "eNCF": "E340000000001",
+        "TipoIngresos": "01",
+        "TipoPago": "1",
+        "TablaFormasPago": {
+          "FormaDePago": [
+            {
+              "FormaPago": 1,
+              "MontoPago": "250.00"
+            }
+          ]
+        }
+      },
+      "Emisor": {
+        "RNCEmisor": "131880681",
+        "RazonSocialEmisor": "ZYNSTORM SRL",
+        "DireccionEmisor": "Av. Principal 1",
+        "FechaEmision": "15-05-2026"
+      },
+      "Comprador": {
+        "RNCComprador": "130862346",
+        "RazonSocialComprador": "CLIENTE SRL"
+      },
+      "Totales": {
+        "MontoExento": 250,
+        "MontoTotal": 250
+      }
+    },
+    "DetallesItems": {
+      "Item": [
+        {
+          "NumeroLinea": "1",
+          "IndicadorFacturacion": "4",
+          "NombreItem": "Devolucion parcial",
+          "DescripcionItem": "Devolucion parcial",
+          "CantidadItem": 1,
+          "UnidadMedida": "43",
+          "PrecioUnitarioItem": 250,
+          "MontoItem": 250
+        }
+      ]
+    },
+    "InformacionReferencia": {
+      "NCFModificado": "E310000000001",
+      "FechaNCFModificado": "14-05-2026",
+      "CodigoModificacion": "3"
+    }
+  }
+}</pre>
+
+    <h3>Tipo 41 compras</h3>
+<pre>{
+  "externalReference": "COMP-41-0001",
+  "ECF": {
+    "Encabezado": {
+      "Version": "1.0",
+      "IdDoc": {
+        "TipoeCF": "41",
+        "eNCF": "E410000000001",
+        "TipoPago": "1",
+        "TablaFormasPago": {
+          "FormaDePago": [
+            {
+              "FormaPago": 1,
+              "MontoPago": "800.00"
+            }
+          ]
+        }
+      },
+      "Emisor": {
+        "RNCEmisor": "131880681",
+        "RazonSocialEmisor": "ZYNSTORM SRL",
+        "DireccionEmisor": "Av. Principal 1",
+        "FechaEmision": "15-05-2026"
+      },
+      "Comprador": {
+        "RNCComprador": "00112345678",
+        "RazonSocialComprador": "PROVEEDOR INFORMAL"
+      },
+      "Totales": {
+        "MontoExento": 800,
+        "MontoTotal": 800
+      }
+    },
+    "DetallesItems": {
+      "Item": [
+        {
+          "NumeroLinea": "1",
+          "IndicadorFacturacion": "4",
+          "NombreItem": "Compra informal",
+          "DescripcionItem": "Compra informal",
+          "CantidadItem": 1,
+          "UnidadMedida": "43",
+          "PrecioUnitarioItem": 800,
+          "MontoItem": 800
+        }
+      ]
+    }
+  }
+}</pre>
+
+    <div class="page-break"></div>
+
+    <h3>Tipo 43 gastos menores</h3>
+<pre>{
+  "externalReference": "GM-43-0001",
+  "ECF": {
+    "Encabezado": {
+      "Version": "1.0",
+      "IdDoc": {
+        "TipoeCF": "43",
+        "eNCF": "E430000000001",
+        "TipoPago": "1",
+        "TablaFormasPago": {
+          "FormaDePago": [
+            {
+              "FormaPago": 1,
+              "MontoPago": "300.00"
+            }
+          ]
+        }
+      },
+      "Emisor": {
+        "RNCEmisor": "131880681",
+        "RazonSocialEmisor": "ZYNSTORM SRL",
+        "DireccionEmisor": "Av. Principal 1",
+        "FechaEmision": "15-05-2026"
+      },
+      "Comprador": {},
+      "Totales": {
+        "MontoExento": 300,
+        "MontoTotal": 300
+      }
+    },
+    "DetallesItems": {
+      "Item": [
+        {
+          "NumeroLinea": "1",
+          "IndicadorFacturacion": "4",
+          "NombreItem": "Gasto menor",
+          "DescripcionItem": "Gasto menor",
+          "CantidadItem": 1,
+          "UnidadMedida": "43",
+          "PrecioUnitarioItem": 300,
+          "MontoItem": 300
+        }
+      ]
+    }
+  }
+}</pre>
+
+    <h3>Tipo 44 regimenes especiales</h3>
+<pre>{
+  "externalReference": "REG-44-0001",
+  "ECF": {
+    "Encabezado": {
+      "Version": "1.0",
+      "IdDoc": {
+        "TipoeCF": "44",
+        "eNCF": "E440000000001",
+        "TipoIngresos": "01",
+        "TipoPago": "1",
+        "TablaFormasPago": {
+          "FormaDePago": [
+            {
+              "FormaPago": 1,
+              "MontoPago": "1200.00"
+            }
+          ]
+        }
+      },
+      "Emisor": {
+        "RNCEmisor": "131880681",
+        "RazonSocialEmisor": "ZYNSTORM SRL",
+        "DireccionEmisor": "Av. Principal 1",
+        "FechaEmision": "15-05-2026"
+      },
+      "Comprador": {
+        "RNCComprador": "430000001",
+        "RazonSocialComprador": "ENTIDAD REGIMEN ESPECIAL"
+      },
+      "Totales": {
+        "MontoExento": 1200,
+        "MontoTotal": 1200
+      }
+    },
+    "DetallesItems": {
+      "Item": [
+        {
+          "NumeroLinea": "1",
+          "IndicadorFacturacion": "4",
+          "NombreItem": "Servicio exento",
+          "DescripcionItem": "Servicio exento",
+          "CantidadItem": 1,
+          "UnidadMedida": "43",
+          "PrecioUnitarioItem": 1200,
+          "MontoItem": 1200
+        }
+      ]
+    }
+  }
+}</pre>
+
+    <h3>Tipo 45 gubernamental</h3>
+<pre>{
+  "externalReference": "GOB-45-0001",
+  "ECF": {
+    "Encabezado": {
+      "Version": "1.0",
+      "IdDoc": {
+        "TipoeCF": "45",
+        "eNCF": "E450000000001",
+        "TipoIngresos": "01",
+        "TipoPago": "2",
+        "FechaLimitePago": "30-05-2026",
+        "TablaFormasPago": {
+          "FormaDePago": [
+            {
+              "FormaPago": 2,
+              "MontoPago": "2000.00"
+            }
+          ]
+        }
+      },
+      "Emisor": {
+        "RNCEmisor": "131880681",
+        "RazonSocialEmisor": "ZYNSTORM SRL",
+        "DireccionEmisor": "Av. Principal 1",
+        "FechaEmision": "15-05-2026"
+      },
+      "Comprador": {
+        "RNCComprador": "401000001",
+        "RazonSocialComprador": "INSTITUCION PUBLICA"
+      },
+      "Totales": {
+        "MontoExento": 2000,
+        "MontoTotal": 2000
+      }
+    },
+    "DetallesItems": {
+      "Item": [
+        {
+          "NumeroLinea": "1",
+          "IndicadorFacturacion": "4",
+          "NombreItem": "Servicio gubernamental",
+          "DescripcionItem": "Servicio gubernamental",
+          "CantidadItem": 1,
+          "UnidadMedida": "43",
+          "PrecioUnitarioItem": 2000,
+          "MontoItem": 2000
+        }
+      ]
+    }
+  }
+}</pre>
+
+    <div class="page-break"></div>
+
+    <h3>Tipo 46 exportacion</h3>
+<pre>{
+  "externalReference": "EXP-46-0001",
+  "ECF": {
+    "Encabezado": {
+      "Version": "1.0",
+      "IdDoc": {
+        "TipoeCF": "46",
+        "eNCF": "E460000000001",
+        "TipoIngresos": "01",
+        "TipoPago": "1",
+        "TablaFormasPago": {
+          "FormaDePago": [
+            {
+              "FormaPago": 1,
+              "MontoPago": "5000.00"
+            }
+          ]
+        }
+      },
+      "Emisor": {
+        "RNCEmisor": "131880681",
+        "RazonSocialEmisor": "ZYNSTORM SRL",
+        "DireccionEmisor": "Av. Principal 1",
+        "FechaEmision": "15-05-2026"
+      },
+      "Comprador": {
+        "IdentificadorExtranjero": "US-TAX-123456",
+        "RazonSocialComprador": "FOREIGN CUSTOMER LLC",
+        "PaisComprador": "US"
+      },
+      "Totales": {
+        "MontoExento": 5000,
+        "MontoTotal": 5000
+      }
+    },
+    "DetallesItems": {
+      "Item": [
+        {
+          "NumeroLinea": "1",
+          "IndicadorFacturacion": "4",
+          "NombreItem": "Servicio exportado",
+          "DescripcionItem": "Servicio exportado",
+          "CantidadItem": 1,
+          "UnidadMedida": "43",
+          "PrecioUnitarioItem": 5000,
+          "MontoItem": 5000
+        }
+      ]
+    }
+  }
+}</pre>
+
+    <h3>Tipo 47 pagos al exterior</h3>
+<pre>{
+  "externalReference": "EXT-47-0001",
+  "ECF": {
+    "Encabezado": {
+      "Version": "1.0",
+      "IdDoc": {
+        "TipoeCF": "47",
+        "eNCF": "E470000000001",
+        "TipoPago": "1",
+        "TablaFormasPago": {
+          "FormaDePago": [
+            {
+              "FormaPago": 1,
+              "MontoPago": "3500.00"
+            }
+          ]
+        }
+      },
+      "Emisor": {
+        "RNCEmisor": "131880681",
+        "RazonSocialEmisor": "ZYNSTORM SRL",
+        "DireccionEmisor": "Av. Principal 1",
+        "FechaEmision": "15-05-2026"
+      },
+      "Comprador": {
+        "IdentificadorExtranjero": "US-TAX-999999",
+        "RazonSocialComprador": "SUPPLIER INC"
+      },
+      "Totales": {
+        "MontoExento": 3500,
+        "MontoTotal": 3500
+      }
+    },
+    "DetallesItems": {
+      "Item": [
+        {
+          "NumeroLinea": "1",
+          "IndicadorFacturacion": "4",
+          "NombreItem": "Pago servicio exterior",
+          "DescripcionItem": "Pago servicio exterior",
+          "CantidadItem": 1,
+          "UnidadMedida": "43",
+          "PrecioUnitarioItem": 3500,
+          "MontoItem": 3500
+        }
+      ]
+    }
+  }
+}</pre>
+
+    <div class="page-break"></div>
+
+    <h2>Consumo del EcfController</h2>
+    <p>Los endpoints de emision reciben y responden JSON. Todos los requests deben incluir la autenticacion configurada para el API, usando el header de API Key que corresponda en su ambiente.</p>
+
+    <h3>Base de rutas</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Ambiente</th>
+                <th>Ruta base</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>Local</td><td><code>https://localhost:{puerto}/v1/Ecf</code></td></tr>
+            <tr><td>Staging/Produccion</td><td><code>https://{host}/v1/Ecf</code></td></tr>
+        </tbody>
+    </table>
+
+    <h3>Headers recomendados</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Header</th>
+                <th>Valor</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td><code>Content-Type</code></td><td><code>application/json</code></td></tr>
+            <tr><td><code>Accept</code></td><td><code>application/json</code></td></tr>
+            <tr><td><code>X-Api-Key</code></td><td>API Key asignada al cliente. Use el nombre real del header si el ambiente fue configurado con otro nombre.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>EmitEcf</h2>
+    <p>Emite un e-CF a partir del <code>EcfInvoiceRequestDto</code>, genera el XML, valida contra XSD y referencias <code>XmlProd</code>, firma el XML, envia el comprobante y consulta el estado inicial.</p>
+<pre>POST /v1/Ecf/emit?environment=Production</pre>
+
+    <p><code>environment</code> es opcional. Valores permitidos:</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Valor</th>
+                <th>Uso</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td><code>Production</code></td><td>Envia a DGII produccion.</td></tr>
+            <tr><td><code>Test</code></td><td>Ambiente de prueba si esta configurado.</td></tr>
+            <tr><td><code>CerteCF</code></td><td>Ambiente de certificacion si esta configurado.</td></tr>
+        </tbody>
+    </table>
+
+    <div class="blockquote">En <code>Development</code> y <code>Staging</code>, el servicio puede validar el XML generado contra el endpoint de validacion configurado antes de enviarlo a DGII, segun la configuracion del ambiente.</div>
+
+    <h3>Ejemplo con curl</h3>
+<pre>curl -X POST "https://localhost:5001/v1/Ecf/emit?environment=Production" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "X-Api-Key: {API_KEY}" \
+  -d @factura.json</pre>
+
+    <h3>Ejemplo con fetch</h3>
+<pre>const response = await fetch("https://localhost:5001/v1/Ecf/emit?environment=Production", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "X-Api-Key": apiKey
+  },
+  body: JSON.stringify(ecfInvoiceRequestDto)
+});
+
+const result = await response.json();</pre>
+
+    <h3>Respuesta cuando DGII acepta dentro de la ventana inicial</h3>
+    <p>El API espera hasta 2 segundos por una respuesta final. La primera consulta de estado se hace luego de 300 milisegundos. Si DGII responde <code>Aceptado</code> dentro de esa ventana, <code>success</code> llega en <code>true</code>, <code>isPending</code> llega en <code>false</code> y se incluyen los datos principales de verificacion.</p>
+<pre>{
+  "success": true,
+  "isPending": false,
+  "message": "TrackId: 123456789",
+  "ecfDocumentId": 1001,
+  "ecfType": 31,
+  "eNcf": "E310000000001",
+  "trackId": "123456789",
+  "securityCode": "ABC123",
+  "signatureDate": "16-05-2026 10:35:20",
+  "qrUrl": "https://ecf.dgii.gov.do/CerteCF/ConsultaTimbre?...",
+  "status": {
+    "trackId": "123456789",
+    "estado": "Aceptado",
+    "mensaje": "Aceptado"
+  }
+}</pre>
+
+    <p><code>qrUrl</code> contiene la URL que debe usarse para generar el QR con la libreria que el cliente prefiera. El API ya no devuelve la imagen QR ni el objeto <code>xmlValidation</code> en la respuesta de <code>EmitEcf</code>.</p>
+
+    <h3>Respuesta cuando DGII sigue procesando</h3>
+    <p>Si despues de 2 segundos DGII no confirma aceptacion o rechazo, el API devuelve el <code>TrackId</code>, marca <code>isPending</code> en <code>true</code> y programa el job de seguimiento. El cliente debe consultar el endpoint de estado.</p>
+<pre>{
+  "success": false,
+  "isPending": true,
+  "message": "DGII aun procesa el e-CF. TrackId: 123456789",
+  "ecfDocumentId": 1001,
+  "ecfType": 31,
+  "eNcf": "E310000000001",
+  "trackId": "123456789",
+  "securityCode": "ABC123",
+  "signatureDate": "16-05-2026 10:35:20",
+  "qrUrl": "https://ecf.dgii.gov.do/CerteCF/ConsultaTimbre?...",
+  "hangfireJobId": "456",
+  "status": {
+    "trackId": "123456789",
+    "estado": "Recibido",
+    "mensaje": "Recibido"
+  }
+}</pre>
+
+    <h3>Respuesta con errores de validacion</h3>
+    <p>Si el objeto recibido no cumple las reglas del DTO, XSD, <code>XmlProd</code> o reglas internas, el API responde <code>400 Bad Request</code> con el mismo objeto de resultado y las listas de errores llenas.</p>
+<pre>{
+  "success": false,
+  "message": "El XML generado no cumple con el esquema XSD de la DGII.",
+  "dtoErrors": [],
+  "xsdErrors": [
+    "Detalle del error XSD"
+  ],
+  "xmlProdErrors": []
+}</pre>
+
+    <div class="page-break"></div>
+
+    <h2>GetEmissionStatus</h2>
+    <p>Consulta el estado cacheado del envio por <code>TrackId</code>. Este estado se actualiza con la consulta inicial y con el job de seguimiento.</p>
+<pre>GET /v1/Ecf/status/{trackId}
+GET /v1/Ecf/estado-envio/{trackId}</pre>
+
+    <h3>Ejemplo con curl</h3>
+<pre>curl -X GET "https://localhost:5001/v1/Ecf/status/123456789" \
+  -H "Accept: application/json" \
+  -H "X-Api-Key: {API_KEY}"</pre>
+
+    <h3>Ejemplo con fetch</h3>
+<pre>const response = await fetch(`https://localhost:5001/v1/Ecf/status/${trackId}`, {
+  headers: {
+    "Accept": "application/json",
+    "X-Api-Key": apiKey
+  }
+});
+
+const statusResult = await response.json();</pre>
+
+    <h3>Respuesta cuando el estado existe</h3>
+<pre>{
+  "success": true,
+  "isPending": false,
+  "trackId": "123456789",
+  "status": {
+    "trackId": "123456789",
+    "codigo": "1",
+    "estado": "Aceptado",
+    "rnc": "131880681",
+    "eNcf": "E310000000001",
+    "secuenciaUtilizada": true,
+    "fechaRecepcion": "16-05-2026 10:35:22",
+    "error": "",
+    "mensaje": "Aceptado",
+    "mensajes": []
+  }
+}</pre>
+
+    <p>Cuando <code>isPending</code> llega en <code>true</code>, el cliente debe esperar unos segundos y consultar nuevamente con el mismo <code>TrackId</code>. Cuando <code>success</code> llega en <code>false</code> y <code>isPending</code> llega en <code>false</code>, el comprobante fue rechazado o quedo en error; revise <code>status.error</code>, <code>status.mensaje</code> y <code>status.mensajes</code>.</p>
+
+    <h3>Respuesta cuando el TrackId no esta en cache o expiro</h3>
+<pre>{
+  "success": false,
+  "isPending": true,
+  "trackId": "123456789",
+  "message": "Estado no encontrado o expirado. Si el envio fue reciente, intente consultar nuevamente en unos segundos."
+}</pre>
+
+</body>
+</html>

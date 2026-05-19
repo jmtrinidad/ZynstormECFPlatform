@@ -606,6 +606,27 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasData(
+                new Currency { CurrencyId = 1, Code = "DOP", Name = "PESO DOMINICANO" },
+                new Currency { CurrencyId = 2, Code = "USD", Name = "DOLAR ESTADOUNIDENSE" },
+                new Currency { CurrencyId = 3, Code = "EUR", Name = "EURO" },
+                new Currency { CurrencyId = 4, Code = "BRL", Name = "REAL BRASILENO" },
+                new Currency { CurrencyId = 5, Code = "CAD", Name = "DOLAR CANADIENSE" },
+                new Currency { CurrencyId = 6, Code = "CHF", Name = "FRANCO SUIZO" },
+                new Currency { CurrencyId = 7, Code = "CHY", Name = "YUAN CHINO" },
+                new Currency { CurrencyId = 8, Code = "XDR", Name = "DERECHO ESPECIAL DE GIRO" },
+                new Currency { CurrencyId = 9, Code = "DKK", Name = "CORONA DANESA" },
+                new Currency { CurrencyId = 10, Code = "GBP", Name = "LIBRA ESTERLINA" },
+                new Currency { CurrencyId = 11, Code = "JPY", Name = "YEN JAPONES" },
+                new Currency { CurrencyId = 12, Code = "NOK", Name = "CORONA NORUEGA" },
+                new Currency { CurrencyId = 13, Code = "SCP", Name = "LIBRA ESCOCESA" },
+                new Currency { CurrencyId = 14, Code = "SEK", Name = "CORONA SUECA" },
+                new Currency { CurrencyId = 15, Code = "VEF", Name = "BOLIVAR FUERTE VENEZOLANO" },
+                new Currency { CurrencyId = 16, Code = "HTG", Name = "GURDA HAITIANA" },
+                new Currency { CurrencyId = 17, Code = "MXN", Name = "PESO MEXICANO" },
+                new Currency { CurrencyId = 18, Code = "COP", Name = "PESO COLOMBIANO" }
+            );
         });
 
         modelBuilder.Entity<DGIIUnit>(entity =>

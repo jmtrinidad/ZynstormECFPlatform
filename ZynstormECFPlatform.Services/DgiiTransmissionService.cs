@@ -27,46 +27,61 @@ public class DgiiTransmissionService : IDgiiTransmissionService
 
     public async Task<DgiiTransmissionResult> SendEcfAsync(DgiiEnvironment environment, string token, string signedXml, int ecfType, decimal totalAmount, string rncEmisor, string eNcf, bool isSummary = false)
     {
-        string envKey = environment.ToString();
-        string baseUrl;
         string endpointUrl;
 
-        if (environment == DgiiEnvironment.CerteCF)
+        bool useInternalValidator = _configuration.GetValue<bool>("EcfXmlValidation:UseInternalValidator");
+        if (useInternalValidator)
         {
-            bool isB2CSummaryChannel = isSummary;
-
-            if (isB2CSummaryChannel) 
-            {
-                baseUrl = _configuration["DgiiUrls:CerteCF:RecepcionFC"] 
-                    ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:RecepcionFC no fue encontrada.");
-                
-                // ── UNIFIED: Both Summary and Individual use the /ecf endpoint in RecepcionFC ──
-                // DGII differentiates them by the XML root element (<RFCE> vs <ECF>)
-                endpointUrl = $"{baseUrl}/api/recepcion/ecf";
-            }
-            else
-            {
-                baseUrl = _configuration["DgiiUrls:CerteCF:Recepcion"] 
-                    ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:Recepcion no fue encontrada.");
-                endpointUrl = $"{baseUrl}/api/facturaselectronicas";
-            }
+            string platformUrl = _configuration["AppSettings:PlatformUrl"] ?? "https://ecfstaging.zynstorm.com/api";
+            endpointUrl = $"{platformUrl.TrimEnd('/')}/v1/Fe/recepcion/api/ecf";
         }
         else
         {
-            baseUrl = _configuration[$"DgiiUrls:{envKey}"] 
-                ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey} no fue encontrada en appsettings.json");
-            
-            bool isResumenFacturaConsumo = isSummary;
-            endpointUrl = isResumenFacturaConsumo 
-                ? $"{baseUrl}/recepcionfc/api/recepcion/ecf" 
-                : $"{baseUrl}/recepcion/api/facturaselectronicas";
+            string envKey = environment.ToString();
+            string baseUrl;
+
+            if (environment == DgiiEnvironment.CerteCF)
+            {
+                bool isB2CSummaryChannel = isSummary;
+
+                if (isB2CSummaryChannel) 
+                {
+                    baseUrl = _configuration["DgiiUrls:CerteCF:RecepcionFC"] 
+                        ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:RecepcionFC no fue encontrada.");
+                    
+                    // ── UNIFIED: Both Summary and Individual use the /ecf endpoint in RecepcionFC ──
+                    // DGII differentiates them by the XML root element (<RFCE> vs <ECF>)
+                    endpointUrl = $"{baseUrl}/api/recepcion/ecf";
+                }
+                else
+                {
+                    baseUrl = _configuration["DgiiUrls:CerteCF:Recepcion"] 
+                        ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:Recepcion no fue encontrada.");
+                    endpointUrl = $"{baseUrl}/api/facturaselectronicas";
+                }
+            }
+            else
+            {
+                baseUrl = _configuration[$"DgiiUrls:{envKey}"] 
+                    ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey} no fue encontrada en appsettings.json");
+                
+                bool isResumenFacturaConsumo = isSummary;
+                endpointUrl = isResumenFacturaConsumo 
+                    ? $"{baseUrl}/recepcionfc/api/recepcion/ecf" 
+                    : $"{baseUrl}/recepcion/api/facturaselectronicas";
+            }
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Post, endpointUrl);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         
         // CerteCF always uses multipart/form-data in this implementation to match portal behavior.
-        if (environment == DgiiEnvironment.CerteCF)
+        if (useInternalValidator)
+        {
+            // DEV env uses raw body or form content, we use raw application/xml
+            request.Content = new StringContent(signedXml, Encoding.UTF8, "application/xml");
+        }
+        else if (environment == DgiiEnvironment.CerteCF)
         {
             string fileName = $"{rncEmisor}{eNcf}.xml";
             var multipartContent = new MultipartFormDataContent();
@@ -210,10 +225,20 @@ public class DgiiTransmissionService : IDgiiTransmissionService
 
     public async Task<DgiiTransmissionResult> SendArecfAsync(DgiiEnvironment environment, string token, string signedXml, string rncEmisor, string eNcf)
     {
-        string baseUrl = _configuration["DgiiUrls:CerteCF:AprobacionComercial"] 
-            ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:AprobacionComercial no fue encontrada.");
-        
-        string endpointUrl = $"{baseUrl}/api/AprobacionComercial";
+        string endpointUrl;
+        bool useInternalValidator = _configuration.GetValue<bool>("EcfXmlValidation:UseInternalValidator");
+
+        if (useInternalValidator)
+        {
+            string platformUrl = _configuration["AppSettings:PlatformUrl"] ?? "https://ecfstaging.zynstorm.com/api";
+            endpointUrl = $"{platformUrl.TrimEnd('/')}/v1/Fe/aprobacioncomercial/api/ecf";
+        }
+        else
+        {
+            string baseUrl = _configuration["DgiiUrls:CerteCF:AprobacionComercial"] 
+                ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:AprobacionComercial no fue encontrada.");
+            endpointUrl = $"{baseUrl}/api/AprobacionComercial";
+        }
 
         using var request = new HttpRequestMessage(HttpMethod.Post, endpointUrl);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);

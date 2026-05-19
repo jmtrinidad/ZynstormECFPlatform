@@ -9,7 +9,15 @@
           "FechaVencimientoSecuencia": "31-12-2028",
           "IndicadorEnvioDiferido": 1,
           "TipoIngresos": "01",
-          "TipoPago": 1
+          "TipoPago": 1,
+          "TablaFormasPago": {
+            "FormaDePago": [
+              {
+                "FormaPago": 1,
+                "MontoPago": "244"
+              }
+            ]
+          }
         },
         "Emisor": {
           "RNCEmisor": "{{RNC}}",
@@ -22,8 +30,8 @@
           "RazonSocialComprador": "IT SOLUCLICK SRL"
         },
         "Totales": {
-          "MontoExento": 244.0,
-          "MontoTotal": 244.0
+          "MontoExento": 244,
+          "MontoTotal": 244
         }
       },
       "DetallesItems": {
@@ -33,9 +41,11 @@
             "IndicadorFacturacion": 4,
             "NombreItem": "CEDEBRAL 5000 JARABE",
             "IndicadorBienoServicio": 1,
-            "CantidadItem": 1.0,
-            "PrecioUnitarioItem": 244.0,
-            "MontoItem": 244.0
+            "DescripcionItem": "CEDEBRAL 5000 JARABE",
+            "CantidadItem": 1,
+            "UnidadMedida": "43",
+            "PrecioUnitarioItem": 244,
+            "MontoItem": 244
           }
         ]
       }
@@ -55,7 +65,15 @@
           "IndicadorEnvioDiferido": 1,
           "IndicadorMontoGravado": 0,
           "TipoIngresos": "01",
-          "TipoPago": 1
+          "TipoPago": 1,
+          "TablaFormasPago": {
+            "FormaDePago": [
+              {
+                "FormaPago": 1,
+                "MontoPago": "601"
+              }
+            ]
+          }
         },
         "Emisor": {
           "RNCEmisor": "{{RNC}}",
@@ -68,8 +86,8 @@
           "RazonSocialComprador": "CLIENTES DE LA ADMINISTRACION"
         },
         "Totales": {
-          "MontoExento": 601.0,
-          "MontoTotal": 601.0
+          "MontoExento": 601,
+          "MontoTotal": 601
         }
       },
       "DetallesItems": {
@@ -79,9 +97,11 @@
             "IndicadorFacturacion": 4,
             "NombreItem": "CORACOR A C/30 TABS.",
             "IndicadorBienoServicio": 1,
-            "CantidadItem": 1.0,
-            "PrecioUnitarioItem": 601.0,
-            "MontoItem": 601.0
+            "DescripcionItem": "CORACOR A C/30 TABS.",
+            "CantidadItem": 1,
+            "UnidadMedida": "43",
+            "PrecioUnitarioItem": 601,
+            "MontoItem": 601
           }
         ]
       }
@@ -101,7 +121,15 @@
           "IndicadorEnvioDiferido": 1,
           "IndicadorMontoGravado": 0,
           "TipoIngresos": "01",
-          "TipoPago": 1
+          "TipoPago": 1,
+          "TablaFormasPago": {
+            "FormaDePago": [
+              {
+                "FormaPago": 1,
+                "MontoPago": "600000"
+              }
+            ]
+          }
         },
         "Emisor": {
           "RNCEmisor": "{{RNC}}",
@@ -114,8 +142,8 @@
           "RazonSocialComprador": "BRYAN TORRES"
         },
         "Totales": {
-          "MontoExento": 600000.0,
-          "MontoTotal": 600000.0
+          "MontoExento": 600000,
+          "MontoTotal": 600000
         }
       },
       "DetallesItems": {
@@ -125,9 +153,11 @@
             "IndicadorFacturacion": 4,
             "NombreItem": "GREEN PIGEON PEAS CARIDOM 24/15 OZ.",
             "IndicadorBienoServicio": 1,
-            "CantidadItem": 2.0,
-            "PrecioUnitarioItem": 300000.0,
-            "MontoItem": 600000.0
+            "DescripcionItem": "GREEN PIGEON PEAS CARIDOM 24/15 OZ.",
+            "CantidadItem": 2,
+            "UnidadMedida": "43",
+            "PrecioUnitarioItem": 300000,
+            "MontoItem": 600000
           }
         ]
       }
@@ -179,6 +209,7 @@
             "IndicadorFacturacion": 4,
             "NombreItem": "GENERAL",
             "IndicadorBienoServicio": 1,
+            "DescripcionItem": "GENERAL",
             "CantidadItem": "1",
             "UnidadMedida": "47",
             "PrecioUnitarioItem": "203898.31",
@@ -214,7 +245,15 @@
           "IndicadorMontoGravado": 0,
           "TipoIngresos": "01",
           "TipoPago": 2,
-          "FechaLimitePago": "{{FECHA_LIMITE_PAGO}}"
+          "FechaLimitePago": "{{FECHA_LIMITE_PAGO}}",
+          "TablaFormasPago": {
+            "FormaDePago": [
+              {
+                "FormaPago": 2,
+                "MontoPago": "3005"
+              }
+            ]
+          }
         },
         "Emisor": {
           "RNCEmisor": "{{RNC}}",
@@ -227,8 +266,8 @@
           "RazonSocialComprador": "CLIENTES DE LA ADMINISTRACION"
         },
         "Totales": {
-          "MontoExento": 3005.0,
-          "MontoTotal": 3005.0
+          "MontoExento": 3005,
+          "MontoTotal": 3005
         }
       },
       "DetallesItems": {
@@ -238,9 +277,11 @@
             "IndicadorFacturacion": 4,
             "NombreItem": "CORACOR A C/30 TABS.",
             "IndicadorBienoServicio": 1,
-            "CantidadItem": 5.0,
-            "PrecioUnitarioItem": 601.0,
-            "MontoItem": 3005.0
+            "DescripcionItem": "CORACOR A C/30 TABS.",
+            "CantidadItem": 5,
+            "UnidadMedida": "43",
+            "PrecioUnitarioItem": 601,
+            "MontoItem": 3005
           }
         ]
       },
@@ -266,7 +307,15 @@
           "FechaVencimientoSecuencia": "31-12-2028",
           "IndicadorMontoGravado": 0,
           "TipoPago": 2,
-          "FechaLimitePago": "{{FECHA_LIMITE_PAGO}}"
+          "FechaLimitePago": "{{FECHA_LIMITE_PAGO}}",
+          "TablaFormasPago": {
+            "FormaDePago": [
+              {
+                "FormaPago": 2,
+                "MontoPago": "1180"
+              }
+            ]
+          }
         },
         "Emisor": {
           "RNCEmisor": "{{RNC}}",
@@ -279,12 +328,12 @@
           "RazonSocialComprador": "ENRIQUE CAMILO SANTOS TAVAREZ"
         },
         "Totales": {
-          "MontoGravadoTotal": 1000.0,
-          "MontoGravadoI1": 1000.0,
+          "MontoGravadoTotal": 1000,
+          "MontoGravadoI1": 1000,
           "ITBIS1": 18,
-          "TotalITBIS": 180.0,
-          "TotalITBIS1": 180.0,
-          "MontoTotal": 1180.0,
+          "TotalITBIS": 180,
+          "TotalITBIS1": 180,
+          "MontoTotal": 1180,
           "TotalITBISRetenido": "0.00",
           "TotalISRRetencion": "0.00"
         }
@@ -296,13 +345,15 @@
             "IndicadorFacturacion": 1,
             "Retencion": {
               "IndicadorAgenteRetencionoPercepcion": 1,
-              "MontoITBISRetenido": 0.0
+              "MontoITBISRetenido": 0
             },
             "NombreItem": "COMISION VERIFON TARJETAS",
             "IndicadorBienoServicio": 1,
-            "CantidadItem": 1.0,
-            "PrecioUnitarioItem": 1000.0,
-            "MontoItem": 1000.0
+            "DescripcionItem": "COMISION VERIFON TARJETAS",
+            "CantidadItem": 1,
+            "UnidadMedida": "43",
+            "PrecioUnitarioItem": 1000,
+            "MontoItem": 1000
           }
         ]
       }
@@ -328,8 +379,8 @@
           "FechaEmision": "{{FECHA_EMISION}}"
         },
         "Totales": {
-          "MontoExento": 1000.0,
-          "MontoTotal": 1000.0
+          "MontoExento": 1000,
+          "MontoTotal": 1000
         }
       },
       "DetallesItems": {
@@ -339,9 +390,11 @@
             "IndicadorFacturacion": 4,
             "NombreItem": "PROPIETARIO COMPANIA DE TRANSPORTE DIVER",
             "IndicadorBienoServicio": 1,
-            "CantidadItem": 1.0,
-            "PrecioUnitarioItem": 1000.0,
-            "MontoItem": 1000.0
+            "DescripcionItem": "PROPIETARIO COMPANIA DE TRANSPORTE DIVER",
+            "CantidadItem": 1,
+            "UnidadMedida": "43",
+            "PrecioUnitarioItem": 1000,
+            "MontoItem": 1000
           }
         ]
       }
@@ -360,7 +413,15 @@
           "FechaVencimientoSecuencia": "31-12-2028",
           "IndicadorEnvioDiferido": 1,
           "TipoIngresos": "01",
-          "TipoPago": 1
+          "TipoPago": 1,
+          "TablaFormasPago": {
+            "FormaDePago": [
+              {
+                "FormaPago": 1,
+                "MontoPago": "29.5"
+              }
+            ]
+          }
         },
         "Emisor": {
           "RNCEmisor": "{{RNC}}",
@@ -384,7 +445,9 @@
             "IndicadorFacturacion": 4,
             "NombreItem": "GREEN PIGEON PEAS CARIDOM 24/15 OZ.",
             "IndicadorBienoServicio": 1,
-            "CantidadItem": 1.0,
+            "DescripcionItem": "GREEN PIGEON PEAS CARIDOM 24/15 OZ.",
+            "CantidadItem": 1,
+            "UnidadMedida": "43",
             "PrecioUnitarioItem": 29.5,
             "MontoItem": 29.5
           }
@@ -406,7 +469,15 @@
           "FechaVencimientoSecuencia": "31-12-2028",
           "IndicadorEnvioDiferido": 1,
           "TipoIngresos": "01",
-          "TipoPago": 1
+          "TipoPago": 1,
+          "TablaFormasPago": {
+            "FormaDePago": [
+              {
+                "FormaPago": 1,
+                "MontoPago": "1197"
+              }
+            ]
+          }
         },
         "Emisor": {
           "RNCEmisor": "{{RNC}}",
@@ -419,8 +490,8 @@
           "RazonSocialComprador": "PLAN DE ASISTENCIA SOCIAL DE LA PRESIDENCIA"
         },
         "Totales": {
-          "MontoExento": 1197.0,
-          "MontoTotal": 1197.0
+          "MontoExento": 1197,
+          "MontoTotal": 1197
         }
       },
       "DetallesItems": {
@@ -430,9 +501,11 @@
             "IndicadorFacturacion": 4,
             "NombreItem": "OXIGEN 200 C/30 TABS.",
             "IndicadorBienoServicio": 1,
-            "CantidadItem": 1.0,
-            "PrecioUnitarioItem": 1197.0,
-            "MontoItem": 1197.0
+            "DescripcionItem": "OXIGEN 200 C/30 TABS.",
+            "CantidadItem": 1,
+            "UnidadMedida": "43",
+            "PrecioUnitarioItem": 1197,
+            "MontoItem": 1197
           }
         ]
       }
@@ -543,6 +616,7 @@
             "IndicadorFacturacion": 3,
             "NombreItem": "AGUACATE CRIOLLO",
             "IndicadorBienoServicio": 1,
+            "DescripcionItem": "AGUACATE CRIOLLO",
             "CantidadItem": "100.00",
             "UnidadMedida": "43",
             "PrecioUnitarioItem": "18000.00",
@@ -604,6 +678,7 @@
             },
             "NombreItem": "LICENCIA WYI",
             "IndicadorBienoServicio": 2,
+            "DescripcionItem": "LICENCIA WYI",
             "CantidadItem": "1.00",
             "UnidadMedida": "43",
             "PrecioUnitarioItem": "180000.00",

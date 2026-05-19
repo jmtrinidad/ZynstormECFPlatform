@@ -72,28 +72,54 @@ public class EcfXmlIdDoc
     public string? TerminoPago { get; set; }
     public bool ShouldSerializeTerminoPago() => !string.IsNullOrWhiteSpace(TerminoPago);
 
-    [XmlElement("TipoCuentaPago", Order = 12)]
+    [XmlElement("TablaFormasPago", Order = 12)]
+    public EcfXmlTablaFormasPago? TablaFormasPago { get; set; }
+    public bool ShouldSerializeTablaFormasPago() => TablaFormasPago?.FormasDePago?.Count > 0;
+
+    [XmlElement("TipoCuentaPago", Order = 13)]
     public string? TipoCuentaPago { get; set; }
     public bool ShouldSerializeTipoCuentaPago() => !string.IsNullOrWhiteSpace(TipoCuentaPago);
 
-    [XmlElement("NumeroCuentaPago", Order = 13)]
+    [XmlElement("NumeroCuentaPago", Order = 14)]
     public string? NumeroCuentaPago { get; set; }
     public bool ShouldSerializeNumeroCuentaPago() => !string.IsNullOrWhiteSpace(NumeroCuentaPago);
 
-    [XmlElement("BancoPago", Order = 14)]
+    [XmlElement("BancoPago", Order = 15)]
     public string? BancoPago { get; set; }
     public bool ShouldSerializeBancoPago() => !string.IsNullOrWhiteSpace(BancoPago);
 
-    [XmlElement("FechaDesde", Order = 15)]
+    [XmlElement("FechaDesde", Order = 16)]
     public string? FechaDesde { get; set; }
     public bool ShouldSerializeFechaDesde() => !string.IsNullOrWhiteSpace(FechaDesde);
 
-    [XmlElement("FechaHasta", Order = 16)]
+    [XmlElement("FechaHasta", Order = 17)]
     public string? FechaHasta { get; set; }
     public bool ShouldSerializeFechaHasta() => !string.IsNullOrWhiteSpace(FechaHasta);
 
-    [XmlElement("TotalPaginas", Order = 17)]
+    [XmlElement("TotalPaginas", Order = 18)]
     public int? TotalPaginas { get; set; }
     public bool ShouldSerializeTotalPaginas() => TotalPaginas.HasValue;
+}
+
+public class EcfXmlTablaFormasPago
+{
+    [XmlElement("FormaDePago")]
+    public List<EcfXmlFormaDePago> FormasDePago { get; set; } = new();
+}
+
+public class EcfXmlFormaDePago
+{
+    [XmlElement("FormaPago", Order = 1)]
+    public int FormaPago { get; set; }
+
+    [XmlIgnore]
+    public decimal MontoPago { get; set; }
+
+    [XmlElement("MontoPago", Order = 2)]
+    public string MontoPagoFormatted
+    {
+        get => ZynstormECFPlatform.Common.Utilities.Tools.FormatDecimal(MontoPago) ?? "0.00";
+        set => MontoPago = decimal.TryParse(value, out var parsed) ? parsed : 0m;
+    }
 }
 

@@ -26,12 +26,14 @@ public class ReceivedEcfEmissionResultDto
     public string SignatureDate { get; set; } = string.Empty;
     public string QrUrl { get; set; } = string.Empty;
 
-    public string UrlQr => QrUrl;
-
     [JsonIgnore]
     public string QrImageUrl { get; set; } = string.Empty;
+
     public string? HangfireJobId { get; set; }
+
+    [JsonIgnore]
     public EcfXmlValidationResult? XmlValidation { get; set; }
+
     public string UnsignedXml { get; set; } = string.Empty;
     public string SignedXml { get; set; } = string.Empty;
     public List<string> DtoErrors { get; set; } = [];

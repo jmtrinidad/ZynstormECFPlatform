@@ -14,11 +14,13 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
     [ApiController]
     [ApiKeyAuth]
     public class EcfController(
-        IEcfGeneratorService ecfGeneratorService,
-        IReceivedEcfProductionService receivedEcfProductionService) : ControllerBase
+        IEcfProductionGeneratorService ecfGeneratorService,
+        IReceivedEcfProductionService receivedEcfProductionService,
+        ICacheService cacheService) : ControllerBase
     {
-        private readonly IEcfGeneratorService _ecfGeneratorService = ecfGeneratorService;
+        private readonly IEcfProductionGeneratorService _ecfGeneratorService = ecfGeneratorService;
         private readonly IReceivedEcfProductionService _receivedEcfProductionService = receivedEcfProductionService;
+        private readonly ICacheService _cacheService = cacheService;
 
         /// <summary>
         /// Genera un XML de e-CF a partir del DTO de factura y lo valida contra el esquema XSD de la DGII.
@@ -107,6 +109,42 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     detail = ex.Message
                 });
             }
+        }
+
+        /// <summary>
+        /// Consulta el estado del envio a DGII por TrackId. Este endpoint usa el estado cacheado por el proceso inicial
+        /// y por el job de seguimiento.
+        /// </summary>
+        [HttpGet("status/{trackId}")]
+        [HttpGet("estado-envio/{trackId}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult GetEmissionStatus(string trackId)
+        {
+            if (string.IsNullOrWhiteSpace(trackId))
+                return BadRequest(new { success = false, message = "Debe proporcionar el TrackId." });
+
+            var cacheKey = $"EcfStatus_{trackId.Trim()}";
+            var status = _cacheService.Get<DgiiStatusResponse>(cacheKey);
+
+            if (status == null)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    isPending = true,
+                    trackId,
+                    message = "Estado no encontrado o expirado. Si el envio fue reciente, intente consultar nuevamente en unos segundos."
+                });
+            }
+
+            return Ok(new
+            {
+                success = string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase),
+                isPending = ReceivedEcfProductionService.IsPendingDgiiStatus(status),
+                trackId,
+                status
+            });
         }
 
         /// <summary>

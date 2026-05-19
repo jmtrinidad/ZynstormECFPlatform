@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ZynstormECFPlatform.Data;
@@ -11,9 +12,11 @@ using ZynstormECFPlatform.Data;
 namespace ZynstormECFPlatform.Data.Migrations
 {
     [DbContext(typeof(StorageContext))]
-    partial class StorageContextModelSnapshot : ModelSnapshot
+    [Migration("20260519020551_MakeClientBrancheIdOptionalInEcfDocument")]
+    partial class MakeClientBrancheIdOptionalInEcfDocument
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1460,152 +1463,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.HasKey("CurrencyId");
 
                     b.ToTable("Currency");
-
-                    b.HasData(
-                        new
-                        {
-                            CurrencyId = 1,
-                            Code = "DOP",
-                            IsDeleted = false,
-                            Name = "PESO DOMINICANO",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 2,
-                            Code = "USD",
-                            IsDeleted = false,
-                            Name = "DOLAR ESTADOUNIDENSE",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 3,
-                            Code = "EUR",
-                            IsDeleted = false,
-                            Name = "EURO",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 4,
-                            Code = "BRL",
-                            IsDeleted = false,
-                            Name = "REAL BRASILENO",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 5,
-                            Code = "CAD",
-                            IsDeleted = false,
-                            Name = "DOLAR CANADIENSE",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 6,
-                            Code = "CHF",
-                            IsDeleted = false,
-                            Name = "FRANCO SUIZO",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 7,
-                            Code = "CHY",
-                            IsDeleted = false,
-                            Name = "YUAN CHINO",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 8,
-                            Code = "XDR",
-                            IsDeleted = false,
-                            Name = "DERECHO ESPECIAL DE GIRO",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 9,
-                            Code = "DKK",
-                            IsDeleted = false,
-                            Name = "CORONA DANESA",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 10,
-                            Code = "GBP",
-                            IsDeleted = false,
-                            Name = "LIBRA ESTERLINA",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 11,
-                            Code = "JPY",
-                            IsDeleted = false,
-                            Name = "YEN JAPONES",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 12,
-                            Code = "NOK",
-                            IsDeleted = false,
-                            Name = "CORONA NORUEGA",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 13,
-                            Code = "SCP",
-                            IsDeleted = false,
-                            Name = "LIBRA ESCOCESA",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 14,
-                            Code = "SEK",
-                            IsDeleted = false,
-                            Name = "CORONA SUECA",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 15,
-                            Code = "VEF",
-                            IsDeleted = false,
-                            Name = "BOLIVAR FUERTE VENEZOLANO",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 16,
-                            Code = "HTG",
-                            IsDeleted = false,
-                            Name = "GURDA HAITIANA",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 17,
-                            Code = "MXN",
-                            IsDeleted = false,
-                            Name = "PESO MEXICANO",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        },
-                        new
-                        {
-                            CurrencyId = 18,
-                            Code = "COP",
-                            IsDeleted = false,
-                            Name = "PESO COLOMBIANO",
-                            RegisteredAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified)
-                        });
                 });
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.DGIIUnit", b =>

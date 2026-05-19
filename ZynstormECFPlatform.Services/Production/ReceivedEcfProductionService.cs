@@ -41,6 +41,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     private readonly IEcfStatusHistoryService _ecfStatusHistoryService;
     private readonly ISystemLogService _systemLogService;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ICacheService _cacheService;
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _hostEnvironment;
 
@@ -62,6 +63,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         IEcfStatusHistoryService ecfStatusHistoryService,
         ISystemLogService systemLogService,
         IHttpClientFactory httpClientFactory,
+        ICacheService cacheService,
         IConfiguration configuration,
         IHostEnvironment hostEnvironment)
     {
@@ -82,6 +84,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         _ecfStatusHistoryService = ecfStatusHistoryService;
         _systemLogService = systemLogService;
         _httpClientFactory = httpClientFactory;
+        _cacheService = cacheService;
         _configuration = configuration;
         _hostEnvironment = hostEnvironment;
     }
@@ -92,6 +95,13 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         int statusDelayMilliseconds = 750)
     {
         var resultDto = new ReceivedEcfEmissionResultDto();
+
+        var targetEnvStr = _configuration["EcfXmlValidation:TargetDgiiEnvironment"];
+        var targetEnvironment = environment;
+        if (!string.IsNullOrEmpty(targetEnvStr) && Enum.TryParse<DgiiEnvironment>(targetEnvStr, true, out var parsedEnv))
+        {
+            targetEnvironment = parsedEnv;
+        }
 
         var dtoErrors = _generatorService.ValidateDto(dto);
         if (dtoErrors.Count > 0)
@@ -113,8 +123,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)
             ?? throw new Exception("ApiKey no encontrada.");
         var clientBranch = await _clientBrancheService.GetByAsync(x => x.ClientId == client.ClientId && x.IsMain)
-            ?? await _clientBrancheService.GetByAsync(x => x.ClientId == client.ClientId)
-            ?? throw new Exception($"El cliente con RNC {issuerRnc} no tiene sucursal configurada.");
+            ?? await _clientBrancheService.GetByAsync(x => x.ClientId == client.ClientId);
         var currency = await _currencyService.GetByAsync(x => x.Code == "DOP")
             ?? await _currencyService.GetByAsync(x => x.CurrencyId > 0)
             ?? throw new Exception("No hay moneda configurada para registrar el e-CF.");
@@ -181,15 +190,24 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
         if (ShouldUseStagingXmlValidation())
         {
-            return await ProcessWithStagingValidationAsync(resultDto, ecfDocument, client.ClientId, signedXml, statusDelayMilliseconds);
+            return await ProcessWithStagingValidationAsync(
+                resultDto,
+                ecfDocument,
+                client.ClientId,
+                signedXml,
+                statusDelayMilliseconds,
+                issuerRnc,
+                targetEnvironment,
+                certBase64,
+                certPass);
         }
 
-        var token = await _authService.GetTokenAsync(issuerRnc, environment, certBase64, certPass);
+        var token = await _authService.GetTokenAsync(issuerRnc, targetEnvironment, certBase64, certPass);
         var total = CalculateTransmissionTotal(dto);
 
         await MarkDocumentAsync(ecfDocument, 8, "Enviando e-CF a DGII.");
 
-        var transmission = await _transmissionService.SendEcfAsync(environment, token, signedXml, ecfType, total, issuerRnc, eNcf, isSummary: false);
+        var transmission = await _transmissionService.SendEcfAsync(targetEnvironment, token, signedXml, ecfType, total, issuerRnc, eNcf, isSummary: false);
 
         resultDto.Transmission = transmission;
         resultDto.TrackId = transmission.TrackId;
@@ -207,7 +225,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         {
             await SaveTransmissionAsync(ecfDocument, transmission, statusId: 9, signedXml);
             await MarkDocumentAsync(ecfDocument, 9, $"DGII recibio el e-CF. TrackId: {transmission.TrackId}");
-            var status = await PollInitialDgiiStatusAsync(environment, token, transmission.TrackId);
+            var status = await PollInitialDgiiStatusAsync(targetEnvironment, token, transmission.TrackId);
+            _cacheService.Set($"EcfStatus_{transmission.TrackId}", status, TimeSpan.FromHours(1));
             resultDto.Status = status;
             resultDto.Success = string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase);
             var statusId = MapDgiiStatusToEcfStatus(status);
@@ -227,7 +246,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
                 resultDto.Message = $"DGII aun procesa el e-CF. TrackId: {transmission.TrackId}";
 
                 var jobId = BackgroundJob.Schedule<EcfTrackingJob>(
-                    j => j.Execute(transmission.TrackId, environment, issuerRnc, certBase64, certPass, ecfDocument.EcfDocumentId, 1),
+                    j => j.Execute(transmission.TrackId, targetEnvironment, issuerRnc, certBase64, certPass, ecfDocument.EcfDocumentId, 1),
                     TimeSpan.FromSeconds(3));
 
                 ecfDocument.HangfireJobId = jobId;
@@ -258,18 +277,41 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         EcfDocument ecfDocument,
         int clientId,
         string signedXml,
-        int statusDelayMilliseconds)
+        int statusDelayMilliseconds,
+        string issuerRnc,
+        DgiiEnvironment targetEnvironment,
+        string certBase64,
+        string certPass)
     {
         var validationUrl = _configuration["EcfXmlValidation:DevStagingUrl"]
             ?? "https://ecfstaging.zynstorm.com/api/v1/EcfXmlValidation/validate";
+        //https://ecfstaging.zynstorm.com/api
+        await AddLogAsync(ecfDocument, clientId, "Information", $"Ambiente {_hostEnvironment.EnvironmentName}: obteniendo token de autenticación local.");
+
+        string token = "";
+        try
+        {
+            token = await _authService.GetTokenAsync(issuerRnc, targetEnvironment, certBase64, certPass);
+            await AddLogAsync(ecfDocument, clientId, "Information", "Token de autenticación local obtenido correctamente.");
+        }
+        catch (Exception ex)
+        {
+            await AddLogAsync(ecfDocument, clientId, "Warning", $"No fue posible obtener el token local: {ex.Message}");
+        }
 
         await AddLogAsync(ecfDocument, clientId, "Information", $"Ambiente {_hostEnvironment.EnvironmentName}: enviando XML al validador interno {validationUrl}.");
 
         try
         {
             var client = _httpClientFactory.CreateClient();
-            using var content = new StringContent(signedXml, Encoding.UTF8, "application/xml");
-            using var response = await client.PostAsync(validationUrl, content);
+            using var request = new HttpRequestMessage(HttpMethod.Post, validationUrl);
+            if (!string.IsNullOrEmpty(token))
+            {
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+            request.Content = new StringContent(signedXml, Encoding.UTF8, "application/xml");
+
+            using var response = await client.SendAsync(request);
             var responseBody = await response.Content.ReadAsStringAsync();
             var receipt = DeserializeValidationReceipt(responseBody);
 
@@ -294,7 +336,12 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             await Task.Delay(Math.Max(0, statusDelayMilliseconds));
 
             var statusUrl = BuildValidationStatusUrl(validationUrl, receipt.TrackId);
-            using var statusResponse = await client.GetAsync(statusUrl);
+            using var statusRequest = new HttpRequestMessage(HttpMethod.Get, statusUrl);
+            if (!string.IsNullOrEmpty(token))
+            {
+                statusRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+            using var statusResponse = await client.SendAsync(statusRequest);
             var statusBody = await statusResponse.Content.ReadAsStringAsync();
             var status = DeserializeValidationStatus(statusBody);
 
@@ -380,8 +427,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
     private bool ShouldUseStagingXmlValidation()
     {
-        return _hostEnvironment.IsDevelopment()
-            || _hostEnvironment.IsStaging();
+        return _configuration.GetValue<bool>("EcfXmlValidation:UseInternalValidator");
     }
 
     private static EcfXmlValidationReceipt? DeserializeValidationReceipt(string responseBody)
@@ -442,7 +488,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     private async Task<EcfDocument> CreateEcfDocumentAsync(
         EcfInvoiceRequestDto dto,
         Client client,
-        ClientBranche clientBranch,
+        ClientBranche? clientBranch,
         ApiKey apiKey,
         Currency currency,
         Core.Entities.EcfType ecfType)
@@ -457,7 +503,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         var ecfDocument = new EcfDocument
         {
             ClientId = client.ClientId,
-            ClientBrancheId = clientBranch.ClientBrancheId,
+            ClientBrancheId = clientBranch?.ClientBrancheId,
             ApiKeyId = apiKey.ApiKeyId,
             EcfTypeId = ecfType.EcfTypeId,
             ExternalReference = TrimTo(dto.ExternalReference ?? header.Emisor.NumeroFacturaInterna ?? header.IdDoc.eNCF, 70),
@@ -584,7 +630,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         });
     }
 
-    internal static int MapDgiiStatusToEcfStatus(DgiiStatusResponse status)
+    public static int MapDgiiStatusToEcfStatus(DgiiStatusResponse status)
     {
         if (string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase)) return 10;
         if (string.Equals(status.Estado, "Rechazado", StringComparison.OrdinalIgnoreCase)) return 11;
@@ -592,7 +638,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         return 7;
     }
 
-    internal static bool IsPendingDgiiStatus(DgiiStatusResponse status)
+    public static bool IsPendingDgiiStatus(DgiiStatusResponse status)
     {
         if (string.IsNullOrWhiteSpace(status.Estado)) return true;
         return status.Estado.Equals("Recibido", StringComparison.OrdinalIgnoreCase)
@@ -924,12 +970,19 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         {
             if (path.Contains("Signature") || path.Contains("FechaHoraFirma")) continue;
             if (skippablePaths.Contains(path)) continue;
+            if (IsOptionalXmlProdPath(path)) continue;
 
             if (!generatedPaths.Contains(path))
                 errors.Add($"Elemento '{path}' (presente en referencia XmlProd) no se encuentra en el XML generado.");
         }
 
         return errors;
+    }
+
+    private static bool IsOptionalXmlProdPath(string path)
+    {
+        return path.StartsWith("ECF/DescuentosORecargos", StringComparison.OrdinalIgnoreCase) ||
+               path.StartsWith("RFCE/DescuentosORecargos", StringComparison.OrdinalIgnoreCase);
     }
 
     private static HashSet<string> GetUniqueElementPaths(XmlDocument doc)

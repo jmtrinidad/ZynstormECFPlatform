@@ -45,31 +45,34 @@ public class DgiiAuthService : IDgiiAuthService
 
         string envKey = environment.ToString();
         string baseAuthUrl;
-
-        if (environment == DgiiEnvironment.CerteCF)
-        {
-            baseAuthUrl = _configuration["DgiiUrls:CerteCF:Auth"]
-                ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:Auth no fue encontrada.");
-        }
-        else
-        {
-            string baseUrl = _configuration[$"DgiiUrls:{envKey}"]
-                ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey} no fue encontrada.");
-            baseAuthUrl = $"{baseUrl}/autenticacion";
-        }
-
         string semillaUrl;
         string validacionUrl;
 
-        if (environment == DgiiEnvironment.CerteCF)
+        bool useInternalValidator = _configuration.GetValue<bool>("EcfXmlValidation:UseInternalValidator");
+        if (useInternalValidator)
         {
-            semillaUrl = $"{baseAuthUrl}/api/Autenticacion/Semilla";
-            validacionUrl = $"{baseAuthUrl}/api/Autenticacion/ValidarSemilla";
+            string platformUrl = _configuration["AppSettings:PlatformUrl"] ?? "https://ecfstaging.zynstorm.com/api";
+            baseAuthUrl = $"{platformUrl.TrimEnd('/')}/v1/Fe";
+            semillaUrl = $"{baseAuthUrl}/autenticacion/api/Semilla";
+            validacionUrl = $"{baseAuthUrl}/autenticacion/api/validacioncertificado";
         }
         else
         {
-            semillaUrl = $"{baseAuthUrl}/api/semilla";
-            validacionUrl = $"{baseAuthUrl}/api/validacioncertificado";
+            if (environment == DgiiEnvironment.CerteCF)
+            {
+                baseAuthUrl = _configuration["DgiiUrls:CerteCF:Auth"]
+                    ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:Auth no fue encontrada.");
+                semillaUrl = $"{baseAuthUrl}/api/Autenticacion/Semilla";
+                validacionUrl = $"{baseAuthUrl}/api/Autenticacion/ValidarSemilla";
+            }
+            else
+            {
+                string baseUrl = _configuration[$"DgiiUrls:{envKey}"]
+                    ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey} no fue encontrada.");
+                baseAuthUrl = $"{baseUrl}/autenticacion";
+                semillaUrl = $"{baseAuthUrl}/api/semilla";
+                validacionUrl = $"{baseAuthUrl}/api/validacioncertificado";
+            }
         }
 
         // 1. Get Semilla
@@ -89,7 +92,12 @@ public class DgiiAuthService : IDgiiAuthService
         // 3. Request Token
         HttpResponseMessage tokenResponse;
 
-        if (environment == DgiiEnvironment.CerteCF)
+        if (useInternalValidator)
+        {
+            using var requestContent = new StringContent(signedSemillaXml, Encoding.UTF8, "application/xml");
+            tokenResponse = await _httpClient.PostAsync(validacionUrl, requestContent);
+        }
+        else if (environment == DgiiEnvironment.CerteCF)
         {
             var multipartContent = new MultipartFormDataContent();
             var xmlFileContent = new StringContent(signedSemillaXml, Encoding.UTF8, "application/xml");

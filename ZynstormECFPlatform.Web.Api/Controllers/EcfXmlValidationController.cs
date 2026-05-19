@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Hangfire;
 using Microsoft.AspNetCore.Mvc;
 using ZynstormECFPlatform.Abstractions.Services;
@@ -9,7 +10,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers;
 /// Controller independiente para la validación exhaustiva de XMLs e-CF. Desacoplado de la lógica de generación y
 /// transmisión.
 /// </summary>
-[Route("api/v1/[controller]")]
+[ApiVersion("1.0")]
+[Route("v{version:apiVersion}/[controller]")]
 [ApiController]
 public class EcfXmlValidationController : ControllerBase
 {

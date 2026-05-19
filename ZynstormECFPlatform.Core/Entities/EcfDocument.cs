@@ -11,7 +11,7 @@ public partial class EcfDocument : BaseEntity
     public int ClientId { get; set; }
 
     [XmlIgnore]
-    public int ClientBrancheId { get; set; }
+    public int? ClientBrancheId { get; set; }
 
     [XmlIgnore]
     public int ApiKeyId { get; set; }
@@ -74,7 +74,7 @@ public partial class EcfDocument : BaseEntity
     public virtual Client Client { get; set; } = null!;
 
     [XmlIgnore]
-    public virtual ClientBranche ClientBranche { get; set; } = null!;
+    public virtual ClientBranche? ClientBranche { get; set; }
 
     [XmlIgnore]
     public virtual Currency Currency { get; set; } = null!;

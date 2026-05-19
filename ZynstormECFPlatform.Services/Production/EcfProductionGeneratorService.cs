@@ -237,6 +237,31 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
         if (idDoc.TipoPago == "2" && string.IsNullOrWhiteSpace(idDoc.FechaLimitePago))
             errors.Add("La fecha limite de pago es requerida cuando el tipo de pago es Credito (2).");
 
+        var formasPago = idDoc.TablaFormasPago?.FormaDePago;
+        var hasFormaPagoShortcut = !string.IsNullOrWhiteSpace(idDoc.FormaPago);
+        if (!string.IsNullOrWhiteSpace(idDoc.TipoPago) && formasPago?.Any() != true && !hasFormaPagoShortcut)
+            errors.Add("Debe proveer al menos una FormaPago en IdDoc.TablaFormasPago.FormaDePago.");
+
+        if (hasFormaPagoShortcut)
+        {
+            if (!IsValidPaymentForm(idDoc.FormaPago))
+                errors.Add("FormaPago debe estar entre 1 y 8.");
+            if (idDoc.MontoPago == null || idDoc.MontoPago < 0)
+                errors.Add("MontoPago es requerido y no puede ser negativo cuando se envia FormaPago.");
+        }
+
+        if (formasPago?.Any() == true)
+        {
+            for (var i = 0; i < formasPago.Count; i++)
+            {
+                var formaPago = formasPago[i];
+                if (!IsValidPaymentForm(formaPago.FormaPago))
+                    errors.Add($"FormaDePago {i + 1}: FormaPago debe estar entre 1 y 8.");
+                if (formaPago.MontoPago < 0)
+                    errors.Add($"FormaDePago {i + 1}: MontoPago no puede ser negativo.");
+            }
+        }
+
         var buyerRncRequired = ecfType is 31 or 41 or 44 or 45;
         if (buyerRncRequired && string.IsNullOrWhiteSpace(buyer?.RNCComprador))
             errors.Add($"El RNC/Cedula del comprador es requerido para el comprobante tipo {ecfType}.");
@@ -296,6 +321,7 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
                 if (string.IsNullOrWhiteSpace(itm.IndicadorFacturacion)) errors.Add($"Item {i + 1}: El indicador de facturacion es requerido.");
                 if (string.IsNullOrWhiteSpace(itm.NombreItem)) errors.Add($"Item {i + 1}: El nombre es requerido.");
                 if (itm.CantidadItem <= 0) errors.Add($"Item {i + 1}: La cantidad debe ser mayor a cero.");
+                if (string.IsNullOrWhiteSpace(itm.UnidadMedida)) errors.Add($"Item {i + 1}: La unidad de medida es requerida.");
                 if (itm.PrecioUnitarioItem < 0) errors.Add($"Item {i + 1}: El precio unitario no puede ser negativo.");
                 if (itm.MontoItem <= 0) errors.Add($"Item {i + 1}: El monto del item debe ser mayor a cero.");
 
@@ -488,6 +514,8 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
             })
             .ToList() ?? [];
 
+        var formasPago = BuildFormasPago(e.IdDoc);
+
         var root = new EcfXmlRoot
         {
             Encabezado = new EcfXmlEncabezado
@@ -504,6 +532,9 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
                     PaymentType = int.TryParse(e.IdDoc.TipoPago, out int tp) ? tp : null,
                     FechaLimitePago = e.IdDoc.FechaLimitePago,
                     TerminoPago = e.IdDoc.TerminoPago,
+                    TablaFormasPago = formasPago.Count > 0
+                        ? new EcfXmlTablaFormasPago { FormasDePago = formasPago }
+                        : null,
                     TipoCuentaPago = e.IdDoc.TipoCuentaPago,
                     NumeroCuentaPago = e.IdDoc.NumeroCuentaPago,
                     BancoPago = e.IdDoc.BancoPago,
@@ -539,7 +570,9 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
                     CorreoComprador = e.Comprador.CorreoComprador,
                     DireccionComprador = e.Comprador.DireccionComprador,
                     PaisComprador = e.Comprador.PaisComprador,
-                    TelefonoAdicional = e.Comprador.TelefonoAdicional,
+                    TelefonoAdicional = string.IsNullOrWhiteSpace(e.Comprador.TelefonoAdicional)
+                        ? e.Emisor.Telefono
+                        : e.Comprador.TelefonoAdicional,
                     MunicipioComprador = e.Comprador.MunicipioComprador,
                     ProvinciaComprador = e.Comprador.ProvinciaComprador,
                     FechaEntrega = e.Comprador.FechaEntrega,
@@ -573,6 +606,38 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
         return root;
     }
 
+    private static List<EcfXmlFormaDePago> BuildFormasPago(EcfIdDocRequest idDoc)
+    {
+        if (idDoc.TablaFormasPago?.FormaDePago?.Any() == true)
+        {
+            return idDoc.TablaFormasPago.FormaDePago
+                .Select(f => new EcfXmlFormaDePago
+                {
+                    FormaPago = int.TryParse(f.FormaPago, out var formaPago) ? formaPago : 0,
+                    MontoPago = f.MontoPago
+                })
+                .Where(f => f.FormaPago > 0)
+                .ToList();
+        }
+
+        if (!string.IsNullOrWhiteSpace(idDoc.FormaPago) && idDoc.MontoPago.HasValue)
+        {
+            return
+            [
+                new EcfXmlFormaDePago
+                {
+                    FormaPago = int.TryParse(idDoc.FormaPago, out var formaPago) ? formaPago : 0,
+                    MontoPago = idDoc.MontoPago.Value
+                }
+            ];
+        }
+
+        return [];
+    }
+
+    private static bool IsValidPaymentForm(string? value) =>
+        int.TryParse(value, out var formaPago) && formaPago is >= 1 and <= 8;
+
     private static RfceXmlRoot MapToRfceXmlRoot(EcfInvoiceRequestDto dto)
     {
         var e = dto.ECF.Encabezado;
@@ -587,7 +652,8 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
                     EcfType = 32,
                     Ncf = e.IdDoc.eNCF,
                     TipoIngresos = e.IdDoc.TipoIngresos,
-                    TipoPago = int.TryParse(e.IdDoc.TipoPago, out int tp) ? tp : null
+                    TipoPago = int.TryParse(e.IdDoc.TipoPago, out int tp) ? tp : null,
+                    TablaFormasPago = BuildRfceFormasPago(e.IdDoc)
                 },
                 Emisor = new RfceXmlEmisor
                 {
@@ -625,6 +691,21 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
         root.Signature = doc.CreateElement("Signature", "http://www.w3.org/2000/09/xmldsig#");
 
         return root;
+    }
+
+    private static RfceXmlTablaFormasPago? BuildRfceFormasPago(EcfIdDocRequest idDoc)
+    {
+        var formasPago = BuildFormasPago(idDoc)
+            .Select(f => new RfceXmlFormaDePago
+            {
+                FormaPago = f.FormaPago,
+                MontoPago = f.MontoPago
+            })
+            .ToList();
+
+        return formasPago.Count > 0
+            ? new RfceXmlTablaFormasPago { FormasDePago = formasPago }
+            : null;
     }
 
     private static string GenerateRandomCode(int length)
