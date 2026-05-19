@@ -16,11 +16,13 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
     public class EcfController(
         IEcfProductionGeneratorService ecfGeneratorService,
         IReceivedEcfProductionService receivedEcfProductionService,
-        ICacheService cacheService) : ControllerBase
+        ICacheService cacheService,
+        ILogger<EcfController> logger) : ControllerBase
     {
         private readonly IEcfProductionGeneratorService _ecfGeneratorService = ecfGeneratorService;
         private readonly IReceivedEcfProductionService _receivedEcfProductionService = receivedEcfProductionService;
         private readonly ICacheService _cacheService = cacheService;
+        private readonly ILogger<EcfController> _logger = logger;
 
         /// <summary>
         /// Genera un XML de e-CF a partir del DTO de factura y lo valida contra el esquema XSD de la DGII.
@@ -67,10 +69,12 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             }
             catch (ArgumentException ex)
             {
+                _logger.LogError(ex, ex.Message);
                 return BadRequest(new { success = false, message = ex.Message });
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, ex.Message);
                 return StatusCode(StatusCodes.Status500InternalServerError, new
                 {
                     success = false,
@@ -103,6 +107,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, ex.Message);
+
                 return StatusCode(StatusCodes.Status500InternalServerError, new
                 {
                     success = false,
