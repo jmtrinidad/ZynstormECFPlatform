@@ -58,25 +58,26 @@ public class DgiiAuthService : IDgiiAuthService
         }
         else
         {
-            if (environment == DgiiEnvironment.CerteCF)
-            {
-                baseAuthUrl = _configuration["DgiiUrls:CerteCF:Auth"]
-                    ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:Auth no fue encontrada.");
-                semillaUrl = $"{baseAuthUrl}/api/Autenticacion/Semilla";
-                validacionUrl = $"{baseAuthUrl}/api/Autenticacion/ValidarSemilla";
-            }
-            else
-            {
-                string baseUrl = _configuration[$"DgiiUrls:{envKey}"]
-                    ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey} no fue encontrada.");
-                baseAuthUrl = $"{baseUrl}/autenticacion";
-                semillaUrl = $"{baseAuthUrl}/api/semilla";
-                validacionUrl = $"{baseAuthUrl}/api/validacioncertificado";
-            }
+            baseAuthUrl = _configuration[$"DgiiUrls:{envKey}:Auth"]
+                ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey}:Auth no fue encontrada.");
+            semillaUrl = $"{baseAuthUrl}/api/Autenticacion/Semilla";
+            validacionUrl = $"{baseAuthUrl}/api/Autenticacion/ValidarSemilla";
         }
 
         // 1. Get Semilla
-        var semillaResponse = await _httpClient.GetAsync(semillaUrl);
+        _logger.LogError("[DgiiAuth] Ambiente={Env} | useInternalValidator={UseInternal} | Solicitando semilla en: {SemillaUrl}", environment, useInternalValidator, semillaUrl);
+
+        HttpResponseMessage semillaResponse;
+        try
+        {
+            semillaResponse = await _httpClient.GetAsync(semillaUrl);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[DgiiAuth] Fallo al conectar con DGII para obtener semilla. URL={SemillaUrl}", semillaUrl);
+            throw;
+        }
+
         semillaResponse.EnsureSuccessStatusCode();
         var semillaXml = await semillaResponse.Content.ReadAsStringAsync();
 
@@ -90,6 +91,7 @@ public class DgiiAuthService : IDgiiAuthService
         //_logger.LogError("=== SEMILLA FIRMADA A ENVIAR A DGII [{Env}] ===\n{Xml}", environment, signedSemillaXml);
 
         // 3. Request Token
+        // DGII Test, Production y CerteCF usan multipart/form-data para ValidarSemilla
         HttpResponseMessage tokenResponse;
 
         if (useInternalValidator)
@@ -97,17 +99,13 @@ public class DgiiAuthService : IDgiiAuthService
             using var requestContent = new StringContent(signedSemillaXml, Encoding.UTF8, "application/xml");
             tokenResponse = await _httpClient.PostAsync(validacionUrl, requestContent);
         }
-        else if (environment == DgiiEnvironment.CerteCF)
+        else
         {
+            // All DGII environments (Test, Production, CerteCF) use multipart/form-data
             var multipartContent = new MultipartFormDataContent();
             var xmlFileContent = new StringContent(signedSemillaXml, Encoding.UTF8, "application/xml");
             multipartContent.Add(xmlFileContent, "xml", "semilla.xml");
             tokenResponse = await _httpClient.PostAsync(validacionUrl, multipartContent);
-        }
-        else
-        {
-            using var requestContent = new StringContent(signedSemillaXml, Encoding.UTF8, "application/xml");
-            tokenResponse = await _httpClient.PostAsync(validacionUrl, requestContent);
         }
 
         tokenResponse.EnsureSuccessStatusCode();

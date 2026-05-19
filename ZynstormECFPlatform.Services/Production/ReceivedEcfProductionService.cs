@@ -795,6 +795,10 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         var montoTotalUrl = montoTotal.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
         // E32 (Factura de Consumo) con monto menor a 250K usa el portal FC
+        // URLs confirmadas en vivo:
+        //   Test:       https://fc.dgii.gov.do/testecf/ConsultaTimbreFC
+        //   CerteCF:    https://fc.dgii.gov.do/CerteCF/ConsultaTimbreFC
+        //   Production: https://fc.dgii.gov.do/ConsultaTimbreFC
         if (ecfType == 32 && montoTotal < 250000m)
         {
             string fcBase = environment == DgiiEnvironment.Test
@@ -806,9 +810,13 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             return $"{fcBase}/ConsultaTimbreFC?RncEmisor={rncEmisor}&ENCF={encf}&MontoTotal={montoTotalUrl}&CodigoSeguridad={Uri.EscapeDataString(securityCode)}";
         }
 
-        // Base URL segun ambiente
+        // Base URL segun ambiente para ConsultaTimbre (todos los demas tipos de e-CF)
+        // URLs confirmadas en vivo:
+        //   Test:       https://ecf.dgii.gov.do/TesteCF/ConsultaTimbre
+        //   CerteCF:    https://ecf.dgii.gov.do/CerteCF/ConsultaTimbre
+        //   Production: https://ecf.dgii.gov.do/ConsultaTimbre
         string baseUrl = environment == DgiiEnvironment.Test
-            ? "https://ecf.dgii.gov.do/testecf"
+            ? "https://ecf.dgii.gov.do/TesteCF"
             : environment == DgiiEnvironment.CerteCF
                 ? "https://ecf.dgii.gov.do/CerteCF"
                 : "https://ecf.dgii.gov.do";

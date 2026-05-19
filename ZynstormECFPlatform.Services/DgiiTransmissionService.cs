@@ -38,67 +38,58 @@ public class DgiiTransmissionService : IDgiiTransmissionService
         else
         {
             string envKey = environment.ToString();
-            string baseUrl;
 
             if (environment == DgiiEnvironment.CerteCF)
             {
-                bool isB2CSummaryChannel = isSummary;
-
-                if (isB2CSummaryChannel) 
+                if (isSummary)
                 {
-                    baseUrl = _configuration["DgiiUrls:CerteCF:RecepcionFC"] 
+                    string baseUrl = _configuration["DgiiUrls:CerteCF:RecepcionFC"]
                         ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:RecepcionFC no fue encontrada.");
-                    
-                    // ── UNIFIED: Both Summary and Individual use the /ecf endpoint in RecepcionFC ──
-                    // DGII differentiates them by the XML root element (<RFCE> vs <ECF>)
                     endpointUrl = $"{baseUrl}/api/recepcion/ecf";
                 }
                 else
                 {
-                    baseUrl = _configuration["DgiiUrls:CerteCF:Recepcion"] 
+                    string baseUrl = _configuration["DgiiUrls:CerteCF:Recepcion"]
                         ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:Recepcion no fue encontrada.");
-                    endpointUrl = $"{baseUrl}/api/facturaselectronicas";
+                    endpointUrl = $"{baseUrl}/api/FacturasElectronicas";
                 }
             }
             else
             {
-                baseUrl = _configuration[$"DgiiUrls:{envKey}"] 
-                    ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey} no fue encontrada en appsettings.json");
-                
-                bool isResumenFacturaConsumo = isSummary;
-                endpointUrl = isResumenFacturaConsumo 
-                    ? $"{baseUrl}/recepcionfc/api/recepcion/ecf" 
-                    : $"{baseUrl}/recepcion/api/facturaselectronicas";
+                if (isSummary)
+                {
+                    string baseUrl = _configuration[$"DgiiUrls:{envKey}:RecepcionFC"]
+                        ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey}:RecepcionFC no fue encontrada.");
+                    endpointUrl = $"{baseUrl}/api/recepcion/ecf";
+                }
+                else
+                {
+                    string baseUrl = _configuration[$"DgiiUrls:{envKey}:Recepcion"]
+                        ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey}:Recepcion no fue encontrada.");
+                    endpointUrl = $"{baseUrl}/api/FacturasElectronicas";
+                }
             }
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Post, endpointUrl);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        
-        // CerteCF always uses multipart/form-data in this implementation to match portal behavior.
+
         if (useInternalValidator)
         {
-            // DEV env uses raw body or form content, we use raw application/xml
+            // DEV env uses raw application/xml body
             request.Content = new StringContent(signedXml, Encoding.UTF8, "application/xml");
         }
-        else if (environment == DgiiEnvironment.CerteCF)
+        else
         {
+            // DGII Test, Production y CerteCF usan multipart/form-data
             string fileName = $"{rncEmisor}{eNcf}.xml";
             var multipartContent = new MultipartFormDataContent();
-            
-            // Use UTF-8 WITHOUT BOM to avoid "001 Archivo no válido"
             var utf8WithoutBom = new System.Text.UTF8Encoding(false);
             var xmlBytes = utf8WithoutBom.GetBytes(signedXml);
             var xmlFileContent = new ByteArrayContent(xmlBytes);
             xmlFileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/xml");
-            
             multipartContent.Add(xmlFileContent, "xml", fileName);
             request.Content = multipartContent;
-        }
-        else
-        {
-            // Production/Test usually expects plain application/xml body
-            request.Content = new StringContent(signedXml, Encoding.UTF8, "application/xml");
         }
 
         var response = await _httpClient.SendAsync(request);
@@ -160,31 +151,22 @@ public class DgiiTransmissionService : IDgiiTransmissionService
 
     public async Task<DgiiStatusResponse> GetStatusAsync(DgiiEnvironment environment, string token, string trackId)
     {
-        string baseUrl;
-        if (environment == DgiiEnvironment.CerteCF)
-        {
-            baseUrl = _configuration["DgiiUrls:CerteCF:Consulta"] 
-                ?? throw new InvalidOperationException("La configuración DgiiUrls:CerteCF:Consulta no fue encontrada.");
-        }
-        else
-        {
-            string envKey = environment.ToString();
-            baseUrl = _configuration[$"DgiiUrls:{envKey}"] 
-                ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey} no fue encontrada.");
-            
-            // For Production/Test, the consultas are usually at /consultas
-            baseUrl = $"{baseUrl}/consultas"; 
-        }
-
         string url;
-        if (environment == DgiiEnvironment.CerteCF)
+        string envKey = environment.ToString();
+
+        bool useInternalValidator = _configuration.GetValue<bool>("EcfXmlValidation:UseInternalValidator");
+        if (useInternalValidator)
         {
-            // CerteCF standard for consulting by trackId using the /Estado endpoint
-            url = $"{baseUrl}/api/Consultas/Estado?TrackId={trackId}";
+            string platformUrl = _configuration["AppSettings:PlatformUrl"] ?? "https://ecfstaging.zynstorm.com/api";
+            string baseUrl = $"{platformUrl.TrimEnd('/')}/v1/Fe/consultaresultado";
+            url = $"{baseUrl}/api/Consultas/Estado?TrackId={Uri.EscapeDataString(trackId)}";
         }
         else
         {
-            url = $"{baseUrl}/api/Consultas/TrackId/{trackId}";
+            string baseUrl = _configuration[$"DgiiUrls:{envKey}:Consulta"]
+                ?? throw new InvalidOperationException($"La configuración DgiiUrls:{envKey}:Consulta no fue encontrada.");
+            // Todos los ambientes DGII usan: /api/Consultas/Estado?TrackId=
+            url = $"{baseUrl}/api/Consultas/Estado?TrackId={Uri.EscapeDataString(trackId)}";
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
