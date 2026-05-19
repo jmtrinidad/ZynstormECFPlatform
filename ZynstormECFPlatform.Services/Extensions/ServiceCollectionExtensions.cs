@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
 using ZynstormECFPlatform.Abstractions.Services;
 
@@ -16,8 +18,18 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IInboundEcfService, InboundEcfService>();
         
         services.AddTransient<IXmlSignatureService, XmlSignatureService>();
-        services.AddHttpClient<IDgiiAuthService, DgiiAuthService>();
-        services.AddHttpClient<IDgiiTransmissionService, DgiiTransmissionService>();
+        // DGII servers (Test & Production) do not support HTTP/2.
+        // Forcing HTTP/1.1 prevents the 'ResponseEnded' premature connection drop.
+        services.AddHttpClient<IDgiiAuthService, DgiiAuthService>(client =>
+        {
+            client.DefaultRequestVersion = HttpVersion.Version11;
+            client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionExact;
+        });
+        services.AddHttpClient<IDgiiTransmissionService, DgiiTransmissionService>(client =>
+        {
+            client.DefaultRequestVersion = HttpVersion.Version11;
+            client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionExact;
+        });
         
 
         // --- Certification: Excel Passthrough (Data Testing) ---

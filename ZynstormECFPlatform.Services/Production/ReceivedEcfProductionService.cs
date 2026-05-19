@@ -177,7 +177,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
         var signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
         resultDto.SignedXml = signedXml;
-        ApplyQrMetadata(resultDto, dto, signedXml, ecfType);
+        ApplyQrMetadata(resultDto, dto, signedXml, ecfType, targetEnvironment);
         resultDto.XmlValidation = BuildAcceptedValidationResult(dto, signedXml, ecfType, resultDto.QrUrl, resultDto.SecurityCode, resultDto.SignatureDate);
 
         await _ecfXmlDocumentService.InsertAsync(new EcfXmlDocument
@@ -687,7 +687,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         };
     }
 
-    internal static QrMetadata BuildQrMetadata(EcfDocument ecfDocument, string signedXml, string rncEmisor)
+    internal static QrMetadata BuildQrMetadata(EcfDocument ecfDocument, string signedXml, string rncEmisor, DgiiEnvironment environment = DgiiEnvironment.Production)
     {
         var securityCode = ExtractSecurityCode(signedXml);
         var signatureDate = ExtractXmlValue(signedXml, "FechaHoraFirma");
@@ -698,6 +698,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             signatureDate = ecfDocument.SignatureDateTime?.ToString("dd-MM-yyyy HH:mm:ss") ?? DateTime.Now.ToDrTime().ToString("dd-MM-yyyy HH:mm:ss");
 
         var qrUrl = BuildQrUrl(
+            environment,
             NcfHelper.ExtractEcfType(ecfDocument.Ncf),
             rncEmisorRaw: rncEmisor,
             rncCompradorRaw: ecfDocument.CustomerRnc,
@@ -710,7 +711,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         return new QrMetadata(securityCode, signatureDate, qrUrl);
     }
 
-    private static void ApplyQrMetadata(ReceivedEcfEmissionResultDto resultDto, EcfInvoiceRequestDto dto, string signedXml, int ecfType)
+    private static void ApplyQrMetadata(ReceivedEcfEmissionResultDto resultDto, EcfInvoiceRequestDto dto, string signedXml, int ecfType, DgiiEnvironment environment = DgiiEnvironment.Production)
     {
         var securityCode = ExtractSecurityCode(signedXml);
         var signatureDate = ExtractXmlValue(signedXml, "FechaHoraFirma");
@@ -721,6 +722,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             signatureDate = dto.ECF.FechaHoraFirma ?? dto.SignatureDateOverride?.ToString("dd-MM-yyyy HH:mm:ss") ?? DateTime.Now.ToDrTime().ToString("dd-MM-yyyy HH:mm:ss");
 
         var qrUrl = BuildQrUrl(
+            environment,
             ecfType,
             dto.ECF.Encabezado.Emisor.RNCEmisor,
             dto.ECF.Encabezado.Comprador.RNCComprador ?? string.Empty,
@@ -772,6 +774,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     }
 
     private static string BuildQrUrl(
+        DgiiEnvironment environment,
         int ecfType,
         string rncEmisorRaw,
         string rncCompradorRaw,
@@ -791,17 +794,31 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             : DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss")).Replace(" ", "%20");
         var montoTotalUrl = montoTotal.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
+        // E32 (Factura de Consumo) con monto menor a 250K usa el portal FC
         if (ecfType == 32 && montoTotal < 250000m)
         {
-            return $"https://fc.dgii.gov.do/ConsultaTimbreFC?RncEmisor={rncEmisor}&ENCF={encf}&MontoTotal={montoTotalUrl}&CodigoSeguridad={Uri.EscapeDataString(securityCode)}";
+            string fcBase = environment == DgiiEnvironment.Test
+                ? "https://fc.dgii.gov.do/testecf"
+                : environment == DgiiEnvironment.CerteCF
+                    ? "https://fc.dgii.gov.do/CerteCF"
+                    : "https://fc.dgii.gov.do";
+
+            return $"{fcBase}/ConsultaTimbreFC?RncEmisor={rncEmisor}&ENCF={encf}&MontoTotal={montoTotalUrl}&CodigoSeguridad={Uri.EscapeDataString(securityCode)}";
         }
+
+        // Base URL segun ambiente
+        string baseUrl = environment == DgiiEnvironment.Test
+            ? "https://ecf.dgii.gov.do/testecf"
+            : environment == DgiiEnvironment.CerteCF
+                ? "https://ecf.dgii.gov.do/CerteCF"
+                : "https://ecf.dgii.gov.do";
 
         if (string.IsNullOrEmpty(rncComprador))
         {
-            return $"https://ecf.dgii.gov.do/ConsultaTimbre?RncEmisor={rncEmisor}&ENCF={encf}&FechaEmision={fechaEmisionUrl}&MontoTotal={montoTotalUrl}&FechaFirma={fechaFirmaUrl}&CodigoSeguridad={Uri.EscapeDataString(securityCode)}";
+            return $"{baseUrl}/ConsultaTimbre?RncEmisor={rncEmisor}&ENCF={encf}&FechaEmision={fechaEmisionUrl}&MontoTotal={montoTotalUrl}&FechaFirma={fechaFirmaUrl}&CodigoSeguridad={Uri.EscapeDataString(securityCode)}";
         }
 
-        return $"https://ecf.dgii.gov.do/ConsultaTimbre?RncEmisor={rncEmisor}&RncComprador={rncComprador}&ENCF={encf}&FechaEmision={fechaEmisionUrl}&MontoTotal={montoTotalUrl}&FechaFirma={fechaFirmaUrl}&CodigoSeguridad={Uri.EscapeDataString(securityCode)}";
+        return $"{baseUrl}/ConsultaTimbre?RncEmisor={rncEmisor}&RncComprador={rncComprador}&ENCF={encf}&FechaEmision={fechaEmisionUrl}&MontoTotal={montoTotalUrl}&FechaFirma={fechaFirmaUrl}&CodigoSeguridad={Uri.EscapeDataString(securityCode)}";
     }
 
     private static string GetEcfTypeName(int ecfType)

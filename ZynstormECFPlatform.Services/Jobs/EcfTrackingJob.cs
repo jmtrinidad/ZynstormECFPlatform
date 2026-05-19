@@ -71,7 +71,7 @@ public class EcfTrackingJob
 
             if (ecfDocumentId > 0)
             {
-                await PersistStatusAsync(ecfDocumentId, trackId, rncEmisor, statusResponse, attemptNumber);
+                await PersistStatusAsync(ecfDocumentId, trackId, rncEmisor, statusResponse, attemptNumber, environment);
             }
 
             if (ReceivedEcfProductionService.IsPendingDgiiStatus(statusResponse) && attemptNumber < MaxAttempts)
@@ -91,7 +91,7 @@ public class EcfTrackingJob
         }
     }
 
-    private async Task PersistStatusAsync(int ecfDocumentId, string trackId, string rncEmisor, DgiiStatusResponse statusResponse, int attemptNumber)
+    private async Task PersistStatusAsync(int ecfDocumentId, string trackId, string rncEmisor, DgiiStatusResponse statusResponse, int attemptNumber, DgiiEnvironment environment = DgiiEnvironment.Production)
     {
         var ecfDocument = await _ecfDocumentService.GetAsync(ecfDocumentId);
         if (ecfDocument == null) return;
@@ -102,7 +102,7 @@ public class EcfTrackingJob
         if (statusId == 10)
         {
             var xmlDocument = await _ecfXmlDocumentService.GetByAsync(x => x.EcfDocumentId == ecfDocumentId);
-            qrMetadata = ReceivedEcfProductionService.BuildQrMetadata(ecfDocument, xmlDocument?.XmlSigned ?? string.Empty, rncEmisor);
+            qrMetadata = ReceivedEcfProductionService.BuildQrMetadata(ecfDocument, xmlDocument?.XmlSigned ?? string.Empty, rncEmisor, environment);
             message = $"{message}. CodigoSeguridad: {qrMetadata.SecurityCode}. FechaFirma: {qrMetadata.SignatureDate}. QR: {qrMetadata.QrUrl}";
         }
 
