@@ -209,6 +209,11 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
         var transmission = await _transmissionService.SendEcfAsync(targetEnvironment, token, signedXml, ecfType, total, issuerRnc, eNcf, isSummary: false);
 
+        if (targetEnvironment == DgiiEnvironment.Test)
+        {
+            await AddLogAsync(ecfDocument, client.ClientId, "Information", "Respuesta de envio a DGII Test", JsonSerializer.Serialize(transmission));
+        }
+
         resultDto.Transmission = transmission;
         resultDto.TrackId = transmission.TrackId;
 
@@ -285,7 +290,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     {
         var validationUrl = _configuration["EcfXmlValidation:DevStagingUrl"]
             ?? "https://ecfstaging.zynstorm.com/api/v1/EcfXmlValidation/validate";
-        //https://ecfstaging.zynstorm.com/api
+
         await AddLogAsync(ecfDocument, clientId, "Information", $"Ambiente {_hostEnvironment.EnvironmentName}: obteniendo token de autenticación local.");
 
         string token = "";

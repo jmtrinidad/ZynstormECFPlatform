@@ -10,8 +10,8 @@ using static ZynstormECFPlatform.Services.Validation.EcfXmlStructuralValidator;
 namespace ZynstormECFPlatform.Services.Validation;
 
 /// <summary>
-/// Standalone XML validation service. Completely decoupled from EcfController/ReceivedEcfProductionService.
-/// Runs 4 validation layers and caches valid XMLs for DGII-style lookup.
+/// Standalone XML validation service. Completely decoupled from EcfController/ReceivedEcfProductionService. Runs 4
+/// validation layers and caches valid XMLs for DGII-style lookup.
 /// </summary>
 public class EcfXmlValidationService : IEcfXmlValidationService
 {
@@ -29,8 +29,7 @@ public class EcfXmlValidationService : IEcfXmlValidationService
         ?? Assembly.Load("ZynstormECFPlatform.Schemas");
 
     /// <summary>
-    /// In-memory store for validated e-NCFs. Thread-safe.
-    /// Key = eNCF, Value = verification info.
+    /// In-memory store for validated e-NCFs. Thread-safe. Key = eNCF, Value = verification info.
     /// </summary>
     private static readonly ConcurrentDictionary<string, EcfVerificacionInfo> _verificacionCache = new();
 
@@ -317,7 +316,7 @@ public class EcfXmlValidationService : IEcfXmlValidationService
         nsManager.AddNamespace("ds", "http://www.w3.org/2000/09/xmldsig#");
         var sigValueNode = doc.SelectSingleNode("//ds:SignatureValue", nsManager);
         var signingTimeNode = doc.SelectSingleNode("//*[local-name()='SigningTime']", nsManager);
-        
+
         string? sigValue = sigValueNode?.InnerText?.Trim();
         info.FechaFirma = signingTimeNode?.InnerText?.Trim() ?? DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss");
 
@@ -346,7 +345,7 @@ public class EcfXmlValidationService : IEcfXmlValidationService
 
             // 2. Determinar URL Base (Nuestra URL en lugar de la DGII)
             string platformUrl = _configuration["AppSettings:PlatformUrl"] ?? "http://localhost:5000";
-            string baseUrl = $"{platformUrl.TrimEnd('/')}/api/v1/EcfXmlValidation/verificacion?";
+            string baseUrl = $"{platformUrl.TrimEnd('/')}/v1/EcfXmlValidation/verificacion?";
 
             // 3. Construir Query String (Replicando parámetros DGII pero a nuestra URL)
             var queryParams = new List<string>

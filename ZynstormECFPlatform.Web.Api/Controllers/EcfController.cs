@@ -34,6 +34,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         {
             // 1. Validar DTO
             var dtoErrors = _ecfGeneratorService.ValidateDto(dto);
+
             if (dtoErrors.Count > 0)
             {
                 return BadRequest(new
@@ -86,7 +87,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         [HttpPost("emit")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> EmitEcf([FromBody] EcfInvoiceRequestDto dto, [FromQuery] DgiiEnvironment environment = DgiiEnvironment.Production)
+        public async Task<IActionResult> EmitEcf([FromBody] EcfInvoiceRequestDto dto, [FromQuery] DgiiEnvironment environment = DgiiEnvironment.Test)
         {
             if (dto == null)
                 return BadRequest(new { success = false, message = "Debe proporcionar el objeto e-CF." });
