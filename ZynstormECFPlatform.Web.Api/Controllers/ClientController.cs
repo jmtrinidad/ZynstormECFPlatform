@@ -34,7 +34,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 // Si se proporciona 'id', buscamos un único cliente por su GUID
                 if (!string.IsNullOrEmpty(id))
                 {
-                    var query = Repository.Table.AsNoTracking().Where(c => c.GuidId == id);
+                    var query = Repository.Table.AsNoTracking().Include(c => c.ApiKeys).Where(c => c.GuidId == id).AsQueryable();
                     if (!IsSA)
                     {
                         var userId = CurrentUserId;
@@ -47,7 +47,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 }
 
                 // Si no hay 'id', devolvemos una lista (opcionalmente filtrada por guidId)
-                var listQuery = Repository.Table.AsNoTracking();
+                var listQuery = Repository.Table.AsNoTracking().Include(c => c.ApiKeys).AsQueryable();
                 if (!string.IsNullOrEmpty(guidId))
                 {
                     listQuery = listQuery.Where(x => x.GuidId == guidId);
@@ -105,6 +105,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                         };
 
                         await apiKeyService.InsertAsync(apiKeyEntity);
+                        model.ApiKeys.Add(apiKeyEntity);
                     }
 
                     // Asignamos el cliente al usuario que lo creó
@@ -169,7 +170,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 if (string.IsNullOrEmpty(guid))
                     return BadRequest("El GuidId es obligatorio para la actualización.");
 
-                var query = Repository.Table.Where(c => c.GuidId == guid);
+                var query = Repository.Table.Include(c => c.ApiKeys).Where(c => c.GuidId == guid).AsQueryable();
 
                 if (!IsSA)
                 {

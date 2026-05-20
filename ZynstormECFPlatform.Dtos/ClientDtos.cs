@@ -34,4 +34,6 @@ public class ClientViewDto : ClientUpdateDto
     public bool IsCertified { get; set; }
 
     public DateTime RegisteredAt { get; set; }
+
+    public string? ApiKey { get; set; }
 }

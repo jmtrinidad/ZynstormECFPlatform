@@ -18,7 +18,12 @@ public class MappingProfiles : Profile
 
         CreateMap<ClientUpdateDto, Client>()
             .ForMember(dest => dest.ClientId, opt => opt.Ignore());
-        CreateMap<Client, ClientViewDto>();
+        CreateMap<Client, ClientViewDto>()
+            .ForMember(dest => dest.ApiKey, opt => opt.MapFrom(src => 
+                src.ApiKeys.Where(k => k.StatusId == (int)Enums.StatusEnum.Active)
+                           .Select(k => k.Apikey)
+                           .FirstOrDefault()
+            ));
 
         // ClientCallBack
         CreateMap<ClientCallBackCreateDto, ClientCallBack>();
