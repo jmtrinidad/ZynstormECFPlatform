@@ -92,7 +92,29 @@ public class DgiiTransmissionService : IDgiiTransmissionService
             request.Content = multipartContent;
         }
 
-        var response = await _httpClient.SendAsync(request);
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.SendAsync(request);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(
+                ex,
+                "DGII SendEcf HTTP request failed. Environment={Environment} Endpoint={Endpoint} EcfType={EcfType} ENcf={ENcf} IsRfce={IsRfce}",
+                environment,
+                endpointUrl,
+                ecfType,
+                eNcf,
+                isSummary);
+
+            return new DgiiTransmissionResult
+            {
+                Error = $"No fue posible conectar con DGII para {(isSummary ? "Resumen B2C/RFCE" : "e-CF")}. Endpoint: {endpointUrl}. Detalle: {ex.Message}",
+                Mensaje = ex.InnerException?.Message ?? ex.Message
+            };
+        }
+
         var responseString = await response.Content.ReadAsStringAsync();
         LogDgiiRawResponse("SendEcf", environment, endpointUrl, ecfType, eNcf, isSummary, response, responseString);
 
