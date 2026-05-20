@@ -23,7 +23,7 @@ public class EcfXmlTotales
         get => Tools.FormatDecimal(MontoGravadoTotal);
         set => MontoGravadoTotal = Tools.ParseDecimal(value);
     }
-    public bool ShouldSerializeMontoGravadoTotalString() => (EcfType == 46 || (EcfType != 46 && EcfType != 47)) && MontoGravadoTotal.HasValue;
+    public bool ShouldSerializeMontoGravadoTotalString() => EcfType != 44 && (EcfType == 46 || (EcfType != 46 && EcfType != 47)) && MontoGravadoTotal.HasValue;
 
     [XmlIgnore]
     public decimal? MontoGravadoI1 { get; set; }
@@ -33,7 +33,7 @@ public class EcfXmlTotales
         get => (EcfType == 46 || EcfType == 47) ? null : Tools.FormatDecimal(MontoGravadoI1);
         set => MontoGravadoI1 = Tools.ParseDecimal(value);
     }
-    public bool ShouldSerializeMontoGravadoI1String() => EcfType != 46 && EcfType != 47 && MontoGravadoI1.HasValue;
+    public bool ShouldSerializeMontoGravadoI1String() => EcfType != 44 && EcfType != 46 && EcfType != 47 && MontoGravadoI1.HasValue;
 
     [XmlIgnore]
     public decimal? MontoGravadoI2 { get; set; }
@@ -43,7 +43,7 @@ public class EcfXmlTotales
         get => (EcfType == 46 || EcfType == 47) ? null : Tools.FormatDecimal(MontoGravadoI2);
         set => MontoGravadoI2 = Tools.ParseDecimal(value);
     }
-    public bool ShouldSerializeMontoGravadoI2String() => EcfType != 46 && EcfType != 47 && MontoGravadoI2.HasValue;
+    public bool ShouldSerializeMontoGravadoI2String() => EcfType != 44 && EcfType != 46 && EcfType != 47 && MontoGravadoI2.HasValue;
 
     [XmlIgnore]
     public decimal? MontoGravadoI3 { get; set; }
@@ -53,7 +53,7 @@ public class EcfXmlTotales
         get => (EcfType == 47) ? null : Tools.FormatDecimal(MontoGravadoI3);
         set => MontoGravadoI3 = Tools.ParseDecimal(value);
     }
-    public bool ShouldSerializeMontoGravadoI3String() => (EcfType == 46 || (EcfType != 46 && EcfType != 47)) && MontoGravadoI3.HasValue;
+    public bool ShouldSerializeMontoGravadoI3String() => EcfType != 44 && (EcfType == 46 || (EcfType != 46 && EcfType != 47)) && MontoGravadoI3.HasValue;
 
     [XmlIgnore]
     public decimal? MontoExento { get; set; }
@@ -75,7 +75,7 @@ public class EcfXmlTotales
         get => (EcfType == 46 || EcfType == 47) ? null : ITBIS1?.ToString();
         set => ITBIS1 = string.IsNullOrEmpty(value) ? null : int.Parse(value);
     }
-    public bool ShouldSerializeITBIS1String() => ITBIS1.HasValue && EcfType != 46 && EcfType != 47;
+    public bool ShouldSerializeITBIS1String() => ITBIS1.HasValue && EcfType != 44 && EcfType != 46 && EcfType != 47;
 
     [XmlIgnore]
     public int? ITBIS2 { get; set; }
@@ -85,7 +85,7 @@ public class EcfXmlTotales
         get => (EcfType == 46 || EcfType == 47) ? null : ITBIS2?.ToString();
         set => ITBIS2 = string.IsNullOrEmpty(value) ? null : int.Parse(value);
     }
-    public bool ShouldSerializeITBIS2String() => ITBIS2.HasValue && EcfType != 46 && EcfType != 47;
+    public bool ShouldSerializeITBIS2String() => ITBIS2.HasValue && EcfType != 44 && EcfType != 46 && EcfType != 47;
 
     [XmlIgnore]
     public int? ITBIS3 { get; set; }
@@ -95,7 +95,7 @@ public class EcfXmlTotales
         get => (EcfType == 47) ? null : ITBIS3?.ToString();
         set => ITBIS3 = string.IsNullOrEmpty(value) ? null : int.Parse(value);
     }
-    public bool ShouldSerializeITBIS3String() => EcfType != 47 && ITBIS3.HasValue;
+    public bool ShouldSerializeITBIS3String() => EcfType != 44 && EcfType != 47 && ITBIS3.HasValue;
 
     // ── ITBIS totals ───────────────────────────────────────────────────────
 
@@ -107,7 +107,7 @@ public class EcfXmlTotales
         get => (EcfType == 47) ? null : Tools.FormatDecimal(TotalITBIS);
         set => TotalITBIS = Tools.ParseDecimal(value);
     }
-    public bool ShouldSerializeTotalITBISString() => EcfType != 47 && TotalITBIS.HasValue;
+    public bool ShouldSerializeTotalITBISString() => EcfType != 44 && EcfType != 47 && TotalITBIS.HasValue;
 
     [XmlIgnore]
     public decimal? TotalITBIS1 { get; set; }
@@ -117,7 +117,7 @@ public class EcfXmlTotales
         get => (EcfType == 46 || EcfType == 47) ? null : Tools.FormatDecimal(TotalITBIS1);
         set => TotalITBIS1 = Tools.ParseDecimal(value);
     }
-    public bool ShouldSerializeTotalITBIS1String() => EcfType != 46 && EcfType != 47 && TotalITBIS1.HasValue;
+    public bool ShouldSerializeTotalITBIS1String() => EcfType != 44 && EcfType != 46 && EcfType != 47 && TotalITBIS1.HasValue;
 
     [XmlIgnore]
     public decimal? TotalITBIS2 { get; set; }
@@ -127,7 +127,7 @@ public class EcfXmlTotales
         get => (EcfType == 46 || EcfType == 47) ? null : Tools.FormatDecimal(TotalITBIS2);
         set => TotalITBIS2 = Tools.ParseDecimal(value);
     }
-    public bool ShouldSerializeTotalITBIS2String() => EcfType != 46 && EcfType != 47 && TotalITBIS2.HasValue;
+    public bool ShouldSerializeTotalITBIS2String() => EcfType != 44 && EcfType != 46 && EcfType != 47 && TotalITBIS2.HasValue;
 
     [XmlIgnore]
     public decimal? TotalITBIS3 { get; set; }
@@ -137,7 +137,7 @@ public class EcfXmlTotales
         get => (EcfType == 47) ? null : Tools.FormatDecimal(TotalITBIS3);
         set => TotalITBIS3 = Tools.ParseDecimal(value);
     }
-    public bool ShouldSerializeTotalITBIS3String() => EcfType != 47 && TotalITBIS3.HasValue;
+    public bool ShouldSerializeTotalITBIS3String() => EcfType != 44 && EcfType != 47 && TotalITBIS3.HasValue;
 
     // ── Additional taxes (ISC — Impuesto Selectivo al Consumo) ────────────
 

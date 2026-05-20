@@ -127,12 +127,20 @@ public class EcfInvoiceRequestDto : IValidatableObject
         {
             case 31:
             case 41:
-            case 44:
             case 45:
                 if (string.IsNullOrWhiteSpace(e.Comprador?.RNCComprador))
                     yield return new ValidationResult($"Para el comprobante tipo {tipoEcf}, el RNCComprador es obligatorio.", new[] { "ECF.Encabezado.Comprador.RNCComprador" });
                 if (string.IsNullOrWhiteSpace(e.Comprador?.RazonSocialComprador))
                     yield return new ValidationResult($"Para el comprobante tipo {tipoEcf}, la RazonSocialComprador es obligatoria.", new[] { "ECF.Encabezado.Comprador.RazonSocialComprador" });
+                break;
+
+            case 44:
+                if (string.IsNullOrWhiteSpace(e.Comprador?.RNCComprador))
+                    yield return new ValidationResult($"Para el comprobante tipo {tipoEcf}, el RNCComprador es obligatorio.", new[] { "ECF.Encabezado.Comprador.RNCComprador" });
+                if (string.IsNullOrWhiteSpace(e.Comprador?.RazonSocialComprador))
+                    yield return new ValidationResult($"Para el comprobante tipo {tipoEcf}, la RazonSocialComprador es obligatoria.", new[] { "ECF.Encabezado.Comprador.RazonSocialComprador" });
+                foreach (var error in ValidateTipo44Totales(e.Totales!))
+                    yield return error;
                 break;
 
             case 32:
@@ -222,6 +230,48 @@ public class EcfInvoiceRequestDto : IValidatableObject
 
     private static bool IsValidPaymentForm(string? value) =>
         int.TryParse(value, out var formaPago) && formaPago is >= 1 and <= 8;
+
+    private static IEnumerable<ValidationResult> ValidateTipo44Totales(EcfTotalesRequest totales)
+    {
+        var invalidAmounts = new (decimal? Value, string Field)[]
+        {
+            (totales.MontoGravadoTotal, "MontoGravadoTotal"),
+            (totales.MontoGravadoI1, "MontoGravadoI1"),
+            (totales.MontoGravadoI2, "MontoGravadoI2"),
+            (totales.MontoGravadoI3, "MontoGravadoI3"),
+            (totales.TotalITBIS, "TotalITBIS"),
+            (totales.TotalITBIS1, "TotalITBIS1"),
+            (totales.TotalITBIS2, "TotalITBIS2"),
+            (totales.TotalITBIS3, "TotalITBIS3")
+        };
+
+        foreach (var (value, field) in invalidAmounts)
+        {
+            if (value.HasValue && value.Value > 0)
+            {
+                yield return new ValidationResult(
+                    $"Para Regimenes Especiales (tipo 44), Totales no debe incluir {field}. Use MontoExento y MontoTotal segun aplique.",
+                    new[] { $"ECF.Encabezado.Totales.{field}" });
+            }
+        }
+
+        var invalidRates = new (int? Value, string Field)[]
+        {
+            (totales.ITBIS1, "ITBIS1"),
+            (totales.ITBIS2, "ITBIS2"),
+            (totales.ITBIS3, "ITBIS3")
+        };
+
+        foreach (var (value, field) in invalidRates)
+        {
+            if (value.HasValue && value.Value > 0)
+            {
+                yield return new ValidationResult(
+                    $"Para Regimenes Especiales (tipo 44), Totales no debe incluir {field}.",
+                    new[] { $"ECF.Encabezado.Totales.{field}" });
+            }
+        }
+    }
 }
 
 public class EcfRequest

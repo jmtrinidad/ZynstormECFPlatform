@@ -267,5 +267,39 @@ internal static class EcfXmlBusinessRuleValidator
             // Not strictly required by XSD but expected per DGII practice
             // Just a warning, not an error
         }
+
+        if (ecfType == 44)
+        {
+            ValidateType44Totales(errors, encabezado);
+        }
+    }
+
+    private static void ValidateType44Totales(List<string> errors, XmlElement encabezado)
+    {
+        var totales = GetChild(encabezado, "Totales");
+        if (totales == null) return;
+
+        var disallowedTotalTags = new[]
+        {
+            "MontoGravadoTotal",
+            "MontoGravadoI1",
+            "MontoGravadoI2",
+            "MontoGravadoI3",
+            "ITBIS1",
+            "ITBIS2",
+            "ITBIS3",
+            "TotalITBIS",
+            "TotalITBIS1",
+            "TotalITBIS2",
+            "TotalITBIS3"
+        };
+
+        foreach (var tag in disallowedTotalTags)
+        {
+            if (GetChild(totales, tag) != null)
+            {
+                errors.Add($"Para Regímenes Especiales (tipo 44), <Totales> no debe incluir <{tag}>. Use <MontoExento>, <MontoImpuestoAdicional>, <ImpuestosAdicionales> y <MontoTotal> según aplique.");
+            }
+        }
     }
 }

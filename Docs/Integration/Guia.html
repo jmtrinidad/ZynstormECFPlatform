@@ -903,6 +903,7 @@
 }</pre>
 
     <h3>Tipo 44 regimenes especiales</h3>
+    <p>Para Regimenes Especiales (<code>TipoeCF: 44</code>), la DGII no acepta montos gravados ni totales de ITBIS dentro de <code>ECF.Encabezado.Totales</code>. Los items deben reportarse como exentos usando <code>IndicadorFacturacion: "4"</code> y los totales deben usar <code>MontoExento</code> y <code>MontoTotal</code>. No envie <code>MontoGravadoTotal</code>, <code>MontoGravadoI1</code>, <code>MontoGravadoI2</code>, <code>MontoGravadoI3</code>, <code>ITBIS1</code>, <code>ITBIS2</code>, <code>ITBIS3</code>, <code>TotalITBIS</code>, <code>TotalITBIS1</code>, <code>TotalITBIS2</code> ni <code>TotalITBIS3</code> para este tipo. Si aplica impuesto adicional, use <code>MontoImpuestoAdicional</code> / <code>ImpuestosAdicionales</code> segun corresponda.</p>
 <pre>{
   "externalReference": "REG-44-0001",
   "ECF": {

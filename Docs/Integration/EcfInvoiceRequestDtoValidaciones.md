@@ -850,6 +850,8 @@ Para `46`, el validador XML tambien puede exigir nodos propios de exportacion se
 
 ### Tipo 44 regimenes especiales
 
+Para Regimenes Especiales (`TipoeCF: 44`), la DGII no acepta montos gravados ni totales de ITBIS dentro de `ECF.Encabezado.Totales`. Los items deben reportarse como exentos usando `IndicadorFacturacion: "4"` y los totales deben usar `MontoExento` y `MontoTotal`. No envie `MontoGravadoTotal`, `MontoGravadoI1`, `MontoGravadoI2`, `MontoGravadoI3`, `ITBIS1`, `ITBIS2`, `ITBIS3`, `TotalITBIS`, `TotalITBIS1`, `TotalITBIS2` ni `TotalITBIS3` para este tipo. Si aplica impuesto adicional, use `MontoImpuestoAdicional` / `ImpuestosAdicionales` segun corresponda.
+
 ```json
 {
   "externalReference": "REG-44-0001",
