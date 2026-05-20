@@ -96,12 +96,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     {
         var resultDto = new ReceivedEcfEmissionResultDto();
 
-        var targetEnvStr = _configuration["EcfXmlValidation:TargetDgiiEnvironment"];
-        var targetEnvironment = environment;
-        if (!string.IsNullOrEmpty(targetEnvStr) && Enum.TryParse<DgiiEnvironment>(targetEnvStr, true, out var parsedEnv))
-        {
-            targetEnvironment = parsedEnv;
-        }
+        var targetEnvironment = ResolveTargetEnvironment(environment);
+        resultDto.TargetEnvironment = targetEnvironment.ToString();
 
         var dtoErrors = _generatorService.ValidateDto(dto);
         if (dtoErrors.Count > 0)
@@ -206,13 +202,10 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         var total = CalculateTransmissionTotal(dto);
 
         await MarkDocumentAsync(ecfDocument, 8, "Enviando e-CF a DGII.");
+        await AddLogAsync(ecfDocument, client.ClientId, "Information", $"Ambiente DGII seleccionado para envio: {targetEnvironment}.");
 
         var transmission = await _transmissionService.SendEcfAsync(targetEnvironment, token, signedXml, ecfType, total, issuerRnc, eNcf, isSummary: false);
-
-        if (targetEnvironment == DgiiEnvironment.Test)
-        {
-            await AddLogAsync(ecfDocument, client.ClientId, "Information", "Respuesta de envio a DGII Test", JsonSerializer.Serialize(transmission));
-        }
+        await AddDgiiResponseLogAsync(ecfDocument, client.ClientId, "recepcion", targetEnvironment, transmission);
 
         resultDto.Transmission = transmission;
         resultDto.TrackId = transmission.TrackId;
@@ -232,6 +225,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             await MarkDocumentAsync(ecfDocument, 9, $"DGII recibio el e-CF. TrackId: {transmission.TrackId}");
             var status = await PollInitialDgiiStatusAsync(targetEnvironment, token, transmission.TrackId);
             _cacheService.Set($"EcfStatus_{transmission.TrackId}", status, TimeSpan.FromHours(1));
+            await AddDgiiStatusLogAsync(ecfDocument, client.ClientId, targetEnvironment, transmission.TrackId, status);
             resultDto.Status = status;
             resultDto.Success = string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase);
             var statusId = MapDgiiStatusToEcfStatus(status);
@@ -242,7 +236,6 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
             await MarkDocumentAsync(ecfDocument, statusId, resultDto.Message);
             await SaveTransmissionAsync(ecfDocument, transmission, statusId, signedXml, status);
-            await AddLogAsync(ecfDocument, client.ClientId, "Information", $"Consulta DGII TrackId {transmission.TrackId}: {status.Estado}", JsonSerializer.Serialize(status));
 
             if (IsPendingDgiiStatus(status))
             {
@@ -275,6 +268,18 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             await AddLogAsync(ecfDocument, client.ClientId, "Information", $"e-CF aprobado. CodigoSeguridad: {resultDto.SecurityCode}. FechaFirma: {resultDto.SignatureDate}. QR: {resultDto.QrUrl}.");
 
         return resultDto;
+    }
+
+    private DgiiEnvironment ResolveTargetEnvironment(DgiiEnvironment requestedEnvironment)
+    {
+        var configuredEnvironment = _configuration["EcfXmlValidation:TargetDgiiEnvironment"];
+        if (!string.IsNullOrWhiteSpace(configuredEnvironment) &&
+            Enum.TryParse<DgiiEnvironment>(configuredEnvironment, true, out var parsedEnvironment))
+        {
+            return parsedEnvironment;
+        }
+
+        return requestedEnvironment;
     }
 
     private async Task<ReceivedEcfEmissionResultDto> ProcessWithStagingValidationAsync(
@@ -620,6 +625,39 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             EcfStatusId = statusId,
             Message = message
         });
+    }
+
+    private async Task AddDgiiResponseLogAsync(
+        EcfDocument ecfDocument,
+        int clientId,
+        string operation,
+        DgiiEnvironment environment,
+        DgiiTransmissionResult transmission)
+    {
+        var level = transmission.Success ? "Information" : "Error";
+        var summary = BuildDgiiTransmissionError(transmission);
+        await AddLogAsync(
+            ecfDocument,
+            clientId,
+            level,
+            $"Respuesta DGII {operation} ({environment}): {summary}",
+            JsonSerializer.Serialize(transmission));
+    }
+
+    private async Task AddDgiiStatusLogAsync(
+        EcfDocument ecfDocument,
+        int clientId,
+        DgiiEnvironment environment,
+        string trackId,
+        DgiiStatusResponse status)
+    {
+        var level = string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase) ? "Information" : "Error";
+        await AddLogAsync(
+            ecfDocument,
+            clientId,
+            level,
+            $"Respuesta DGII consulta estado ({environment}) TrackId {trackId}: {BuildDgiiStatusError(status)}",
+            JsonSerializer.Serialize(status));
     }
 
     private async Task AddLogAsync(EcfDocument ecfDocument, int clientId, string level, string message, string? exception = null)
@@ -1055,6 +1093,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     {
         var parts = new List<string>();
 
+        if (!string.IsNullOrWhiteSpace(result.TrackId)) parts.Add($"TrackId: {result.TrackId}");
         if (!string.IsNullOrWhiteSpace(result.Estado)) parts.Add($"DGII: {result.Estado}");
         if (!string.IsNullOrWhiteSpace(result.Error)) parts.Add(result.Error);
         if (!string.IsNullOrWhiteSpace(result.Mensaje)) parts.Add(result.Mensaje);

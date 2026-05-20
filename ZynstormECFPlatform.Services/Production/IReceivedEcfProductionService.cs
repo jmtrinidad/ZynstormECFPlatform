@@ -22,6 +22,7 @@ public class ReceivedEcfEmissionResultDto
     public int EcfType { get; set; }
     public string ENcf { get; set; } = string.Empty;
     public string TrackId { get; set; } = string.Empty;
+    public string TargetEnvironment { get; set; } = string.Empty;
     public string SecurityCode { get; set; } = string.Empty;
     public string SignatureDate { get; set; } = string.Empty;
     public string QrUrl { get; set; } = string.Empty;
