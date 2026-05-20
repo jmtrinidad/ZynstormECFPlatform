@@ -27,10 +27,17 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
         [HttpGet]
         [Route("", Order = 1)]
-        public override async Task<ActionResult> Get([FromQuery] string? guidId, [FromQuery] string? id, CancellationToken cancellationToken = default)
+        public override async Task<ActionResult> Get(
+            [FromQuery] string? guidId, 
+            [FromQuery] string? id, 
+            CancellationToken cancellationToken = default)
         {
             try
             {
+                // Leer parámetros de consulta adicionales de Request.Query
+                string? search = Request.Query.TryGetValue("search", out var searchVal) ? searchVal.ToString() : null;
+                int? pageNumber = int.TryParse(Request.Query["pageNumber"], out var pn) ? pn : null;
+                int? pageSize = int.TryParse(Request.Query["pageSize"], out var ps) ? ps : null;
                 // Si se proporciona 'id', buscamos un único cliente por su GUID
                 if (!string.IsNullOrEmpty(id))
                 {
@@ -59,8 +66,49 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     listQuery = listQuery.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
                 }
 
-                var results = await listQuery.ToListAsync(cancellationToken);
-                return Ok(Mapper.Map<IEnumerable<Client>, IEnumerable<ClientViewDto>>(results));
+                // Aplicar búsqueda si se proporciona
+                if (!string.IsNullOrEmpty(search))
+                {
+                    var searchLower = search.ToLower().Trim();
+                    listQuery = listQuery.Where(c => 
+                        c.Name.ToLower().Contains(searchLower) || 
+                        c.Rnc.Contains(searchLower) || 
+                        (c.Email != null && c.Email.ToLower().Contains(searchLower))
+                    );
+                }
+
+                // Paginación si se especifica
+                if (pageNumber.HasValue || pageSize.HasValue)
+                {
+                    var page = pageNumber ?? 1;
+                    var size = pageSize ?? 10;
+
+                    var totalCount = await listQuery.CountAsync(cancellationToken);
+
+                    var results = await listQuery
+                        .OrderBy(c => c.Name)
+                        .Skip((page - 1) * size)
+                        .Take(size)
+                        .ToListAsync(cancellationToken);
+
+                    var mappedItems = Mapper.Map<IEnumerable<Client>, IEnumerable<ClientViewDto>>(results);
+
+                    var paginatedResponse = new PaginatedResponseDto<ClientViewDto>
+                    {
+                        Items = mappedItems,
+                        TotalCount = totalCount,
+                        PageNumber = page,
+                        PageSize = size,
+                        TotalPages = (int)Math.Ceiling((double)totalCount / size)
+                    };
+
+                    return Ok(paginatedResponse);
+                }
+                else
+                {
+                    var results = await listQuery.OrderBy(c => c.Name).ToListAsync(cancellationToken);
+                    return Ok(Mapper.Map<IEnumerable<Client>, IEnumerable<ClientViewDto>>(results));
+                }
             }
             catch (Exception exception)
             {
@@ -188,6 +236,82 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 await Repository.UpdateAsync(model);
 
                 return Ok(Mapper.Map<Client, ClientViewDto>(model));
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [HttpGet]
+        [Route("guid/{guid}", Order = 1)]
+        public override async Task<ActionResult<ClientViewDto>> GetByGuid(string guid, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var query = Repository.Table.AsNoTracking().Include(c => c.ApiKeys).Where(c => c.GuidId == guid).AsQueryable();
+                if (!IsSA)
+                {
+                    var userId = CurrentUserId;
+                    query = query.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
+                }
+
+                var result = await query.FirstOrDefaultAsync(cancellationToken);
+                if (result == null) return NotFound();
+                return Ok(Mapper.Map<Client, ClientViewDto>(result));
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [HttpDelete]
+        [Route("", Order = 1)]
+        public override async Task<IActionResult> Delete([FromQuery] string id)
+        {
+            try
+            {
+                var query = Repository.Table.Where(x => x.GuidId == id).AsQueryable();
+                if (!IsSA)
+                {
+                    var userId = CurrentUserId;
+                    query = query.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
+                }
+
+                var result = await query.FirstOrDefaultAsync();
+                if (result == null) return NotFound();
+
+                await Repository.SoftDeleteAsync(result);
+                return NoContent();
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [HttpDelete]
+        [Route("guid/{guid}", Order = 1)]
+        public override async Task<IActionResult> DeleteByGuid(string guid)
+        {
+            try
+            {
+                var query = Repository.Table.Where(x => x.GuidId == guid).AsQueryable();
+                if (!IsSA)
+                {
+                    var userId = CurrentUserId;
+                    query = query.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
+                }
+
+                var result = await query.FirstOrDefaultAsync();
+                if (result == null) return NotFound();
+
+                await Repository.SoftDeleteAsync(result);
+                return NoContent();
             }
             catch (Exception exception)
             {
