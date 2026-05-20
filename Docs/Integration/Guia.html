@@ -362,7 +362,7 @@
         </thead>
         <tbody>
             <tr><td><code>31</code></td><td>Factura de crédito fiscal</td><td><code>Comprador.RNCComprador</code> y <code>Comprador.RazonSocialComprador</code>.</td></tr>
-            <tr><td><code>32</code></td><td>Factura de consumo</td><td>Si <code>MontoTotal >= 250000</code>, enviar <code>Comprador.RNCComprador</code> o <code>Comprador.IdentificadorExtranjero</code>. Si es menor, el comprador puede ir vacío.</td></tr>
+            <tr><td><code>32</code></td><td>Factura de consumo</td><td>Si <code>MontoTotal >= 250000</code>, enviar <code>Comprador.RNCComprador</code> o <code>Comprador.IdentificadorExtranjero</code>. Si es menor, el comprador puede ir vacio y DGII exige el canal de Resumen B2C (<code>RFCE</code>).</td></tr>
             <tr><td><code>33</code></td><td>Nota de débito</td><td><code>InformacionReferencia.NCFModificado</code>, <code>FechaNCFModificado</code> y <code>CodigoModificacion</code>.</td></tr>
             <tr><td><code>34</code></td><td>Nota de crédito</td><td><code>InformacionReferencia.NCFModificado</code>, <code>FechaNCFModificado</code> y <code>CodigoModificacion</code>.</td></tr>
             <tr><td><code>41</code></td><td>Compras</td><td><code>Comprador.RNCComprador</code> y <code>Comprador.RazonSocialComprador</code>.</td></tr>
@@ -438,6 +438,7 @@
     <h2>Ejemplos por tipo</h2>
 
     <h3>Tipo 32 menor a RD$250,000</h3>
+    <p>Para Facturas de Consumo (<code>TipoeCF: 32</code>) con <code>MontoTotal</code> menor a RD$250,000, la DGII requiere el envio por el canal de Resumen B2C (<code>RFCE</code>), no como e-CF individual. El API enruta estos casos automaticamente; no debe interpretarse como una nota de credito ni como otro tipo de documento. Para <code>MontoTotal</code> igual o mayor a RD$250,000, se envia como e-CF individual y puede requerir datos del comprador segun aplique.</p>
 <pre>{
   "externalReference": "INV-32-0001",
   "ECF": {

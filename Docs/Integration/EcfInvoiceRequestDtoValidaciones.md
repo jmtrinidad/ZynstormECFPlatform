@@ -292,7 +292,7 @@ No mezcle el mismo descuento en ambos lugares. Use `DescuentoMonto` cuando el de
 | Tipo | Nombre comun | Campos adicionales |
 | --- | --- | --- |
 | `31` | Factura de credito fiscal | `Comprador.RNCComprador` y `Comprador.RazonSocialComprador`. |
-| `32` | Factura de consumo | Si `MontoTotal >= 250000`, enviar `Comprador.RNCComprador` o `Comprador.IdentificadorExtranjero`. Si es menor, el comprador puede ir vacio. |
+| `32` | Factura de consumo | Si `MontoTotal >= 250000`, enviar `Comprador.RNCComprador` o `Comprador.IdentificadorExtranjero`. Si es menor, el comprador puede ir vacio y DGII exige el canal de Resumen B2C (`RFCE`). |
 | `33` | Nota de debito | `InformacionReferencia.NCFModificado`, `FechaNCFModificado` y `CodigoModificacion`. |
 | `34` | Nota de credito | `InformacionReferencia.NCFModificado`, `FechaNCFModificado` y `CodigoModificacion`. |
 | `41` | Compras | `Comprador.RNCComprador` y `Comprador.RazonSocialComprador`. |
@@ -366,6 +366,8 @@ Para `46`, el validador XML tambien puede exigir nodos propios de exportacion se
 ## Ejemplos por tipo
 
 ### Tipo 32 menor a RD$250,000
+
+Para Facturas de Consumo (`TipoeCF: 32`) con `MontoTotal` menor a RD$250,000, la DGII requiere el envio por el canal de Resumen B2C (`RFCE`), no como e-CF individual. El API enruta estos casos automaticamente; no debe interpretarse como una nota de credito ni como otro tipo de documento. Para `MontoTotal` igual o mayor a RD$250,000, se envia como e-CF individual y puede requerir datos del comprador segun aplique.
 
 ```json
 {

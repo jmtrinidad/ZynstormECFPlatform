@@ -139,7 +139,10 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         await AddHistoryAsync(ecfDocument, 2, "Iniciando validacion y generacion del XML.");
         await AddLogAsync(ecfDocument, client.ClientId, "Information", "Proceso de emision e-CF iniciado.");
 
-        var unsignedXml = _generatorService.GenerateUnsignedXml(dto, isSummary: false);
+        var total = CalculateTransmissionTotal(dto);
+        var isSummary = ShouldSendAsB2cSummary(ecfType, total);
+
+        var unsignedXml = _generatorService.GenerateUnsignedXml(dto, isSummary);
         resultDto.UnsignedXml = unsignedXml;
 
         var xsdErrors = _generatorService.ValidateXmlAgainstSchema(unsignedXml, ecfType);
@@ -199,12 +202,11 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         }
 
         var token = await _authService.GetTokenAsync(issuerRnc, targetEnvironment, certBase64, certPass);
-        var total = CalculateTransmissionTotal(dto);
 
-        await MarkDocumentAsync(ecfDocument, 8, "Enviando e-CF a DGII.");
-        await AddLogAsync(ecfDocument, client.ClientId, "Information", $"Ambiente DGII seleccionado para envio: {targetEnvironment}.");
+        await MarkDocumentAsync(ecfDocument, 8, isSummary ? "Enviando resumen B2C a DGII." : "Enviando e-CF a DGII.");
+        await AddLogAsync(ecfDocument, client.ClientId, "Information", $"Ambiente DGII seleccionado para envio: {targetEnvironment}. Canal: {(isSummary ? "Resumen B2C" : "e-CF")}.");
 
-        var transmission = await _transmissionService.SendEcfAsync(targetEnvironment, token, signedXml, ecfType, total, issuerRnc, eNcf, isSummary: false);
+        var transmission = await _transmissionService.SendEcfAsync(targetEnvironment, token, signedXml, ecfType, total, issuerRnc, eNcf, isSummary);
         await AddDgiiResponseLogAsync(ecfDocument, client.ClientId, "recepcion", targetEnvironment, transmission);
 
         resultDto.Transmission = transmission;
@@ -1083,6 +1085,11 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     {
         return dto.ECF.Encabezado.Totales.MontoTotal
             ?? dto.ECF.DetallesItems.Item.Sum(item => item.MontoItem);
+    }
+
+    private static bool ShouldSendAsB2cSummary(int ecfType, decimal total)
+    {
+        return ecfType == 32 && total < 250000m;
     }
 
     private static string BuildDgiiStatusError(DgiiStatusResponse status)

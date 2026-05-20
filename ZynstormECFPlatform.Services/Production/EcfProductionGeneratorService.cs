@@ -60,14 +60,8 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
         // Calculate actual total from items (do not rely on ManualMontoTotal which may be null)
         decimal actualTotal = dto.ECF.Encabezado.Totales.MontoTotal ?? dto.ECF.DetallesItems.Item.Sum(i => i.MontoItem);
 
-        // For Type 32: route to RFCE only if explicitly a summary OR if actual amount is below threshold
-        bool isRfceSummary = isSummary;
-
-        // SPECIAL CASE: if isSummary flag is NOT set, always use ECF path (not RFCE)
-        if (ecfType == 32 && !isSummary)
-        {
-            isRfceSummary = false;
-        }
+        // DGII requires Factura de Consumo below RD$250,000 to be sent through the B2C summary channel.
+        bool isRfceSummary = isSummary || (ecfType == 32 && actualTotal < 250000m);
 
         // CLEANUP: Buyer cleanup removed to ensure Excel data is included.
         
