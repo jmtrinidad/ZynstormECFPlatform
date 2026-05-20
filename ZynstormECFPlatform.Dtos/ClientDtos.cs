@@ -18,6 +18,12 @@ public class ClientCreateDto
     [Phone]
     public string? Phone { get; set; }
 
+    [StringLength(500)]
+    public string? DailyReportEmails { get; set; }
+
+    [StringLength(500)]
+    public string? WeeklyReportEmails { get; set; }
+
     //public int StatusId { get; set; }
 }
 

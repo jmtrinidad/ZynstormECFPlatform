@@ -389,6 +389,14 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                 .HasMaxLength(50)
                 .IsUnicode(false);
 
+            entity.Property(e => e.DailyReportEmails)
+                  .HasMaxLength(500)
+                  .IsUnicode(false);
+
+            entity.Property(e => e.WeeklyReportEmails)
+                  .HasMaxLength(500)
+                  .IsUnicode(false);
+
             entity.Property(e => e.Name)
                   .HasMaxLength(50)
                   .IsUnicode(false);

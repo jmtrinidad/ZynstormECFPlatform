@@ -194,6 +194,21 @@ app.UseAuthorization();
 
 app.UseHangfireDashboard();
 
+// Register Automatic Reports Recurring Jobs
+RecurringJob.AddOrUpdate<ZynstormECFPlatform.Services.Jobs.AutomaticReportsJob>(
+    "DailyReportJob",
+    job => job.ExecuteDailyReportAsync(default),
+    Cron.Daily(21, 0), // 9:00 PM everyday in DR
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Santo_Domingo") }
+);
+
+RecurringJob.AddOrUpdate<ZynstormECFPlatform.Services.Jobs.AutomaticReportsJob>(
+    "WeeklyReportJob",
+    job => job.ExecuteWeeklyReportAsync(default),
+    Cron.Weekly(DayOfWeek.Friday, 18, 0), // 6:00 PM every Friday in DR
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Santo_Domingo") }
+);
+
 app.MapControllers();
 app.MapHub<CertificationHub>("/hubs/certification");
 

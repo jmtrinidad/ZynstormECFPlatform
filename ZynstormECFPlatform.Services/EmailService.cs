@@ -19,7 +19,7 @@ public class EmailService : IEmailService
         ValidateSettings(_settings);
     }
 
-    public async Task SendEmailAsync(string recipientEmail, string subject, string htmlBody, CancellationToken cancellationToken = default)
+    public async Task SendEmailAsync(string recipientEmail, string subject, string htmlBody, byte[]? attachmentBytes = null, string? attachmentFileName = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(recipientEmail))
             throw new InvalidOperationException("Email service called without a recipient email.");
@@ -30,6 +30,13 @@ public class EmailService : IEmailService
         message.Subject = subject;
         message.IsBodyHtml = true;
         message.Body = htmlBody;
+
+        if (attachmentBytes != null && !string.IsNullOrEmpty(attachmentFileName))
+        {
+            var ms = new MemoryStream(attachmentBytes);
+            var attachment = new Attachment(ms, attachmentFileName, "application/pdf");
+            message.Attachments.Add(attachment);
+        }
 
         using var client = new SmtpClient(_settings.SmtpHost, _settings.SmtpPort);
         client.EnableSsl = true; 

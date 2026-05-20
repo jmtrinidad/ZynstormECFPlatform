@@ -16,6 +16,10 @@ public partial class Client : BaseEntity
 
     public string? Phone { get; set; }
 
+    public string? DailyReportEmails { get; set; }
+
+    public string? WeeklyReportEmails { get; set; }
+
     public int StatusId { get; set; }
 
     public bool IsDgiiProduction { get; set; }

@@ -56,6 +56,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IEcfXmlValidationService, Validation.EcfXmlValidationService>();
 
         services.AddTransient<Jobs.EcfTrackingJob>();
+        services.AddTransient<Jobs.AutomaticReportsJob>();
 
         return services;
     }

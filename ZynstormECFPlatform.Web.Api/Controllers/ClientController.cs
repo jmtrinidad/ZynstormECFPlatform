@@ -5,10 +5,12 @@ using Microsoft.EntityFrameworkCore;
 using ZynstormECFPlatform.Abstractions.Data;
 using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Abstractions.Services;
+using ZynstormECFPlatform.Common;
 using ZynstormECFPlatform.Common.Utilities;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
+using ZynstormECFPlatform.Services.Reports;
 using System.Security.Claims;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers
@@ -20,7 +22,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         IEmailService emailService,
         IUnitOfWork unitOfWork,
         IMapper mapper,
-        ILoggerFactory loggerFactory) : BaseController<ClientController, Client, ClientCreateDto, ClientUpdateDto, ClientViewDto>(clientService, mapper, loggerFactory)
+        ILoggerFactory loggerFactory,
+        IRepository<EcfDocument> ecfDocumentRepository) : BaseController<ClientController, Client, ClientCreateDto, ClientUpdateDto, ClientViewDto>(clientService, mapper, loggerFactory)
     {
         private string? CurrentUserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         private bool IsSA => User.IsInRole("SA");
@@ -316,6 +319,78 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             catch (Exception exception)
             {
                 Logger.LogError(exception, exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [HttpGet]
+        [Route("guid/{guid}/daily-report/pdf")]
+        public async Task<IActionResult> DownloadDailyReportPdf(string guid, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var query = Repository.Table.AsNoTracking().Where(c => c.GuidId == guid);
+                if (!IsSA)
+                {
+                    var userId = CurrentUserId;
+                    query = query.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
+                }
+
+                var client = await query.FirstOrDefaultAsync(cancellationToken);
+                if (client == null) return NotFound("Cliente no encontrado.");
+
+                var now = DateTime.UtcNow;
+                var start = now.AddDays(-1); // Last 24 Hours
+
+                var documents = await ecfDocumentRepository.Table
+                    .Include(d => d.EcfStatus)
+                    .Where(d => d.ClientId == client.ClientId && !d.IsDeleted && d.RegisteredAt >= start && d.RegisteredAt <= now)
+                    .ToListAsync(cancellationToken);
+
+                var pdfBytes = ReportPdfGenerator.GenerateDailyReportPdf(client, documents, start, now);
+                var filename = $"Resumen_Diario_{client.Name.Replace(" ", "_")}_{now.ToDrTime():yyyyMMdd}.pdf";
+
+                return File(pdfBytes, "application/pdf", filename);
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, "Error generating daily report PDF via API: {Message}", exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [HttpGet]
+        [Route("guid/{guid}/weekly-report/pdf")]
+        public async Task<IActionResult> DownloadWeeklyReportPdf(string guid, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var query = Repository.Table.AsNoTracking().Where(c => c.GuidId == guid);
+                if (!IsSA)
+                {
+                    var userId = CurrentUserId;
+                    query = query.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
+                }
+
+                var client = await query.FirstOrDefaultAsync(cancellationToken);
+                if (client == null) return NotFound("Cliente no encontrado.");
+
+                var now = DateTime.UtcNow;
+                var start = now.AddDays(-7); // Last 7 Days
+
+                var documents = await ecfDocumentRepository.Table
+                    .Include(d => d.EcfStatus)
+                    .Where(d => d.ClientId == client.ClientId && !d.IsDeleted && d.RegisteredAt >= start && d.RegisteredAt <= now)
+                    .ToListAsync(cancellationToken);
+
+                var pdfBytes = ReportPdfGenerator.GenerateWeeklyReportPdf(client, documents, start, now);
+                var filename = $"Reporte_Semanal_{client.Name.Replace(" ", "_")}_{now.ToDrTime():yyyyMMdd}.pdf";
+
+                return File(pdfBytes, "application/pdf", filename);
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, "Error generating weekly report PDF via API: {Message}", exception.Message);
                 return StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
         }
