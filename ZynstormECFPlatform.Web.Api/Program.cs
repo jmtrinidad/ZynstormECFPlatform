@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using ZynstormECFPlatform.Services.Extensions;
 using ZynstormECFPlatform.Web.Api.Converters;
+using ZynstormECFPlatform.Abstractions.DataServices;
 using Hangfire;
 using Hangfire.PostgreSql;
 using ZynstormECFPlatform.Data;
@@ -119,6 +120,24 @@ if (builder.Environment.IsDevelopment())
                 ClockSkew = TimeSpan.Zero,
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(appSettings!.Secret)),
             };
+            x.Events = new JwtBearerEvents
+            {
+                OnTokenValidated = async context =>
+                {
+                    var accountService = context.HttpContext.RequestServices.GetRequiredService<IAccountService>();
+                    var userId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                    if (string.IsNullOrEmpty(userId))
+                    {
+                        context.Fail("User ID claim is missing.");
+                        return;
+                    }
+                    var user = await accountService.GetUserByIdAsync(userId).ConfigureAwait(false);
+                    if (user == null || !user.IsActive || user.IsDeleted)
+                    {
+                        context.Fail("User does not exist, is inactive or has been deleted.");
+                    }
+                }
+            };
         }).AddIdentityCookies();
 }
 else
@@ -146,6 +165,24 @@ else
              ValidateLifetime = true,
              ClockSkew = TimeSpan.Zero,
              IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(appSettings.Secret)),
+         };
+         x.Events = new JwtBearerEvents
+         {
+             OnTokenValidated = async context =>
+             {
+                 var accountService = context.HttpContext.RequestServices.GetRequiredService<IAccountService>();
+                 var userId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                 if (string.IsNullOrEmpty(userId))
+                 {
+                     context.Fail("User ID claim is missing.");
+                     return;
+                 }
+                 var user = await accountService.GetUserByIdAsync(userId).ConfigureAwait(false);
+                 if (user == null || !user.IsActive || user.IsDeleted)
+                 {
+                     context.Fail("User does not exist, is inactive or has been deleted.");
+                 }
+             }
          };
      }).AddIdentityCookies();
 }

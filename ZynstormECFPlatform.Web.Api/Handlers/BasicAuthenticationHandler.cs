@@ -1,11 +1,13 @@
-﻿using Azure.Core;
+using Azure.Core;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
+using Microsoft.Extensions.DependencyInjection;
 using ZynstormECFPlatform.Abstractions.Services;
+using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Core;
 using ZynstormECFPlatform.Dtos;
 
@@ -68,6 +70,18 @@ public class BasicAuthenticationHandler : AuthenticationHandler<AuthenticationSc
 
                     case "Bearer":
                         var claimsPrincipal = _jwtTokenService.GetPrincipalClaim(authHeader.Parameter!, _appSettings.Secret);
+                        
+                        var nameIdentifier = claimsPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                        if (!string.IsNullOrEmpty(nameIdentifier))
+                        {
+                            var accountService = Context.RequestServices.GetRequiredService<IAccountService>();
+                            var user = await accountService.GetUserByIdAsync(nameIdentifier).ConfigureAwait(false);
+                            if (user == null || !user.IsActive || user.IsDeleted)
+                            {
+                                return AuthenticateResult.Fail("User does not exist or is inactive");
+                            }
+                        }
+
                         var ticke = new AuthenticationTicket(claimsPrincipal, Scheme.Name);
                         return AuthenticateResult.Success(ticke);
 

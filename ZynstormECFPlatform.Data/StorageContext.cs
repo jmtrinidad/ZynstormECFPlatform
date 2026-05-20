@@ -56,6 +56,10 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
 
         if (string.IsNullOrEmpty(userId)) return auditEntries;
 
+        // Failsafe: verificar que el usuario realmente existe en la base de datos
+        // para evitar excepciones de clave foránea FK_UserAuditLog_User en guardados
+        if (!Users.Any(u => u.Id == userId)) return auditEntries;
+
         foreach (var entry in ChangeTracker.Entries())
         {
             if (entry.Entity is UserAuditLog || entry.Entity is UserAccessLog || entry.State == EntityState.Detached || entry.State == EntityState.Unchanged)
