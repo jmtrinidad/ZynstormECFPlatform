@@ -229,9 +229,11 @@ public class CertificationSimulationService : ICertificationSimulationService
 
                         if (string.IsNullOrEmpty(securityCode))
                         {
-                            securityCode = !string.IsNullOrEmpty(signatureValue) && signatureValue.Length >= 6 
-                                ? signatureValue.Substring(0, 6) 
-                                : "ABC123";
+                            // CodigoSeguridad: primeros 6 chars RAW del base64 (case-sensitive, sin ToUpper).
+                            // Solo se limpian saltos de línea/espacios del base64 multilínea.
+                            var rawSignature = (signatureValue ?? "")
+                                .Replace("\n", "").Replace("\r", "").Replace(" ", "").Trim();
+                            securityCode = rawSignature.Length >= 6 ? rawSignature[..6] : "ABC123";
                         }
 
                         status.CompletedSteps.Add(new CertificationStepResultDto

@@ -964,7 +964,10 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
         int start = signedXml.IndexOf(tag, StringComparison.Ordinal);
         if (start == -1) return string.Empty;
 
-        var content = signedXml[(start + tag.Length)..].TrimStart();
+        // CodigoSeguridad: primeros 6 chars RAW del base64 (case-sensitive, sin ToUpper).
+        // El base64 puede ser multilínea — se limpian todos los whitespace antes de cortar.
+        var content = signedXml[(start + tag.Length)..]
+            .Replace("\n", "").Replace("\r", "").Replace(" ", "").Trim();
         return content.Length >= 6 ? content[..6] : string.Empty;
     }
 

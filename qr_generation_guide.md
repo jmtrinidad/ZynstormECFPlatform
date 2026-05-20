@@ -7,7 +7,9 @@ Esta guía detalla las especificaciones técnicas requeridas para construir la U
 ## 1. Facturas Normales y Comprobantes Generales
 Aplica para comprobantes del tipo **E31, E33, E34, E41, E43, E44, E45, E46, E47** y facturas de consumo (**E32**) con montos iguales o mayores a RD$ 250,000.00.
 
-### URL Base (Entorno de Certificación / Pruebas)
+### URL Base (Entorno de Pruebas/Test **y** Certificación)
+> ⚠️ La DGII **no expone** el portal `ConsultaTimbre` bajo `/TesteCF/`. Aunque el XML se envía y acepta en `TesteCF`, el QR siempre debe apuntar a `/CerteCF/ConsultaTimbre` en ambientes no-productivos.
+
 `https://ecf.dgii.gov.do/CerteCF/ConsultaTimbre?`
 
 ### Parámetros Requeridos (En Orden)
@@ -19,7 +21,7 @@ Aplica para comprobantes del tipo **E31, E33, E34, E41, E43, E44, E45, E46, E47*
 | `FechaEmision` | Fecha de expedición | `DD-MM-YYYY` (ej. `30-03-2026`) |
 | `MontoTotal` | Total facturado | Sin decimales superfluos (ej. `53100` o `6029.50`) |
 | `FechaFirma` | Fecha de firmado | `DD-MM-YYYY%20HH:mm:ss` (escapar espacio, dos puntos literales) |
-| `CodigoSeguridad` | Hash de validación | Primeros 6 caracteres del `<SignatureValue>` del XML |
+| `CodigoSeguridad` | Hash de validación | Primeros 6 caracteres **RAW** del `<SignatureValue>` del XML firmado. **⚠️ Case-sensitive**: la DGII almacena el valor tal como viene en el base64. Ej: si el `SignatureValue` empieza con `bUfoV4jM...` el código es `bUfoV4`, NO `BUFOV4`. Solo eliminar saltos de línea/espacios del base64 multilínea, nunca convertir a mayúsculas. |
 
 ---
 

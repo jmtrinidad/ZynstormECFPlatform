@@ -795,31 +795,29 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         var montoTotalUrl = montoTotal.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
         // E32 (Factura de Consumo) con monto menor a 250K usa el portal FC
-        // URLs confirmadas en vivo:
-        //   Test:       https://fc.dgii.gov.do/testecf/ConsultaTimbreFC
-        //   CerteCF:    https://fc.dgii.gov.do/CerteCF/ConsultaTimbreFC
-        //   Production: https://fc.dgii.gov.do/ConsultaTimbreFC
+        // IMPORTANTE: La DGII solo expone ConsultaTimbreFC bajo /CerteCF/ para entornos no-productivos.
+        //             /testecf/ConsultaTimbreFC NO tiene portal publico de consulta.
+        // URLs:
+        //   Test/CerteCF: https://fc.dgii.gov.do/CerteCF/ConsultaTimbreFC
+        //   Production:   https://fc.dgii.gov.do/ecf/ConsultaTimbreFC
         if (ecfType == 32 && montoTotal < 250000m)
         {
-            string fcBase = environment == DgiiEnvironment.Test
-                ? "https://fc.dgii.gov.do/testecf"
-                : environment == DgiiEnvironment.CerteCF
-                    ? "https://fc.dgii.gov.do/CerteCF"
-                    : "https://fc.dgii.gov.do";
+            string fcBase = environment == DgiiEnvironment.Production
+                ? "https://fc.dgii.gov.do/ecf"
+                : "https://fc.dgii.gov.do/CerteCF";
 
             return $"{fcBase}/ConsultaTimbreFC?RncEmisor={rncEmisor}&ENCF={encf}&MontoTotal={montoTotalUrl}&CodigoSeguridad={Uri.EscapeDataString(securityCode)}";
         }
 
         // Base URL segun ambiente para ConsultaTimbre (todos los demas tipos de e-CF)
-        // URLs confirmadas en vivo:
-        //   Test:       https://ecf.dgii.gov.do/TesteCF/ConsultaTimbre
-        //   CerteCF:    https://ecf.dgii.gov.do/CerteCF/ConsultaTimbre
-        //   Production: https://ecf.dgii.gov.do/ConsultaTimbre
-        string baseUrl = environment == DgiiEnvironment.Test
-            ? "https://ecf.dgii.gov.do/TesteCF"
-            : environment == DgiiEnvironment.CerteCF
-                ? "https://ecf.dgii.gov.do/CerteCF"
-                : "https://ecf.dgii.gov.do";
+        // IMPORTANTE: La DGII solo expone el portal ConsultaTimbre bajo /CerteCF/ para entornos no-productivos.
+        //             /TesteCF/ConsultaTimbre NO tiene portal publico de consulta del timbre.
+        // URLs:
+        //   Test/CerteCF: https://ecf.dgii.gov.do/CerteCF/ConsultaTimbre
+        //   Production:   https://ecf.dgii.gov.do/ecf/ConsultaTimbre
+        string baseUrl = environment == DgiiEnvironment.Production
+            ? "https://ecf.dgii.gov.do/ecf"
+            : "https://ecf.dgii.gov.do/CerteCF";
 
         if (string.IsNullOrEmpty(rncComprador))
         {
@@ -867,9 +865,13 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         if (!string.IsNullOrWhiteSpace(rfceSecurityCode))
             return rfceSecurityCode;
 
-        var signatureValue = ExtractXmlValue(xml, "SignatureValue");
-        var normalizedSignature = new string(signatureValue.Where(char.IsLetterOrDigit).ToArray());
-        return normalizedSignature.Length >= 6 ? normalizedSignature[..6].ToUpperInvariant() : string.Empty;
+        // La DGII toma los primeros 6 caracteres RAW del <SignatureValue> (base64).
+        // No se eliminan los chars especiales (+, /, =) porque eso produciría un
+        // CodigoSeguridad diferente al que la DGII registra internamente.
+        // Solo se hace Trim() para remover saltos de línea del base64 multilínea.
+        var signatureValue = ExtractXmlValue(xml, "SignatureValue")
+            .Replace("\n", "").Replace("\r", "").Replace(" ", "").Trim();
+        return signatureValue.Length >= 6 ? signatureValue[..6] : signatureValue;
     }
 
     private static string OnlyDigits(string? value)
@@ -881,7 +883,10 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
     private static string GenerateSecurityCode()
     {
-        return Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+        // Fallback cuando aún no hay SignatureValue (pre-firma).
+        // Se usa el Guid tal cual, sin alterar el case, para mantener consistencia
+        // con la política: el CodigoSeguridad siempre se toma RAW sin modificar case.
+        return Guid.NewGuid().ToString("N")[..6];
     }
 
     private static string BuildTransmissionResponseMessage(DgiiTransmissionResult transmission, DgiiStatusResponse? status)
