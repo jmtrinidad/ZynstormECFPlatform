@@ -31,7 +31,7 @@ Esta guia aplica al objeto nuevo que recibe `EmitEcf` en produccion. Todos los t
 | `ECF.Encabezado.IdDoc.TipoIngresos` | Obligatorio para tipos `31`, `32`, `33`, `34`, `44`, `45` y `46`. No aplica para `41`, `43` y `47`. |
 | `ECF.Encabezado.IdDoc.TipoPago` | Use `1` contado o `2` credito. |
 | `ECF.Encabezado.IdDoc.FechaLimitePago` | Obligatorio cuando `TipoPago` es `2`. Formato recomendado: `dd-MM-yyyy`. |
-| `ECF.Encabezado.IdDoc.TablaFormasPago.FormaDePago` | Obligatorio cuando se envia `TipoPago`. Cada forma debe incluir `FormaPago` y `MontoPago`. Para un solo pago tambien puede usar el atajo `FormaPago` y `MontoPago` dentro de `IdDoc`. |
+| `ECF.Encabezado.IdDoc.TablaFormasPago.FormaDePago` | Obligatorio cuando se envia `TipoPago`, excepto en e-CF tipo `34`. Cada forma debe incluir `FormaPago` y `MontoPago`. Para un solo pago tambien puede usar el atajo `FormaPago` y `MontoPago` dentro de `IdDoc`. |
 | `ECF.Encabezado.Emisor.RNCEmisor` | RNC del emisor, solo digitos. |
 | `ECF.Encabezado.Emisor.RazonSocialEmisor` | Nombre legal del emisor. |
 | `ECF.Encabezado.Emisor.DireccionEmisor` | Direccion fiscal del emisor. |
@@ -108,6 +108,8 @@ Los siguientes catalogos salen de `EcfEnums.cs`. No todos son obligatorios en to
 ### FormaPago - `ECF.Encabezado.IdDoc.TablaFormasPago.FormaDePago[].FormaPago`
 
 El XML se genera como `<TablaFormasPago><FormaDePago><FormaPago>` y `<MontoPago>`. El `MontoPago` debe ser el monto cubierto por esa forma de pago; si solo hay una forma, normalmente coincide con `MontoTotal`.
+
+Para e-CF tipo `34` nota de credito no envie `TablaFormasPago`, `FormaDePago`, `MontoPago`, `TipoCuentaPago`, `NumeroCuentaPago`, `BancoPago` ni `TerminoPago`; el XSD oficial de DGII para este tipo no permite esos campos. En tipo `34`, `IndicadorNotaCredito` es obligatorio y debe enviarse como `0` cuando la nota se emite hasta 30 dias calendario despues del comprobante modificado, o `1` cuando se emite despues de 30 dias.
 
 | Codigo | Descripcion | Ejemplo |
 | --- | --- | --- |
@@ -687,6 +689,8 @@ Para Facturas de Consumo (`TipoeCF: 32`) con `MontoTotal` menor a RD$250,000, la
 
 ### Tipo 34 nota de credito
 
+Para notas de credito electronicas tipo `34`, incluya `IndicadorNotaCredito` y no envie `TablaFormasPago` aunque exista `TipoPago`.
+
 ```json
 {
   "externalReference": "NC-34-0001",
@@ -696,16 +700,9 @@ Para Facturas de Consumo (`TipoeCF: 32`) con `MontoTotal` menor a RD$250,000, la
       "IdDoc": {
         "TipoeCF": "34",
         "eNCF": "E340000000001",
+        "IndicadorNotaCredito": "0",
         "TipoIngresos": "01",
-        "TipoPago": "1",
-        "TablaFormasPago": {
-          "FormaDePago": [
-            {
-              "FormaPago": 1,
-              "MontoPago": "250.00"
-            }
-          ]
-        }
+        "TipoPago": "1"
       },
       "Emisor": {
         "RNCEmisor": "131880681",

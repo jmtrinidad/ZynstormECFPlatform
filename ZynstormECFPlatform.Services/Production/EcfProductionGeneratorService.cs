@@ -233,7 +233,7 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
 
         var formasPago = idDoc.TablaFormasPago?.FormaDePago;
         var hasFormaPagoShortcut = !string.IsNullOrWhiteSpace(idDoc.FormaPago);
-        if (!string.IsNullOrWhiteSpace(idDoc.TipoPago) && formasPago?.Any() != true && !hasFormaPagoShortcut)
+        if (ecfType != 34 && !string.IsNullOrWhiteSpace(idDoc.TipoPago) && formasPago?.Any() != true && !hasFormaPagoShortcut)
             errors.Add("Debe proveer al menos una FormaPago en IdDoc.TablaFormasPago.FormaDePago.");
 
         if (hasFormaPagoShortcut)
@@ -520,7 +520,9 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
                     EcfType = ecfType,
                     Ncf = e.IdDoc.eNCF,
                     SequenceExpirationDate = e.IdDoc.FechaVencimientoSecuencia,
-                    IndicadorNotaCredito = int.TryParse(e.IdDoc.IndicadorNotaCredito, out int inc) ? inc : null,
+                    IndicadorNotaCredito = ecfType == 34
+                        ? (int.TryParse(e.IdDoc.IndicadorNotaCredito, out int inc) ? inc : 0)
+                        : null,
                     IndicadorMontoGravado = int.TryParse(e.IdDoc.IndicadorMontoGravado, out int img) ? img : null,
                     IncomeType = e.IdDoc.TipoIngresos,
                     PaymentType = int.TryParse(e.IdDoc.TipoPago, out int tp) ? tp : null,

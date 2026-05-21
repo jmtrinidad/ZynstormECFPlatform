@@ -99,7 +99,7 @@ public class EcfInvoiceRequestDto : IValidatableObject
 
         var formasPago = e.IdDoc?.TablaFormasPago?.FormaDePago;
         var hasFormaPagoShortcut = !string.IsNullOrWhiteSpace(e.IdDoc?.FormaPago);
-        if (!string.IsNullOrWhiteSpace(e.IdDoc?.TipoPago) && formasPago?.Any() != true && !hasFormaPagoShortcut)
+        if (tipoEcf != 34 && !string.IsNullOrWhiteSpace(e.IdDoc?.TipoPago) && formasPago?.Any() != true && !hasFormaPagoShortcut)
             yield return new ValidationResult("Debe proveer al menos una FormaPago en ECF.Encabezado.IdDoc.TablaFormasPago.FormaDePago.", new[] { "ECF.Encabezado.IdDoc.TablaFormasPago.FormaDePago" });
 
         if (hasFormaPagoShortcut)

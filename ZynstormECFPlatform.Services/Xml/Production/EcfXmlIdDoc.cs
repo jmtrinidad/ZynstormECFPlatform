@@ -22,7 +22,7 @@ public class EcfXmlIdDoc
     /// <summary>Type 34 only — required at position 3 in XSD 34, before any optional indicators.</summary>
     [XmlElement("IndicadorNotaCredito", Order = 3)]
     public int? IndicadorNotaCredito { get; set; }
-    public bool ShouldSerializeIndicadorNotaCredito() => EcfType == 34;
+    public bool ShouldSerializeIndicadorNotaCredito() => EcfType == 34 && IndicadorNotaCredito.HasValue;
 
     /// <summary>Present in all types EXCEPT 32 (no expiration) and 34 (IndicadorNotaCredito takes position 3).</summary>
     [XmlElement("FechaVencimientoSecuencia", Order = 4)]
@@ -70,23 +70,23 @@ public class EcfXmlIdDoc
 
     [XmlElement("TerminoPago", Order = 11)]
     public string? TerminoPago { get; set; }
-    public bool ShouldSerializeTerminoPago() => !string.IsNullOrWhiteSpace(TerminoPago);
+    public bool ShouldSerializeTerminoPago() => AllowsExtendedPaymentFields() && !string.IsNullOrWhiteSpace(TerminoPago);
 
     [XmlElement("TablaFormasPago", Order = 12)]
     public EcfXmlTablaFormasPago? TablaFormasPago { get; set; }
-    public bool ShouldSerializeTablaFormasPago() => TablaFormasPago?.FormasDePago?.Count > 0;
+    public bool ShouldSerializeTablaFormasPago() => AllowsExtendedPaymentFields() && TablaFormasPago?.FormasDePago?.Count > 0;
 
     [XmlElement("TipoCuentaPago", Order = 13)]
     public string? TipoCuentaPago { get; set; }
-    public bool ShouldSerializeTipoCuentaPago() => !string.IsNullOrWhiteSpace(TipoCuentaPago);
+    public bool ShouldSerializeTipoCuentaPago() => AllowsExtendedPaymentFields() && !string.IsNullOrWhiteSpace(TipoCuentaPago);
 
     [XmlElement("NumeroCuentaPago", Order = 14)]
     public string? NumeroCuentaPago { get; set; }
-    public bool ShouldSerializeNumeroCuentaPago() => !string.IsNullOrWhiteSpace(NumeroCuentaPago);
+    public bool ShouldSerializeNumeroCuentaPago() => AllowsExtendedPaymentFields() && !string.IsNullOrWhiteSpace(NumeroCuentaPago);
 
     [XmlElement("BancoPago", Order = 15)]
     public string? BancoPago { get; set; }
-    public bool ShouldSerializeBancoPago() => !string.IsNullOrWhiteSpace(BancoPago);
+    public bool ShouldSerializeBancoPago() => AllowsExtendedPaymentFields() && !string.IsNullOrWhiteSpace(BancoPago);
 
     [XmlElement("FechaDesde", Order = 16)]
     public string? FechaDesde { get; set; }
@@ -99,6 +99,8 @@ public class EcfXmlIdDoc
     [XmlElement("TotalPaginas", Order = 18)]
     public int? TotalPaginas { get; set; }
     public bool ShouldSerializeTotalPaginas() => TotalPaginas.HasValue;
+
+    private bool AllowsExtendedPaymentFields() => EcfType != 34;
 }
 
 public class EcfXmlTablaFormasPago

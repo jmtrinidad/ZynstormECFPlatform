@@ -245,15 +245,7 @@
           "IndicadorMontoGravado": 0,
           "TipoIngresos": "01",
           "TipoPago": 2,
-          "FechaLimitePago": "{{FECHA_LIMITE_PAGO}}",
-          "TablaFormasPago": {
-            "FormaDePago": [
-              {
-                "FormaPago": 2,
-                "MontoPago": "3005"
-              }
-            ]
-          }
+          "FechaLimitePago": "{{FECHA_LIMITE_PAGO}}"
         },
         "Emisor": {
           "RNCEmisor": "{{RNC}}",

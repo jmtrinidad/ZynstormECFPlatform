@@ -55,7 +55,7 @@
             <tr><td><code>ECF.Encabezado.IdDoc.TipoIngresos</code></td><td>Obligatorio para tipos <code>31</code>, <code>32</code>, <code>33</code>, <code>34</code>, <code>44</code>, <code>45</code> y <code>46</code>. No aplica para <code>41</code>, <code>43</code> y <code>47</code>.</td></tr>
             <tr><td><code>ECF.Encabezado.IdDoc.TipoPago</code></td><td>Use <code>1</code> contado o <code>2</code> crédito.</td></tr>
             <tr><td><code>ECF.Encabezado.IdDoc.FechaLimitePago</code></td><td>Obligatorio cuando <code>TipoPago</code> es <code>2</code>. Formato recomendado: <code>dd-MM-yyyy</code>.</td></tr>
-            <tr><td><code>ECF.Encabezado.IdDoc.TablaFormasPago.FormaDePago</code></td><td>Obligatorio cuando se envia <code>TipoPago</code>. Cada forma debe incluir <code>FormaPago</code> y <code>MontoPago</code>. Para un solo pago tambien puede usar el atajo <code>FormaPago</code> y <code>MontoPago</code> dentro de <code>IdDoc</code>.</td></tr>
+            <tr><td><code>ECF.Encabezado.IdDoc.TablaFormasPago.FormaDePago</code></td><td>Obligatorio cuando se envia <code>TipoPago</code>, excepto en e-CF tipo <code>34</code>. Cada forma debe incluir <code>FormaPago</code> y <code>MontoPago</code>. Para un solo pago tambien puede usar el atajo <code>FormaPago</code> y <code>MontoPago</code> dentro de <code>IdDoc</code>.</td></tr>
             <tr><td><code>ECF.Encabezado.Emisor.RNCEmisor</code></td><td>RNC del emisor, solo dígitos.</td></tr>
             <tr><td><code>ECF.Encabezado.Emisor.RazonSocialEmisor</code></td><td>Nombre legal del emisor.</td></tr>
             <tr><td><code>ECF.Encabezado.Emisor.DireccionEmisor</code></td><td>Dirección fiscal del emisor.</td></tr>
@@ -146,6 +146,7 @@
 
     <h3>FormaPago - <code>ECF.Encabezado.IdDoc.TablaFormasPago.FormaDePago[].FormaPago</code></h3>
     <p>El XML se genera como <code>&lt;TablaFormasPago&gt;&lt;FormaDePago&gt;&lt;FormaPago&gt;</code> y <code>&lt;MontoPago&gt;</code>. El <code>MontoPago</code> debe ser el monto cubierto por esa forma de pago; si solo hay una forma, normalmente coincide con <code>MontoTotal</code>.</p>
+    <p>Para e-CF tipo <code>34</code> nota de credito no envie <code>TablaFormasPago</code>, <code>FormaDePago</code>, <code>MontoPago</code>, <code>TipoCuentaPago</code>, <code>NumeroCuentaPago</code>, <code>BancoPago</code> ni <code>TerminoPago</code>; el XSD oficial de DGII para este tipo no permite esos campos. En tipo <code>34</code>, <code>IndicadorNotaCredito</code> es obligatorio y debe enviarse como <code>0</code> cuando la nota se emite hasta 30 dias calendario despues del comprobante modificado, o <code>1</code> cuando se emite despues de 30 dias.</p>
     <table>
         <thead>
             <tr><th>Codigo</th><th>Descripcion</th><th>Ejemplo</th></tr>
@@ -746,6 +747,7 @@
 }</pre>
 
     <h3>Tipo 34 nota de credito</h3>
+    <p>Para notas de credito electronicas tipo <code>34</code>, incluya <code>IndicadorNotaCredito</code> y no envie <code>TablaFormasPago</code> aunque exista <code>TipoPago</code>.</p>
 <pre>{
   "externalReference": "NC-34-0001",
   "ECF": {
@@ -754,16 +756,9 @@
       "IdDoc": {
         "TipoeCF": "34",
         "eNCF": "E340000000001",
+        "IndicadorNotaCredito": "0",
         "TipoIngresos": "01",
-        "TipoPago": "1",
-        "TablaFormasPago": {
-          "FormaDePago": [
-            {
-              "FormaPago": 1,
-              "MontoPago": "250.00"
-            }
-          ]
-        }
+        "TipoPago": "1"
       },
       "Emisor": {
         "RNCEmisor": "131880681",
