@@ -21,7 +21,8 @@ public class CertificationFeController : FeController
         IApiKeyService apiKeyService,
         IClientCertificateService clientCertificateService,
         IEncryptedService encryptedService,
-        IDgiiAuthService dgiiAuthService)
+        IDgiiAuthService dgiiAuthService,
+        IReceivedB2BMessageService receivedB2BMessageService)
         : base(
             cacheService,
             jwtTokenService,
@@ -31,7 +32,8 @@ public class CertificationFeController : FeController
             apiKeyService,
             clientCertificateService,
             encryptedService,
-            dgiiAuthService)
+            dgiiAuthService,
+            receivedB2BMessageService)
     {
     }
 }

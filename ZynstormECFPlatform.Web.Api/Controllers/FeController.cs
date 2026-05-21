@@ -27,6 +27,7 @@ public class FeController : ControllerBase
     private readonly IClientCertificateService _clientCertificateService;
     private readonly IEncryptedService _encryptedService;
     private readonly IDgiiAuthService _dgiiAuthService;
+    private readonly IReceivedB2BMessageService _receivedB2BMessageService;
 
     public FeController(
         ICacheService cacheService,
@@ -37,7 +38,8 @@ public class FeController : ControllerBase
         IApiKeyService apiKeyService,
         IClientCertificateService clientCertificateService,
         IEncryptedService encryptedService,
-        IDgiiAuthService dgiiAuthService)
+        IDgiiAuthService dgiiAuthService,
+        IReceivedB2BMessageService receivedB2BMessageService)
     {
         _cacheService = cacheService;
         _jwtTokenService = jwtTokenService;
@@ -48,6 +50,7 @@ public class FeController : ControllerBase
         _clientCertificateService = clientCertificateService;
         _encryptedService = encryptedService;
         _dgiiAuthService = dgiiAuthService;
+        _receivedB2BMessageService = receivedB2BMessageService;
     }
 
     /// <summary>
@@ -155,6 +158,28 @@ public class FeController : ControllerBase
         else
         {
             CacheValidatedClient(client);
+        }
+
+        if (client != null)
+        {
+            try
+            {
+                var receivedMessage = new ReceivedB2BMessage
+                {
+                    ClientId = client.ClientId,
+                    MessageType = MessageType.Ecf,
+                    RncEmisor = rncEmisor ?? string.Empty,
+                    RncComprador = rncComprador ?? string.Empty,
+                    ENcf = eNcf ?? string.Empty,
+                    RawXml = xmlContent,
+                    ReceivedAtUtc = DateTime.UtcNow
+                };
+                await _receivedB2BMessageService.InsertAsync(receivedMessage);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al guardar el XML de ECF recibido en la base de datos.");
+            }
         }
 
         string xmlResponse = $@"<?xml version=""1.0"" encoding=""utf-8""?><ARECF><DetalleAcusedeRecibo><Version>1.0</Version><RNCEmisor>{rncEmisor}</RNCEmisor><RNCComprador>{rncComprador}</RNCComprador><eNCF>{eNcf}</eNCF><Estado>{estado}</Estado>{motivoXml}<FechaHoraAcuseRecibo>{fecha}</FechaHoraAcuseRecibo></DetalleAcusedeRecibo></ARECF>";
@@ -272,6 +297,25 @@ public class FeController : ControllerBase
             if (client != null)
             {
                 CacheValidatedClient(client);
+
+                try
+                {
+                    var receivedMessage = new ReceivedB2BMessage
+                    {
+                        ClientId = client.ClientId,
+                        MessageType = MessageType.AprobacionComercial,
+                        RncEmisor = rncEmisor ?? string.Empty,
+                        RncComprador = rncComprador ?? string.Empty,
+                        ENcf = eNcf ?? string.Empty,
+                        RawXml = xmlContent,
+                        ReceivedAtUtc = DateTime.UtcNow
+                    };
+                    await _receivedB2BMessageService.InsertAsync(receivedMessage);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error al guardar el XML de Aprobación Comercial recibido en la base de datos.");
+                }
 
                 var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
                 if (certificate != null)

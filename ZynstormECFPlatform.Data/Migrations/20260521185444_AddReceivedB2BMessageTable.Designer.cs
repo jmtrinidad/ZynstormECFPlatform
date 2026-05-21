@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ZynstormECFPlatform.Data;
@@ -11,9 +12,11 @@ using ZynstormECFPlatform.Data;
 namespace ZynstormECFPlatform.Data.Migrations
 {
     [DbContext(typeof(StorageContext))]
-    partial class StorageContextModelSnapshot : ModelSnapshot
+    [Migration("20260521185444_AddReceivedB2BMessageTable")]
+    partial class AddReceivedB2BMessageTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -4139,9 +4142,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Property<int>("ClientId")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("ClientId1")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime?>("DeletedTimeUtc")
                         .HasColumnType("timestamp without time zone");
 
@@ -4203,8 +4203,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.HasKey("ReceivedB2BMessageId");
 
                     b.HasIndex("ClientId");
-
-                    b.HasIndex("ClientId1");
 
                     b.ToTable("ReceivedB2BMessage");
                 });
@@ -5088,10 +5086,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_ReceivedB2BMessage_Client");
 
-                    b.HasOne("ZynstormECFPlatform.Core.Entities.Client", null)
-                        .WithMany("ReceivedB2BMessages")
-                        .HasForeignKey("ClientId1");
-
                     b.Navigation("Client");
                 });
 
@@ -5223,8 +5217,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Navigation("ENcfs");
 
                     b.Navigation("EcfDocuments");
-
-                    b.Navigation("ReceivedB2BMessages");
 
                     b.Navigation("SystemLogs");
 

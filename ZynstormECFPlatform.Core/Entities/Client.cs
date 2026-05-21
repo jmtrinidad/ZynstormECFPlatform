@@ -28,6 +28,8 @@ public partial class Client : BaseEntity
 
     public virtual Status Status { get; set; } = null!;
 
+    public virtual ICollection<ReceivedB2BMessage> ReceivedB2BMessages { get; set; } = [];
+
     public virtual ICollection<CertificationInvoicePrintTemplate> CertificationInvoicePrintTemplates { get; set; } = [];
 
     public virtual ICollection<CertificationProcess> CertificationProcesses { get; set; } = [];

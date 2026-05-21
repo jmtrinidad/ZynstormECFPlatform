@@ -32,10 +32,6 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
         _currentUserService = currentUserService;
     }
 
-
-
-
-
     protected StorageContext()
     {
     }
@@ -323,7 +319,6 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasForeignKey(d => d.BusinessTypeId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
-
 
         // Apply global PostgreSQL DateTime column type configuration
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
@@ -1117,6 +1112,63 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasDefaultValueSql(DefaultGUIDSqlValue);
 
             entity.HasQueryFilter(c => !c.IsDeleted);
+        });
+
+        modelBuilder.Entity<ReceivedB2BMessage>(entity =>
+        {
+            entity.HasKey(c => c.ReceivedB2BMessageId);
+
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(e => e.MessageType)
+                  .HasConversion<string>()
+                  .HasMaxLength(50)
+                  .IsUnicode(false);
+
+            entity.Property(e => e.RncEmisor)
+                  .HasMaxLength(25)
+                  .IsUnicode(false);
+
+            entity.Property(e => e.RncComprador)
+                  .HasMaxLength(25)
+                  .IsUnicode(false);
+
+            entity.Property(e => e.ENcf)
+                  .HasMaxLength(20)
+                  .IsUnicode(false);
+
+            entity.Property(e => e.RawXml)
+                  .HasColumnType("text");
+
+            entity.Property(e => e.ReceivedAtUtc)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.Client)
+                  .WithMany(c => c.ReceivedB2BMessages)
+                  .HasForeignKey(d => d.ClientId)
+                  .OnDelete(DeleteBehavior.Cascade)
+                  .HasConstraintName("FK_ReceivedB2BMessage_Client");
         });
 
         modelBuilder.Entity<EcfType>(entity =>
