@@ -155,16 +155,16 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             return resultDto;
         }
 
-        var xmlProdErrors = ValidateXmlAgainstProdReferences(unsignedXml, ecfType);
-        resultDto.XmlProdErrors = xmlProdErrors;
+        //var xmlProdErrors = ValidateXmlAgainstProdReferences(unsignedXml, ecfType);
+        //resultDto.XmlProdErrors = xmlProdErrors;
 
-        if (xmlProdErrors.Count > 0)
-        {
-            resultDto.Message = "El XML generado no cumple con las referencias estructurales de XmlProd.";
-            await MarkDocumentAsync(ecfDocument, 3, resultDto.Message);
-            await AddLogAsync(ecfDocument, client.ClientId, "Warning", resultDto.Message, JsonSerializer.Serialize(xmlProdErrors));
-            return resultDto;
-        }
+        //if (xmlProdErrors.Count > 0)
+        //{
+        //    resultDto.Message = "El XML generado no cumple con las referencias estructurales de XmlProd.";
+        //    await MarkDocumentAsync(ecfDocument, 3, resultDto.Message);
+        //    await AddLogAsync(ecfDocument, client.ClientId, "Warning", resultDto.Message, JsonSerializer.Serialize(xmlProdErrors));
+        //    return resultDto;
+        //}
 
         var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey ?? string.Empty);
         var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId)
