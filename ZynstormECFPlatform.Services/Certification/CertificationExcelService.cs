@@ -704,7 +704,57 @@ public class CertificationExcelService : ICertificationExcelService
 
     public async Task<List<DgiiTransmissionResult>> ProcessAprobacionComercialAsync(byte[] excelBytes) => new List<DgiiTransmissionResult>();
 
-    public async Task<(byte[] content, string fileName)> SignXmlAsync(Stream xmlStream, string rnc) => (new byte[0], "");
+    public async Task<(byte[] content, string fileName)> SignXmlAsync(Stream xmlStream, string rnc)
+    {
+        // 1. Leer el contenido del XML desde el stream
+        string xmlContent;
+        using (var reader = new StreamReader(xmlStream, Encoding.UTF8))
+        {
+            xmlContent = await reader.ReadToEndAsync();
+        }
+
+        if (string.IsNullOrWhiteSpace(xmlContent))
+            throw new Exception("El archivo XML está vacío.");
+
+        // 2. Buscar al cliente por RNC
+        var client = await _clientService.GetByAsync(x => x.Rnc == rnc)
+                     ?? throw new Exception($"No se encontró ningún cliente registrado con el RNC '{rnc}'.");
+
+        // 3. Obtener la ApiKey activa del cliente para acceder a la SecretKey
+        var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)
+                     ?? throw new Exception($"El cliente con RNC '{rnc}' no tiene una ApiKey activa configurada.");
+
+        if (string.IsNullOrEmpty(apiKey.SecretKey))
+            throw new Exception($"El cliente con RNC '{rnc}' no tiene SecretKey configurada.");
+
+        // 4. Desencriptar la SecretKey del cliente
+        var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
+        if (string.IsNullOrEmpty(decryptedSecretKey))
+            throw new Exception("No se pudo desencriptar la SecretKey del cliente.");
+
+        // 5. Obtener el certificado digital del cliente
+        var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId)
+                          ?? throw new Exception($"El cliente con RNC '{rnc}' no tiene un certificado digital registrado.");
+
+        // 6. Desencriptar certificado y password
+        var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
+        var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
+
+        if (certificateBytes.Length == 0 || passwordBytes.Length == 0)
+            throw new Exception("No se pudo desencriptar el certificado del cliente.");
+
+        var certBase64 = Convert.ToBase64String(certificateBytes);
+        var certPassword = Encoding.UTF8.GetString(passwordBytes);
+
+        // 7. Firmar el XML
+        string signedXml = _signerService.SignXml(xmlContent, certBase64, certPassword);
+
+        // 8. Retornar el XML firmado como bytes
+        var signedBytes = Encoding.UTF8.GetBytes(signedXml);
+        var fileName = $"{rnc}_signed.xml";
+
+        return (signedBytes, fileName);
+    }
 
     private async Task<DgiiStatusResponse> PollDgiiStatusAsync(string trackId, string rnc)
     {
