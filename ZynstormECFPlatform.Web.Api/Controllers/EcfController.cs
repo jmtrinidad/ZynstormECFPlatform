@@ -149,7 +149,10 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 success = string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase),
                 isPending = ReceivedEcfProductionService.IsPendingDgiiStatus(status),
+                isAcceptedConditional = ReceivedEcfProductionService.IsAcceptedConditionalDgiiStatus(status),
+                requiresCorrection = ReceivedEcfProductionService.RequiresCorrectionDgiiStatus(status),
                 trackId,
+                dgiiResponse = status,
                 status
             });
         }

@@ -17,6 +17,8 @@ public class ReceivedEcfEmissionResultDto
 {
     public bool Success { get; set; }
     public bool IsPending { get; set; }
+    public bool IsAcceptedConditional { get; set; }
+    public bool RequiresCorrection { get; set; }
     public string Message { get; set; } = string.Empty;
     public int EcfDocumentId { get; set; }
     public int EcfType { get; set; }
@@ -42,4 +44,5 @@ public class ReceivedEcfEmissionResultDto
     public List<string> XmlProdErrors { get; set; } = [];
     public DgiiTransmissionResult? Transmission { get; set; }
     public DgiiStatusResponse? Status { get; set; }
+    public DgiiStatusResponse? DgiiResponse { get; set; }
 }

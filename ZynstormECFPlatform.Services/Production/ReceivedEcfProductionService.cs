@@ -229,6 +229,9 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             _cacheService.Set($"EcfStatus_{transmission.TrackId}", status, TimeSpan.FromHours(1));
             await AddDgiiStatusLogAsync(ecfDocument, client.ClientId, targetEnvironment, transmission.TrackId, status);
             resultDto.Status = status;
+            resultDto.DgiiResponse = status;
+            resultDto.IsAcceptedConditional = IsAcceptedConditionalDgiiStatus(status);
+            resultDto.RequiresCorrection = RequiresCorrectionDgiiStatus(status);
             resultDto.Success = string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase);
             var statusId = MapDgiiStatusToEcfStatus(status);
             resultDto.Message = resultDto.Success ? $"TrackId: {transmission.TrackId}" : BuildDgiiStatusError(status);
@@ -678,6 +681,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     public static int MapDgiiStatusToEcfStatus(DgiiStatusResponse status)
     {
         if (string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase)) return 10;
+        if (IsAcceptedConditionalDgiiStatus(status)) return 11;
         if (string.Equals(status.Estado, "Rechazado", StringComparison.OrdinalIgnoreCase)) return 11;
         if (string.Equals(status.Estado, "Error", StringComparison.OrdinalIgnoreCase)) return 12;
         return 7;
@@ -691,6 +695,15 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             || status.Estado.Equals("Procesando", StringComparison.OrdinalIgnoreCase)
             || status.Estado.Equals("Pendiente", StringComparison.OrdinalIgnoreCase);
     }
+
+    public static bool IsAcceptedConditionalDgiiStatus(DgiiStatusResponse status) =>
+        string.Equals(status.Estado, "Aceptado Condicional", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(status.Codigo, "4", StringComparison.OrdinalIgnoreCase);
+
+    public static bool RequiresCorrectionDgiiStatus(DgiiStatusResponse status) =>
+        IsAcceptedConditionalDgiiStatus(status)
+        || string.Equals(status.Estado, "Rechazado", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(status.Estado, "Error", StringComparison.OrdinalIgnoreCase);
 
     private async Task<DgiiStatusResponse> PollInitialDgiiStatusAsync(
         DgiiEnvironment environment,

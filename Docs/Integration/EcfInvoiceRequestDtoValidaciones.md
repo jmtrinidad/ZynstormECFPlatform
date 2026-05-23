@@ -1185,6 +1185,52 @@ Si despues de 2 segundos DGII no confirma aceptacion o rechazo, el API devuelve 
 }
 ```
 
+#### Respuesta cuando DGII acepta condicionalmente
+
+Cuando DGII devuelve `Estado: "Aceptado Condicional"` o `Codigo: "4"`, el API responde `success: false`, `isAcceptedConditional: true` y `requiresCorrection: true`. El cliente debe revisar `dgiiResponse.mensajes` o `status.mensajes`, corregir el comprobante segun los mensajes recibidos y reenviar cuando corresponda.
+
+```json
+{
+  "success": false,
+  "isPending": false,
+  "isAcceptedConditional": true,
+  "requiresCorrection": true,
+  "message": "DGII: Aceptado Condicional | El campo MontoTotal del area Totales de la seccion Encabezado no es valido.El elemento MontoTotal no es correcto",
+  "ecfDocumentId": 1002,
+  "ecfType": 31,
+  "eNcf": "E310000000002",
+  "trackId": "dda6f63d-2665-4ae5-8ef7-6068385b7311",
+  "dgiiResponse": {
+    "trackId": "dda6f63d-2665-4ae5-8ef7-6068385b7311",
+    "codigo": "4",
+    "estado": "Aceptado Condicional",
+    "rnc": "132878191",
+    "eNcf": "E310000000002",
+    "secuenciaUtilizada": true,
+    "fechaRecepcion": "5/23/2026 9:20:56 AM",
+    "error": "",
+    "mensaje": "",
+    "mensajes": [
+      {
+        "codigo": 11105,
+        "valor": "El campo MontoTotal del area Totales de la seccion Encabezado no es valido.El elemento MontoTotal no es correcto"
+      }
+    ]
+  },
+  "status": {
+    "trackId": "dda6f63d-2665-4ae5-8ef7-6068385b7311",
+    "codigo": "4",
+    "estado": "Aceptado Condicional",
+    "mensajes": [
+      {
+        "codigo": 11105,
+        "valor": "El campo MontoTotal del area Totales de la seccion Encabezado no es valido.El elemento MontoTotal no es correcto"
+      }
+    ]
+  }
+}
+```
+
 #### Respuesta con errores de validacion
 
 Si el objeto recibido no cumple las reglas del DTO, XSD, `XmlProd` o reglas internas, el API responde `400 Bad Request` con el mismo objeto de resultado y las listas de errores llenas.
@@ -1237,7 +1283,21 @@ Respuesta cuando el estado existe:
 {
   "success": true,
   "isPending": false,
+  "isAcceptedConditional": false,
+  "requiresCorrection": false,
   "trackId": "123456789",
+  "dgiiResponse": {
+    "trackId": "123456789",
+    "codigo": "1",
+    "estado": "Aceptado",
+    "rnc": "131880681",
+    "eNcf": "E310000000001",
+    "secuenciaUtilizada": true,
+    "fechaRecepcion": "16-05-2026 10:35:22",
+    "error": "",
+    "mensaje": "Aceptado",
+    "mensajes": []
+  },
   "status": {
     "trackId": "123456789",
     "codigo": "1",
@@ -1253,7 +1313,7 @@ Respuesta cuando el estado existe:
 }
 ```
 
-Cuando `isPending` llega en `true`, el cliente debe esperar unos segundos y consultar nuevamente con el mismo `TrackId`. Cuando `success` llega en `false` y `isPending` llega en `false`, el comprobante fue rechazado o quedo en error; revise `status.error`, `status.mensaje` y `status.mensajes`.
+Cuando `isPending` llega en `true`, el cliente debe esperar unos segundos y consultar nuevamente con el mismo `TrackId`. Cuando `requiresCorrection` llega en `true`, el comprobante fue rechazado, quedo en error o fue aceptado condicionalmente; revise `dgiiResponse.error`, `dgiiResponse.mensaje` y `dgiiResponse.mensajes`.
 
 Respuesta cuando el `TrackId` no esta en cache o expiro:
 
