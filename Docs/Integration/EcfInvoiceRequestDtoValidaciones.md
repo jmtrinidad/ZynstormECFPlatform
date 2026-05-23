@@ -28,6 +28,7 @@ Esta guia aplica al objeto nuevo que recibe `EmitEcf` en produccion. Todos los t
 | --- | --- |
 | `ECF.Encabezado.IdDoc.TipoeCF` | Tipo de comprobante: `31`, `32`, `33`, `34`, `41`, `43`, `44`, `45`, `46` o `47`. |
 | `ECF.Encabezado.IdDoc.eNCF` | Debe tener formato `E` + tipo de 2 digitos + secuencia de 10 digitos. Ejemplo: `E310000000001`. |
+| `ECF.Encabezado.IdDoc.IndicadorMontoGravado` | Opcional y solo aplica para tipos `31`, `32`, `33`, `34`, `41` y `45`. Valores permitidos: `0` si los montos de las lineas no incluyen ITBIS, `1` si los montos de las lineas si incluyen ITBIS. Para tipos `43`, `44`, `46` y `47` omita el campo. |
 | `ECF.Encabezado.IdDoc.TipoIngresos` | Obligatorio para tipos `31`, `32`, `33`, `34`, `44`, `45` y `46`. No aplica para `41`, `43` y `47`. |
 | `ECF.Encabezado.IdDoc.TipoPago` | Use `1` contado o `2` credito. |
 | `ECF.Encabezado.IdDoc.FechaLimitePago` | Obligatorio cuando `TipoPago` es `2`. Formato recomendado: `dd-MM-yyyy`. |

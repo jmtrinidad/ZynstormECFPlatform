@@ -94,6 +94,22 @@ public class EcfInvoiceRequestDto : IValidatableObject
         if (tiposRequierenIngresos.Contains(tipoEcf) && string.IsNullOrWhiteSpace(e.IdDoc?.TipoIngresos))
             yield return new ValidationResult($"Para el comprobante tipo {tipoEcf}, el TipoIngresos es obligatorio.", new[] { "ECF.Encabezado.IdDoc.TipoIngresos" });
 
+        if (!string.IsNullOrWhiteSpace(e.IdDoc?.IndicadorMontoGravado))
+        {
+            if (!IsTipoWithIndicadorMontoGravado(tipoEcf))
+            {
+                yield return new ValidationResult(
+                    $"IndicadorMontoGravado no aplica para el comprobante tipo {tipoEcf}. Omita el campo.",
+                    new[] { "ECF.Encabezado.IdDoc.IndicadorMontoGravado" });
+            }
+            else if (!IsValidIndicadorMontoGravado(e.IdDoc.IndicadorMontoGravado))
+            {
+                yield return new ValidationResult(
+                    "IndicadorMontoGravado debe ser 0 o 1. Use 0 cuando los montos de las lineas no incluyen ITBIS y 1 cuando si lo incluyen.",
+                    new[] { "ECF.Encabezado.IdDoc.IndicadorMontoGravado" });
+            }
+        }
+
         if (e.IdDoc?.TipoPago == "2" && string.IsNullOrWhiteSpace(e.IdDoc.FechaLimitePago))
             yield return new ValidationResult("Para pagos a credito (TipoPago = 2), la FechaLimitePago es obligatoria.", new[] { "ECF.Encabezado.IdDoc.FechaLimitePago" });
 
@@ -230,6 +246,12 @@ public class EcfInvoiceRequestDto : IValidatableObject
 
     private static bool IsValidPaymentForm(string? value) =>
         int.TryParse(value, out var formaPago) && formaPago is >= 1 and <= 8;
+
+    private static bool IsValidIndicadorMontoGravado(string? value) =>
+        int.TryParse(value, out var indicador) && indicador is 0 or 1;
+
+    private static bool IsTipoWithIndicadorMontoGravado(int tipoEcf) =>
+        tipoEcf is 31 or 32 or 33 or 34 or 41 or 45;
 
     private static IEnumerable<ValidationResult> ValidateTipo44Totales(EcfTotalesRequest totales)
     {

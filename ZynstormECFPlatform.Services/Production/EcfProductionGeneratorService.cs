@@ -228,6 +228,18 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
         if (new[] { 31, 32, 33, 34, 44, 45, 46 }.Contains(ecfType) && string.IsNullOrWhiteSpace(idDoc.TipoIngresos))
             errors.Add($"El TipoIngresos es requerido para el comprobante tipo {ecfType}.");
 
+        if (!string.IsNullOrWhiteSpace(idDoc.IndicadorMontoGravado))
+        {
+            if (!IsTipoWithIndicadorMontoGravado(ecfType))
+            {
+                errors.Add($"IndicadorMontoGravado no aplica para el comprobante tipo {ecfType}. Omita el campo.");
+            }
+            else if (!IsValidIndicadorMontoGravado(idDoc.IndicadorMontoGravado))
+            {
+                errors.Add("IndicadorMontoGravado debe ser 0 o 1. Use 0 cuando los montos de las lineas no incluyen ITBIS y 1 cuando si lo incluyen.");
+            }
+        }
+
         if (idDoc.TipoPago == "2" && string.IsNullOrWhiteSpace(idDoc.FechaLimitePago))
             errors.Add("La fecha limite de pago es requerida cuando el tipo de pago es Credito (2).");
 
@@ -633,6 +645,12 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
 
     private static bool IsValidPaymentForm(string? value) =>
         int.TryParse(value, out var formaPago) && formaPago is >= 1 and <= 8;
+
+    private static bool IsValidIndicadorMontoGravado(string? value) =>
+        int.TryParse(value, out var indicador) && indicador is 0 or 1;
+
+    private static bool IsTipoWithIndicadorMontoGravado(int ecfType) =>
+        ecfType is 31 or 32 or 33 or 34 or 41 or 45;
 
     private static RfceXmlRoot MapToRfceXmlRoot(EcfInvoiceRequestDto dto)
     {
