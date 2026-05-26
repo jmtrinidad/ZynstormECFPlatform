@@ -13,6 +13,7 @@ namespace ZynstormECFPlatform.Dtos
         public string SentDate { get; set; } = null!; // Fecha de emisión formateada
         public string? ResponseDate { get; set; } // Fecha de procesamiento o respuesta
         public string? Xml { get; set; } // Solo poblado en consulta por GUID
+        public string? DgiiMessage { get; set; } // Mensaje devuelto por la DGII
     }
 
     public class EcfDocumentStatsDto

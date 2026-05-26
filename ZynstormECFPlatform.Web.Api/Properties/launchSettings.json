@@ -11,15 +11,26 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    "https": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
+    "WSL": {
+      "commandName": "WSL2",
       "launchBrowser": true,
-      "launchUrl": "swagger",
-      "applicationUrl": "https://localhost:7257;http://localhost:5220",
+      "launchUrl": "https://localhost:7148/swagger",
+      "workingDirectory": "/home/dev/projects/ZynstormECF-WorkSpace/ZynstormECFPlatform/ZynstormECFPlatform.Web.Api",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "https://localhost:7148;http://localhost:7027"
+      },
+      "distributionName": "Ubuntu"
+    }
+  },
+  "https": {
+    "commandName": "Project",
+    "dotnetRunMessages": true,
+    "launchBrowser": true,
+    "launchUrl": "swagger",
+    "applicationUrl": "https://localhost:7257;http://localhost:5220",
+    "environmentVariables": {
+      "ASPNETCORE_ENVIRONMENT": "Development"
     }
   }
-}
+} }

@@ -59,7 +59,11 @@ public class AutomaticReportsJob
 
                 var usersToNotify = userClients
                     .Select(uc => uc.User)
-                    .Where(u => u.UserNotificationConfigurations.Any(c => c.NotificationTypeId == 3 && c.IsEnabled))
+                    .Where(u =>
+                    {
+                        var config = u.UserNotificationConfigurations.FirstOrDefault(c => c.NotificationTypeId == 3);
+                        return config == null || config.IsEnabled;
+                    })
                     .ToList();
 
                 bool hasExternalEmails = !string.IsNullOrWhiteSpace(client.DailyReportEmails);
@@ -74,8 +78,11 @@ public class AutomaticReportsJob
                     .Where(d => d.ClientId == client.ClientId && !d.IsDeleted && d.RegisteredAt >= start && d.RegisteredAt <= now)
                     .ToListAsync(cancellationToken);
 
-                // Even if there is no activity (0 docs), we send a premium "clean status" report.
-                // It reassures clients that active monitoring is fully operational.
+                if (!documents.Any())
+                {
+                    continue;
+                }
+
                 await SendDailyReportEmailAsync(client, usersToNotify, documents, start, now);
             }
             catch (Exception ex)
@@ -110,7 +117,11 @@ public class AutomaticReportsJob
 
                 var usersToNotify = userClients
                     .Select(uc => uc.User)
-                    .Where(u => u.UserNotificationConfigurations.Any(c => c.NotificationTypeId == 4 && c.IsEnabled))
+                    .Where(u =>
+                    {
+                        var config = u.UserNotificationConfigurations.FirstOrDefault(c => c.NotificationTypeId == 4);
+                        return config == null || config.IsEnabled;
+                    })
                     .ToList();
 
                 bool hasExternalEmails = !string.IsNullOrWhiteSpace(client.WeeklyReportEmails);
@@ -124,6 +135,11 @@ public class AutomaticReportsJob
                     .Include(d => d.EcfStatus)
                     .Where(d => d.ClientId == client.ClientId && !d.IsDeleted && d.RegisteredAt >= start && d.RegisteredAt <= now)
                     .ToListAsync(cancellationToken);
+
+                if (!documents.Any())
+                {
+                    continue;
+                }
 
                 await SendWeeklyReportEmailAsync(client, usersToNotify, documents, start, now);
             }

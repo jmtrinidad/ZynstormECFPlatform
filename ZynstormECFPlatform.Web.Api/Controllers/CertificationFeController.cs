@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Abstractions.Services;
+using Microsoft.AspNetCore.Hosting;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers;
 
@@ -22,7 +23,8 @@ public class CertificationFeController : FeController
         IClientCertificateService clientCertificateService,
         IEncryptedService encryptedService,
         IDgiiAuthService dgiiAuthService,
-        IReceivedB2BMessageService receivedB2BMessageService)
+        IReceivedB2BMessageService receivedB2BMessageService,
+        IEmailService emailService)
         : base(
             cacheService,
             jwtTokenService,
@@ -33,7 +35,8 @@ public class CertificationFeController : FeController
             clientCertificateService,
             encryptedService,
             dgiiAuthService,
-            receivedB2BMessageService)
+            receivedB2BMessageService,
+            emailService)
     {
     }
 }

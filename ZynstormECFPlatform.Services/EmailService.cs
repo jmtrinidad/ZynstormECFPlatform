@@ -34,7 +34,8 @@ public class EmailService : IEmailService
         if (attachmentBytes != null && !string.IsNullOrEmpty(attachmentFileName))
         {
             var ms = new MemoryStream(attachmentBytes);
-            var attachment = new Attachment(ms, attachmentFileName, "application/pdf");
+            var mimeType = attachmentFileName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) ? "application/xml" : "application/pdf";
+            var attachment = new Attachment(ms, attachmentFileName, mimeType);
             message.Attachments.Add(attachment);
         }
 

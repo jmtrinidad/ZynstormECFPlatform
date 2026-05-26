@@ -246,6 +246,13 @@ RecurringJob.AddOrUpdate<ZynstormECFPlatform.Services.Jobs.AutomaticReportsJob>(
     new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Santo_Domingo") }
 );
 
+RecurringJob.AddOrUpdate<ZynstormECFPlatform.Services.Jobs.ReceivedB2BMessagesCleanupJob>(
+    "ReceivedB2BMessagesCleanup",
+    job => job.CleanupOldMessagesAsync(default),
+    Cron.Daily(3, 0), // 3:00 AM everyday
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Santo_Domingo") }
+);
+
 app.MapControllers();
 app.MapHub<CertificationHub>("/hubs/certification");
 

@@ -6,6 +6,8 @@ using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
+using Microsoft.AspNetCore.Hosting;
+using System.IO;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers;
 
@@ -28,6 +30,7 @@ public class FeController : ControllerBase
     private readonly IEncryptedService _encryptedService;
     private readonly IDgiiAuthService _dgiiAuthService;
     private readonly IReceivedB2BMessageService _receivedB2BMessageService;
+    private readonly IEmailService _emailService;
 
     public FeController(
         ICacheService cacheService,
@@ -39,7 +42,8 @@ public class FeController : ControllerBase
         IClientCertificateService clientCertificateService,
         IEncryptedService encryptedService,
         IDgiiAuthService dgiiAuthService,
-        IReceivedB2BMessageService receivedB2BMessageService)
+        IReceivedB2BMessageService receivedB2BMessageService,
+        IEmailService emailService)
     {
         _cacheService = cacheService;
         _jwtTokenService = jwtTokenService;
@@ -51,6 +55,7 @@ public class FeController : ControllerBase
         _encryptedService = encryptedService;
         _dgiiAuthService = dgiiAuthService;
         _receivedB2BMessageService = receivedB2BMessageService;
+        _emailService = emailService;
     }
 
     /// <summary>
@@ -597,6 +602,143 @@ public class FeController : ControllerBase
         while (reader.Read()) { }
 
         return errors;
+    }
+
+    /// <summary>
+    /// Lista los comprobantes XML recibidos y guardados en base de datos para un cliente.
+    /// </summary>
+    [HttpGet("client/{clientId}/received-files")]
+    public async Task<IActionResult> ListReceivedFiles(int clientId)
+    {
+        try
+        {
+            var messages = await _receivedB2BMessageService.GetManyByAsync(m => m.ClientId == clientId);
+            
+            var files = messages
+                .Select(m =>
+                {
+                    string messageTypeName = m.MessageType == MessageType.Ecf ? "ECF" : "AprobacionComercial";
+                    string fileName = $"{messageTypeName}_{m.ENcf}.xml";
+                    int fileSize = string.IsNullOrEmpty(m.RawXml) ? 0 : Encoding.UTF8.GetByteCount(m.RawXml);
+
+                    return new
+                    {
+                        ReceivedB2BMessageId = m.ReceivedB2BMessageId,
+                        FileName = fileName,
+                        FileSize = fileSize,
+                        CreatedTime = m.ReceivedAtUtc,
+                        MessageType = m.MessageType.ToString(),
+                        ENcf = m.ENcf
+                    };
+                })
+                .OrderByDescending(f => f.CreatedTime)
+                .ToList();
+
+            return Ok(files);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error listing received B2B messages for client {ClientId}", clientId);
+            return StatusCode(500, new { error = "Error interno al listar los comprobantes del cliente." });
+        }
+    }
+
+    /// <summary>
+    /// Descarga el XML de un comprobante específico desde la base de datos.
+    /// </summary>
+    [HttpGet("client/{clientId}/received-files/{id:int}")]
+    public async Task<IActionResult> DownloadReceivedFile(int clientId, int id)
+    {
+        try
+        {
+            var message = await _receivedB2BMessageService.GetByAsync(m => m.ReceivedB2BMessageId == id && m.ClientId == clientId);
+
+            if (message == null)
+            {
+                return NotFound(new { error = "El comprobante solicitado no existe." });
+            }
+
+            var fileBytes = Encoding.UTF8.GetBytes(message.RawXml);
+            string messageTypeName = message.MessageType == MessageType.Ecf ? "ECF" : "AprobacionComercial";
+            string fileName = $"{messageTypeName}_{message.ENcf}.xml";
+
+            return File(fileBytes, "application/xml", fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error downloading B2B message {Id} for client {ClientId}", id, clientId);
+            return StatusCode(500, new { error = "Error interno al descargar el comprobante." });
+        }
+    }
+
+    /// <summary>
+    /// Envía por correo electrónico el XML del comprobante desde la base de datos a la dirección de correo del cliente.
+    /// </summary>
+    [HttpPost("client/{clientId}/received-files/{id:int}/send-email")]
+    public async Task<IActionResult> SendReceivedFileByEmail(int clientId, int id)
+    {
+        try
+        {
+            var message = await _receivedB2BMessageService.GetByAsync(m => m.ReceivedB2BMessageId == id && m.ClientId == clientId);
+
+            if (message == null)
+            {
+                return NotFound(new { error = "El comprobante solicitado no existe." });
+            }
+
+            var client = await _clientService.GetByAsync(x => x.ClientId == clientId);
+            if (client == null)
+            {
+                return NotFound(new { error = "Cliente no encontrado." });
+            }
+
+            if (string.IsNullOrWhiteSpace(client.Email))
+            {
+                return BadRequest(new { error = "El cliente no tiene una dirección de correo electrónico configurada." });
+            }
+
+            var fileBytes = Encoding.UTF8.GetBytes(message.RawXml);
+            string messageTypeName = message.MessageType == MessageType.Ecf ? "ECF" : "AprobacionComercial";
+            string fileName = $"{messageTypeName}_{message.ENcf}.xml";
+
+            string subject = $"[Zynstorm ECF] Comprobante Fiscal Recibido - {client.Name}";
+            string bodyHtml = $@"
+            <div style=""font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f4f7f9; padding: 20px; border-radius: 8px;"">
+                <div style=""background-color: #ffffff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);"">
+                    <h1 style=""color: #2c3e50; text-align: center; margin-bottom: 30px;"">Comprobante Fiscal Recibido</h1>
+                    <p style=""color: #34495e; font-size: 16px; line-height: 1.6;"">
+                        Hola, adjunto a este correo encontrarás el archivo XML correspondiente al documento recibido en nuestra plataforma para el cliente <strong>{client.Name}</strong>.
+                    </p>
+                    <div style=""background-color: #f8f9fa; border-left: 4px solid #3498db; padding: 15px; margin: 20px 0;"">
+                        <table style=""width: 100%; border-collapse: collapse; font-size: 14px;"">
+                            <tr>
+                                <td style=""padding: 6px 0; color: #7f8c8d; width: 120px;""><strong>Nombre del Archivo:</strong></td>
+                                <td style=""padding: 6px 0; color: #34495e;"">{fileName}</td>
+                            </tr>
+                            <tr>
+                                <td style=""padding: 6px 0; color: #7f8c8d;""><strong>Fecha de Envío:</strong></td>
+                                <td style=""padding: 6px 0; color: #34495e;"">{DateTime.Now:dd/MM/yyyy hh:mm tt}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <p style=""margin-top: 30px; font-size: 14px; color: #7f8c8d; text-align: center;"">
+                        Si tienes dudas o consultas sobre este documento, ponte en contacto con soporte.
+                    </p>
+                </div>
+                <div style=""text-align: center; margin-top: 20px; color: #95a5a6; font-size: 12px;"">
+                    &copy; {DateTime.Now.Year} Zynstorm ECF Platform. Todos los derechos reservados.
+                </div>
+            </div>";
+
+            await _emailService.SendEmailAsync(client.Email, subject, bodyHtml, fileBytes, fileName);
+
+            return Ok(new { message = $"El comprobante se ha enviado exitosamente a {client.Email}." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error emailing B2B message {Id} to client {ClientId}", id, clientId);
+            return StatusCode(500, new { error = "Error interno al enviar el comprobante por correo electrónico." });
+        }
     }
 
     private sealed record FeValidatedClient(int ClientId, string Rnc);

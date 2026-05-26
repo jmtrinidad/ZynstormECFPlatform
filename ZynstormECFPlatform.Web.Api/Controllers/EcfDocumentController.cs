@@ -131,7 +131,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     DgiiTrackId = e.EcfTransmissions.OrderByDescending(t => t.SentAtUtc).Select(t => t.TrackId).FirstOrDefault(),
                     SentAtUtc = e.EcfTransmissions.OrderByDescending(t => t.SentAtUtc).Select(t => (DateTime?)t.SentAtUtc).FirstOrDefault(),
                     RegisteredAt = e.RegisteredAt,
-                    SignatureDateTime = e.SignatureDateTime
+                    SignatureDateTime = e.SignatureDateTime,
+                    DgiiMessage = e.EcfTransmissions.OrderByDescending(t => t.SentAtUtc).Select(t => t.ResponseMessage).FirstOrDefault()
                 });
 
                 // Paginación si se especifica
@@ -155,7 +156,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     Status = x.Status,
                     DgiiTrackId = x.DgiiTrackId,
                     SentDate = (x.SentAtUtc ?? x.RegisteredAt).ToDrTime().ToString("yyyy-MM-dd HH:mm:ss"),
-                    ResponseDate = x.SignatureDateTime.HasValue ? x.SignatureDateTime.Value.ToString("yyyy-MM-dd HH:mm:ss") : null
+                    ResponseDate = x.SignatureDateTime.HasValue ? x.SignatureDateTime.Value.ToString("yyyy-MM-dd HH:mm:ss") : null,
+                    DgiiMessage = x.DgiiMessage
                 }).ToList();
 
                 var paginatedResponse = new PaginatedResponseDto<EcfDocumentViewDto>
@@ -217,7 +219,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     DgiiTrackId = document.EcfTransmissions.OrderByDescending(t => t.SentAtUtc).Select(t => t.TrackId).FirstOrDefault(),
                     SentDate = (document.EcfTransmissions.OrderByDescending(t => t.SentAtUtc).Select(t => (DateTime?)t.SentAtUtc).FirstOrDefault() ?? document.RegisteredAt).ToDrTime().ToString("yyyy-MM-dd HH:mm:ss"),
                     ResponseDate = document.SignatureDateTime.HasValue ? document.SignatureDateTime.Value.ToString("yyyy-MM-dd HH:mm:ss") : null,
-                    Xml = document.EcfXmlDocuments.Select(x => !string.IsNullOrEmpty(x.XmlSigned) ? x.XmlSigned : x.XmlUnsigned).FirstOrDefault()
+                    Xml = document.EcfXmlDocuments.Select(x => !string.IsNullOrEmpty(x.XmlSigned) ? x.XmlSigned : x.XmlUnsigned).FirstOrDefault(),
+                    DgiiMessage = document.EcfTransmissions.OrderByDescending(t => t.SentAtUtc).Select(t => t.ResponseMessage).FirstOrDefault()
                 };
 
                 return Ok(dto);

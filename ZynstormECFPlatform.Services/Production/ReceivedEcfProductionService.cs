@@ -698,6 +698,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
     public static bool IsAcceptedConditionalDgiiStatus(DgiiStatusResponse status) =>
         string.Equals(status.Estado, "Aceptado Condicional", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(status.Estado, "Aceptado Condicionalmente", StringComparison.OrdinalIgnoreCase)
+        || (status.Estado != null && status.Estado.Contains("condicionalmente", StringComparison.OrdinalIgnoreCase))
         || string.Equals(status.Codigo, "4", StringComparison.OrdinalIgnoreCase);
 
     public static bool RequiresCorrectionDgiiStatus(DgiiStatusResponse status) =>

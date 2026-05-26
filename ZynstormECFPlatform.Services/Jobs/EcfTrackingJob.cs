@@ -217,7 +217,11 @@ public class EcfTrackingJob
 
         var usersToNotify = userClients
             .Select(uc => uc.User)
-            .Where(u => u.UserNotificationConfigurations.Any(c => c.NotificationTypeId == targetNotificationTypeId && c.IsEnabled))
+            .Where(u =>
+            {
+                var config = u.UserNotificationConfigurations.FirstOrDefault(c => c.NotificationTypeId == targetNotificationTypeId);
+                return config == null || config.IsEnabled;
+            })
             .ToList();
 
         if (!usersToNotify.Any())
