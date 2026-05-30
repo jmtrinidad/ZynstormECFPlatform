@@ -16,7 +16,7 @@ public class UserAuditLog : BaseEntity
     [MaxLength(100)]
     public string EntityName { get; set; } = null!;
 
-    [MaxLength(100)]
+    [MaxLength(450)]
     public string EntityId { get; set; } = null!;
 
     public string? PreviousState { get; set; } // JSON

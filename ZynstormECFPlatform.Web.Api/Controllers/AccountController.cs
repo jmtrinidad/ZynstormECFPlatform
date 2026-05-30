@@ -9,6 +9,9 @@ using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Web.Api.Helpers;
 using ZynstormECFPlatform.Core.Entities;
 
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
+
 namespace ZynstormECFPlatform.Web.Api.Controllers
 {
     [ApiVersion("1.0")]
@@ -20,6 +23,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         private readonly IEncryptedService _encryptedService;
         private readonly IJwtTokenService _jwtTokenService;
         private readonly IEmailService _emailService;
+        private readonly IWebHostEnvironment _env;
         private readonly ILogger<AccountController> _logger;
 
         public AccountController(
@@ -27,12 +31,14 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             IEncryptedService encryptedService,
             IJwtTokenService jwtTokenService,
             IEmailService emailService,
+            IWebHostEnvironment env,
             ILogger<AccountController> logger)
         {
             _accountService = accountService;
             _encryptedService = encryptedService;
             _jwtTokenService = jwtTokenService;
             _emailService = emailService;
+            _env = env;
             _logger = logger;
         }
 
@@ -333,6 +339,14 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                 var email = user.Email ?? user.UserName;
                 var appName = "Zynstorm ECF";
+                if (_env.IsDevelopment())
+                {
+                    appName = "Zynstorm ECF Dev";
+                }
+                else if (_env.IsStaging() || _env.EnvironmentName.Equals("Staging", StringComparison.OrdinalIgnoreCase))
+                {
+                    appName = "Zynstorm ECF Staging";
+                }
                 var authenticatorUri = $"otpauth://totp/{Uri.EscapeDataString(appName)}:{Uri.EscapeDataString(email!)}?secret={key}&issuer={Uri.EscapeDataString(appName)}&digits=6";
 
                 return Ok(new TwoFactorSetupDto

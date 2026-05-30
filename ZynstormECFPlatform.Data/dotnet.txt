@@ -1,12 +1,20 @@
+# 2. Borra todas las carpetas bin y obj de golpe
+find . -type d \( -name "obj" -o -name "bin" \) -exec rm -rf {} +
+
+# 3. Restaura los paquetes con el flag de compatibilidad
+dotnet restore /p:EnableWindowsTargeting=true
+
 # Crear migración
 dotnet ef migrations add UpdateSimulationSamples --project ZynstormECFPlatform.Data --startup-project ZynstormECFPlatform.Web.Api
+
+# Aplicar a la base de datos
+dotnet ef database update --project ZynstormECFPlatform.Data --startup-project ZynstormECFPlatform.Web.Api
 
 # Borrar la migración
 dotnet ef migrations remove --project ZynstormECFPlatform.Data --startup-project ZynstormECFPlatform.Web.Api
 
 
-# Aplicar a la base de datos
-dotnet ef database update --project ZynstormECFPlatform.Data --startup-project ZynstormECFPlatform.Web.Api
+
 
 -- Ejemplo para ajustar Facturas de Crédito Fiscal (E31) para un cliente
 UPDATE "ENcf"
