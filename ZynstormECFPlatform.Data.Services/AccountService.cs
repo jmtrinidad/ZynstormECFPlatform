@@ -180,4 +180,29 @@ public class AccountService : IAccountService
     {
         return await _signInManager.CheckPasswordSignInAsync(user, password, false).ConfigureAwait(false);
     }
+
+    public async Task<string?> GetAuthenticatorKeyAsync(User user)
+    {
+        return await _userManager.GetAuthenticatorKeyAsync(user).ConfigureAwait(false);
+    }
+
+    public async Task<IdentityResult> ResetAuthenticatorKeyAsync(User user)
+    {
+        return await _userManager.ResetAuthenticatorKeyAsync(user).ConfigureAwait(false);
+    }
+
+    public async Task<bool> VerifyTwoFactorTokenAsync(User user, string code)
+    {
+        return await _userManager.VerifyTwoFactorTokenAsync(user, _userManager.Options.Tokens.AuthenticatorTokenProvider, code).ConfigureAwait(false);
+    }
+
+    public async Task<IdentityResult> SetTwoFactorEnabledAsync(User user, bool enabled)
+    {
+        return await _userManager.SetTwoFactorEnabledAsync(user, enabled).ConfigureAwait(false);
+    }
+
+    public async Task<SignInResult> TwoFactorAuthenticatorSignInAsync(string code, bool isPersistent, bool rememberClient)
+    {
+        return await _signInManager.TwoFactorAuthenticatorSignInAsync(code, isPersistent, rememberClient).ConfigureAwait(false);
+    }
 }

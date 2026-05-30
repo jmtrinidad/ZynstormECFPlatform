@@ -46,4 +46,14 @@ public interface IAccountService
     Task<SignInResult> ValidatePasswordAsync(User user, string password);
 
     Task RegisterAccessAsync(string userId, string? ipAddress, string? userAgent);
+
+    Task<string?> GetAuthenticatorKeyAsync(User user);
+
+    Task<IdentityResult> ResetAuthenticatorKeyAsync(User user);
+
+    Task<bool> VerifyTwoFactorTokenAsync(User user, string code);
+
+    Task<IdentityResult> SetTwoFactorEnabledAsync(User user, bool enabled);
+
+    Task<SignInResult> TwoFactorAuthenticatorSignInAsync(string code, bool isPersistent, bool rememberClient);
 }

@@ -26,11 +26,17 @@ public class ChangePasswordDto
 
 public class LoginResponseDto
 {
-    public UserViewDto User { get; set; } = null!;
+    public UserViewDto? User { get; set; } = null!;
 
-    public string Token { get; set; } = null!;
+    public string? Token { get; set; } = null!;
 
-    public DateTime ExpirationAt { get; set; }
+    public DateTime? ExpirationAt { get; set; }
+
+    public DateTime? Expiration { get; set; }
+
+    public bool RequiresTwoFactor { get; set; }
+
+    public string? UserId { get; set; }
 }
 
 public class UserCreateDto
@@ -65,10 +71,33 @@ public class UserViewDto : UserUpdateDto
     public string FullName => $"{FirstName} {LastName}";
 
     public DateTime RegisteredAt { get; set; }
+
+    public bool TwoFactorEnabled { get; set; }
 }
 
 public class UserRegisterDto : UserCreateDto
 {
     [Required]
     public string Password { get; set; } = null!;
+}
+
+public class TwoFactorSetupDto
+{
+    public string SharedKey { get; set; } = null!;
+    public string AuthenticatorUri { get; set; } = null!;
+}
+
+public class TwoFactorVerifyDto
+{
+    [Required]
+    public string Code { get; set; } = null!;
+}
+
+public class TwoFactorLoginDto
+{
+    [Required]
+    public string UserId { get; set; } = null!;
+
+    [Required]
+    public string Code { get; set; } = null!;
 }

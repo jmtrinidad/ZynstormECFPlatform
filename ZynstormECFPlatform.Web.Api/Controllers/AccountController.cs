@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
 using System.Text;
+using System.Security.Claims;
 using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Dtos;
@@ -112,10 +113,19 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 if (!user.IsActive)
                     return NotFound("Usuario no se encuentra activo");
 
-                var signIn = await _accountService.LoginAsync(dto).ConfigureAwait(false);
+                var passwordCheck = await _accountService.ValidatePasswordAsync(user, dto.Password).ConfigureAwait(false);
 
-                if (!signIn.Succeeded)
+                if (!passwordCheck.Succeeded)
                     return NotFound("Usuario o contraseña incorrecta");
+
+                if (user.TwoFactorEnabled)
+                {
+                    return Ok(new LoginResponseDto
+                    {
+                        RequiresTwoFactor = true,
+                        UserId = user.Id
+                    });
+                }
 
                 var role = await _accountService.GetRoleByUserAsync(user).ConfigureAwait(false);
 
@@ -126,7 +136,25 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 var userAgent = Request.Headers["User-Agent"].ToString();
                 await _accountService.RegisterAccessAsync(user.Id, ipAddress, userAgent).ConfigureAwait(false);
 
-                return Ok(tokenDto);
+                return Ok(new LoginResponseDto
+                {
+                    Token = tokenDto.Token,
+                    Expiration = tokenDto.Expiration,
+                    ExpirationAt = tokenDto.Expiration,
+                    RequiresTwoFactor = false,
+                    User = new UserViewDto
+                    {
+                        UserId = user.Id,
+                        UserName = user.UserName!,
+                        FirstName = user.FirstName,
+                        LastName = user.LastName,
+                        Email = user.Email!,
+                        PhoneNumber = user.PhoneNumber ?? "",
+                        TwoFactorEnabled = user.TwoFactorEnabled,
+                        IsActive = user.IsActive,
+                        RegisteredAt = user.RegisteredAt
+                    }
+                });
             }
             catch (Exception exception)
             {
@@ -227,6 +255,158 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             catch
             {
                 return value;
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpPost("login-2fa")]
+        public async Task<IActionResult> Login2Fa([FromBody] TwoFactorLoginDto dto)
+        {
+            try
+            {
+                var user = await _accountService.GetUserByIdAsync(dto.UserId).ConfigureAwait(false);
+                if (user is null)
+                    return NotFound("Usuario no encontrado.");
+
+                if (!user.IsActive)
+                    return BadRequest("Usuario no se encuentra activo.");
+
+                var isValid = await _accountService.VerifyTwoFactorTokenAsync(user, dto.Code).ConfigureAwait(false);
+                if (!isValid)
+                    return BadRequest("Código de autenticación inválido.");
+
+                var role = await _accountService.GetRoleByUserAsync(user).ConfigureAwait(false);
+                var tokenDto = _jwtTokenService.CreateToken(user, role!);
+
+                // Register access
+                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+                var userAgent = Request.Headers["User-Agent"].ToString();
+                await _accountService.RegisterAccessAsync(user.Id, ipAddress, userAgent).ConfigureAwait(false);
+
+                return Ok(new LoginResponseDto
+                {
+                    Token = tokenDto.Token,
+                    Expiration = tokenDto.Expiration,
+                    ExpirationAt = tokenDto.Expiration,
+                    RequiresTwoFactor = false,
+                    User = new UserViewDto
+                    {
+                        UserId = user.Id,
+                        UserName = user.UserName!,
+                        FirstName = user.FirstName,
+                        LastName = user.LastName,
+                        Email = user.Email!,
+                        PhoneNumber = user.PhoneNumber ?? "",
+                        TwoFactorEnabled = user.TwoFactorEnabled,
+                        IsActive = user.IsActive,
+                        RegisteredAt = user.RegisteredAt
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in Login2Fa");
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [Authorize]
+        [HttpGet("2fa-setup")]
+        public async Task<IActionResult> GetTwoFactorSetup()
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized();
+
+                var user = await _accountService.GetUserByIdAsync(userId).ConfigureAwait(false);
+                if (user == null)
+                    return NotFound("Usuario no encontrado.");
+
+                var key = await _accountService.GetAuthenticatorKeyAsync(user).ConfigureAwait(false);
+                if (string.IsNullOrEmpty(key))
+                {
+                    await _accountService.ResetAuthenticatorKeyAsync(user).ConfigureAwait(false);
+                    key = await _accountService.GetAuthenticatorKeyAsync(user).ConfigureAwait(false);
+                }
+
+                var email = user.Email ?? user.UserName;
+                var appName = "Zynstorm ECF";
+                var authenticatorUri = $"otpauth://totp/{Uri.EscapeDataString(appName)}:{Uri.EscapeDataString(email!)}?secret={key}&issuer={Uri.EscapeDataString(appName)}&digits=6";
+
+                return Ok(new TwoFactorSetupDto
+                {
+                    SharedKey = key!,
+                    AuthenticatorUri = authenticatorUri
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetTwoFactorSetup");
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [Authorize]
+        [HttpPost("2fa-enable")]
+        public async Task<IActionResult> EnableTwoFactor([FromBody] TwoFactorVerifyDto dto)
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized();
+
+                var user = await _accountService.GetUserByIdAsync(userId).ConfigureAwait(false);
+                if (user == null)
+                    return NotFound("Usuario no encontrado.");
+
+                var isValid = await _accountService.VerifyTwoFactorTokenAsync(user, dto.Code).ConfigureAwait(false);
+                if (!isValid)
+                    return BadRequest("Código de verificación incorrecto.");
+
+                var result = await _accountService.SetTwoFactorEnabledAsync(user, true).ConfigureAwait(false);
+                if (!result.Succeeded)
+                    return BadRequest("No se pudo activar el 2FA.");
+
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in EnableTwoFactor");
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [Authorize]
+        [HttpPost("2fa-disable")]
+        public async Task<IActionResult> DisableTwoFactor([FromBody] TwoFactorVerifyDto dto)
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized();
+
+                var user = await _accountService.GetUserByIdAsync(userId).ConfigureAwait(false);
+                if (user == null)
+                    return NotFound("Usuario no encontrado.");
+
+                var isValid = await _accountService.VerifyTwoFactorTokenAsync(user, dto.Code).ConfigureAwait(false);
+                if (!isValid)
+                    return BadRequest("Código de verificación incorrecto.");
+
+                var result = await _accountService.SetTwoFactorEnabledAsync(user, false).ConfigureAwait(false);
+                if (!result.Succeeded)
+                    return BadRequest("No se pudo desactivar el 2FA.");
+
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in DisableTwoFactor");
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
         }
     }
