@@ -28,11 +28,17 @@ public class LoginResponseDto
 {
     public UserViewDto? User { get; set; } = null!;
 
-    public string? Token { get; set; } = null!;
+    // El JWT ya no se devuelve en el cuerpo: viaja únicamente en una cookie httpOnly.
+    // Se conserva el campo (siempre null) solo por compatibilidad de serialización.
+    public string? Token { get; set; }
 
     public DateTime? ExpirationAt { get; set; }
 
     public DateTime? Expiration { get; set; }
+
+    // Nombre del rol (SA/Admin/Normal). El frontend ya no puede leerlo del JWT,
+    // así que lo entregamos explícitamente para derivar el userType.
+    public string? Role { get; set; }
 
     public bool RequiresTwoFactor { get; set; }
 

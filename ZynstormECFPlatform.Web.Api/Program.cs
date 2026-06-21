@@ -122,6 +122,15 @@ if (builder.Environment.IsDevelopment())
             };
             x.Events = new JwtBearerEvents
             {
+                // Si no viene el header Authorization, toma el JWT de la cookie httpOnly.
+                OnMessageReceived = context =>
+                {
+                    if (string.IsNullOrEmpty(context.Token))
+                    {
+                        context.Token = ZynstormECFPlatform.Web.Api.Helpers.AuthCookie.ReadToken(context.Request);
+                    }
+                    return Task.CompletedTask;
+                },
                 OnTokenValidated = async context =>
                 {
                     var accountService = context.HttpContext.RequestServices.GetRequiredService<IAccountService>();
@@ -168,6 +177,15 @@ else
          };
          x.Events = new JwtBearerEvents
          {
+             // Si no viene el header Authorization, toma el JWT de la cookie httpOnly.
+             OnMessageReceived = context =>
+             {
+                 if (string.IsNullOrEmpty(context.Token))
+                 {
+                     context.Token = ZynstormECFPlatform.Web.Api.Helpers.AuthCookie.ReadToken(context.Request);
+                 }
+                 return Task.CompletedTask;
+             },
              OnTokenValidated = async context =>
              {
                  var accountService = context.HttpContext.RequestServices.GetRequiredService<IAccountService>();
@@ -205,6 +223,16 @@ builder.Services.AddCors(c =>
 var app = builder.Build();
 
 await SeedData(app);
+
+// Security headers (defensa en profundidad). Se agregan a todas las respuestas.
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "DENY";
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    await next().ConfigureAwait(false);
+});
 
 // Configure the HTTP request pipeline.
 // Temporalmente expuesto en producción para pruebas

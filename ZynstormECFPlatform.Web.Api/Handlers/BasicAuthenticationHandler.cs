@@ -69,26 +69,22 @@ public class BasicAuthenticationHandler : AuthenticationHandler<AuthenticationSc
                         throw new ArgumentException("Invalid credentials");
 
                     case "Bearer":
-                        var claimsPrincipal = _jwtTokenService.GetPrincipalClaim(authHeader.Parameter!, _appSettings.Secret);
-                        
-                        var nameIdentifier = claimsPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                        if (!string.IsNullOrEmpty(nameIdentifier))
-                        {
-                            var accountService = Context.RequestServices.GetRequiredService<IAccountService>();
-                            var user = await accountService.GetUserByIdAsync(nameIdentifier).ConfigureAwait(false);
-                            if (user == null || !user.IsActive || user.IsDeleted)
-                            {
-                                return AuthenticateResult.Fail("User does not exist or is inactive");
-                            }
-                        }
-
-                        var ticke = new AuthenticationTicket(claimsPrincipal, Scheme.Name);
-                        return AuthenticateResult.Success(ticke);
+                        return await AuthenticateWithJwtAsync(authHeader.Parameter!).ConfigureAwait(false);
 
                     default:
                         break;
                 }
             }
+
+            // Sin header Authorization: el JWT puede venir en la cookie httpOnly.
+            // Este handler es el esquema DEFAULT en Development, así que necesita el mismo
+            // fallback que el middleware JwtBearer estándar.
+            var cookieToken = Helpers.AuthCookie.ReadToken(Request);
+            if (!string.IsNullOrEmpty(cookieToken))
+            {
+                return await AuthenticateWithJwtAsync(cookieToken).ConfigureAwait(false);
+            }
+
             return AuthenticateResult.NoResult();
         }
         catch (Exception exception)
@@ -96,5 +92,24 @@ public class BasicAuthenticationHandler : AuthenticationHandler<AuthenticationSc
             _logger.LogError(exception, message: exception.Message);
             return AuthenticateResult.Fail($"Authentication failed");
         }
+    }
+
+    private async Task<AuthenticateResult> AuthenticateWithJwtAsync(string token)
+    {
+        var claimsPrincipal = _jwtTokenService.GetPrincipalClaim(token, _appSettings.Secret);
+
+        var nameIdentifier = claimsPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!string.IsNullOrEmpty(nameIdentifier))
+        {
+            var accountService = Context.RequestServices.GetRequiredService<IAccountService>();
+            var user = await accountService.GetUserByIdAsync(nameIdentifier).ConfigureAwait(false);
+            if (user == null || !user.IsActive || user.IsDeleted)
+            {
+                return AuthenticateResult.Fail("User does not exist or is inactive");
+            }
+        }
+
+        var ticket = new AuthenticationTicket(claimsPrincipal, Scheme.Name);
+        return AuthenticateResult.Success(ticket);
     }
 }

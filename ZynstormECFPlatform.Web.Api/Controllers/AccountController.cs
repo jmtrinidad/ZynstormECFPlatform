@@ -142,25 +142,10 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 var userAgent = Request.Headers["User-Agent"].ToString();
                 await _accountService.RegisterAccessAsync(user.Id, ipAddress, userAgent).ConfigureAwait(false);
 
-                return Ok(new LoginResponseDto
-                {
-                    Token = tokenDto.Token,
-                    Expiration = tokenDto.Expiration,
-                    ExpirationAt = tokenDto.Expiration,
-                    RequiresTwoFactor = false,
-                    User = new UserViewDto
-                    {
-                        UserId = user.Id,
-                        UserName = user.UserName!,
-                        FirstName = user.FirstName,
-                        LastName = user.LastName,
-                        Email = user.Email!,
-                        PhoneNumber = user.PhoneNumber ?? "",
-                        TwoFactorEnabled = user.TwoFactorEnabled,
-                        IsActive = user.IsActive,
-                        RegisteredAt = user.RegisteredAt
-                    }
-                });
+                // El JWT viaja SOLO en una cookie httpOnly; nunca en el cuerpo JSON.
+                SetAuthCookie(tokenDto);
+
+                return Ok(BuildLoginResponse(user, role, tokenDto));
             }
             catch (Exception exception)
             {
@@ -289,31 +274,58 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 var userAgent = Request.Headers["User-Agent"].ToString();
                 await _accountService.RegisterAccessAsync(user.Id, ipAddress, userAgent).ConfigureAwait(false);
 
-                return Ok(new LoginResponseDto
-                {
-                    Token = tokenDto.Token,
-                    Expiration = tokenDto.Expiration,
-                    ExpirationAt = tokenDto.Expiration,
-                    RequiresTwoFactor = false,
-                    User = new UserViewDto
-                    {
-                        UserId = user.Id,
-                        UserName = user.UserName!,
-                        FirstName = user.FirstName,
-                        LastName = user.LastName,
-                        Email = user.Email!,
-                        PhoneNumber = user.PhoneNumber ?? "",
-                        TwoFactorEnabled = user.TwoFactorEnabled,
-                        IsActive = user.IsActive,
-                        RegisteredAt = user.RegisteredAt
-                    }
-                });
+                // El JWT viaja SOLO en una cookie httpOnly; nunca en el cuerpo JSON.
+                SetAuthCookie(tokenDto);
+
+                return Ok(BuildLoginResponse(user, role, tokenDto));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in Login2Fa");
                 return StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
+        }
+
+        [AllowAnonymous]
+        [HttpPost("logout")]
+        [ProducesResponseType(200)]
+        public IActionResult Logout()
+        {
+            // Borra la cookie httpOnly en el servidor (no basta con limpiar el estado del cliente).
+            Response.Cookies.Delete(AuthCookie.Name, AuthCookie.BuildDeleteOptions(_env));
+            return Ok();
+        }
+
+        private void SetAuthCookie(TokenDto tokenDto)
+        {
+            Response.Cookies.Append(
+                AuthCookie.Name,
+                tokenDto.Token,
+                AuthCookie.BuildSetOptions(_env, tokenDto.Expiration));
+        }
+
+        private static LoginResponseDto BuildLoginResponse(User user, Role? role, TokenDto tokenDto)
+        {
+            return new LoginResponseDto
+            {
+                // Token se omite a propósito: el cliente ya no debe verlo.
+                Expiration = tokenDto.Expiration,
+                ExpirationAt = tokenDto.Expiration,
+                Role = role?.Name,
+                RequiresTwoFactor = false,
+                User = new UserViewDto
+                {
+                    UserId = user.Id,
+                    UserName = user.UserName!,
+                    FirstName = user.FirstName,
+                    LastName = user.LastName,
+                    Email = user.Email!,
+                    PhoneNumber = user.PhoneNumber ?? "",
+                    TwoFactorEnabled = user.TwoFactorEnabled,
+                    IsActive = user.IsActive,
+                    RegisteredAt = user.RegisteredAt
+                }
+            };
         }
 
         [Authorize]
