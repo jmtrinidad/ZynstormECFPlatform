@@ -249,7 +249,13 @@ app.UseSwaggerUI(options =>
 // }
 
 app.UseWebSockets();
-app.UseHttpsRedirection();
+// En Development NO se fuerza el redirect HTTP->HTTPS: el proxy de dev de Next reenvía al
+// puerto HTTP del backend (mismo origen para la cookie httpOnly) y un 307 hacia el HTTPS
+// autofirmado rompería el login. En Staging/Producción (detrás de Nginx con TLS) sí se aplica.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseStaticFiles();
 
 app.UseCors("corsGlobalPolicy");
