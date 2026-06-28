@@ -20,3 +20,52 @@ dotnet ef migrations remove --project ZynstormECFPlatform.Data --startup-project
 UPDATE "ENcf"
 SET "Sequence" = "Sequence" + 5
 WHERE "ClientId" = (SELECT "ClientId" FROM "Client" WHERE "ClientId" = 3) ;
+
+
+
+# Tarea: Migrar la autenticación JWT a cookie httpOnly (backend .NET + frontend Next.js)
+
+Migra la sesión de "JWT en localStorage/cookie legible por JS + header `Authorization: Bearer`" a "JWT en cookie **httpOnly**", para que un XSS no pueda robar la sesión leyendo el token. Implementa el cambio **end-to-end** y **verifícalo con un login real en navegador** (no solo build/typecheck) antes de darlo por terminado.
+
+Antes de tocar nada, explora el repo y confirma el stack real: framework del backend (.NET: revisa `Program.cs`/`Startup.cs`), framework del frontend (Next.js o Vite — cambia la estrategia del proxy según cuál sea), store de auth, capa de fetch/axios, guard de rutas, y endpoints de login/2FA/logout.
+
+## Backend (API .NET)
+1. Crea un **helper único** para la cookie del JWT (p. ej. `Helpers/AuthCookie.cs`) con: nombre de cookie, opciones de set (`HttpOnly=true`, `SameSite=Lax`, `Secure = !IsDevelopment()`, `Expires` = expiración del JWT, `Path="/"`), opciones de delete, y un método `ReadToken(HttpRequest)` que lea el token de la cookie. Reutilízalo en todos lados.
+2. En el endpoint de login (y en el de verificación 2FA si existe uno separado), tras generar el JWT: **fija la cookie** y **deja de devolver el token en el body JSON**. Incluye en la respuesta el **nombre del rol** (o el userType), porque el frontend ya no podrá leerlo del JWT.
+3. Agrega un endpoint de **logout** que borre la cookie (`Response.Cookies.Delete` con las mismas opciones).
+4. **CRÍTICO — esquemas de autenticación por entorno:** busca TODOS los esquemas/handlers que son **default en cada entorno** (Development puede usar uno distinto al de no-Development). Es común que Development tenga un `AuthenticationHandler` **custom** (ej. "Basic") que es el esquema default y **solo lee el header `Authorization`** — ese handler también necesita el fallback de cookie: si no hay header, lee el token de la cookie y valida igual que el Bearer. No basta con el middleware JwtBearer estándar. Revisa la configuración real de `Program.cs` para **AMBOS** bloques (Development y no-Development):
+   - JwtBearer → agrega `JwtBearerEvents.OnMessageReceived`: si `context.Token` está vacío, tómalo de la cookie.
+   - Handler custom default → mismo fallback dentro de su `HandleAuthenticateAsync`.
+5. Agrega headers de seguridad (defensa en profundidad) si no existen: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`.
+6. **Gotcha de `UseHttpsRedirection`:** si está activo y en dev el backend bindea un endpoint HTTPS, devolverá `307` HTTP→HTTPS y romperá el proxy de dev (ver más abajo). Hazlo condicional: **omítelo en Development**, mantenlo en Staging/Producción.
+
+## Frontend
+1. En la capa de fetch/axios: **deja de mandar `Authorization: Bearer <token>` a mano**; asegúrate de que TODAS las peticiones vayan con `credentials: "include"` (fetch) / `withCredentials: true` (axios) para que el navegador adjunte la cookie sola.
+2. En el store de auth: **deja de guardar el token crudo** en cualquier storage accesible por JS (localStorage, cookie no-httpOnly, estado persistido). El JWT vive solo en la cookie httpOnly.
+3. Busca TODOS los lugares donde el frontend **decodifica el JWT manualmente** (para sacar nombre/email/rol de los claims) — se rompen porque ya no se puede leer el token. Reemplázalos por los datos del objeto `user` (y el rol) que vienen en la respuesta de login.
+4. El **guard de rutas** probablemente chequea "¿existe el token?" — cámbialo a "¿existe el usuario y la sesión no venció (según `expirationAt`)?".
+5. La función de **logout** debe llamar al endpoint de logout del backend (para borrar la cookie en el servidor); limpiar solo el estado local deja la cookie viva.
+6. Agrega una **Content-Security-Policy** + headers de seguridad. Mínimo deseable: `object-src 'none'; base-uri 'self'; frame-ancestors 'none'`. Nota: el runtime de Next necesita `script-src 'self' 'unsafe-inline'` (y `'unsafe-eval'` en dev por Fast Refresh); `connect-src` debe permitir el mismo origen y `ws:`/`wss:` si usas SignalR/WebSocket.
+
+## EL GOTCHA MÁS IMPORTANTE: mismo origen en dev
+Si en dev el frontend y el backend corren en **orígenes distintos** (puertos distintos, o http vs https), el navegador puede tratar la cookie como "third-party" y descartarla aunque pongas `SameSite=None;Secure`. Esto rompe el login silenciosamente (entras, ves el dashboard un instante, y rebotas a login porque las llamadas de datos dan 401 y el handler global de 401 dispara logout).
+
+La solución **no** es `SameSite=None`, es hacer que el front en dev hable con el backend por el **MISMO origen**, igual que staging/prod detrás de un reverse proxy, mediante un proxy de dev:
+- **Si el frontend es Vite:** en `vite.config.ts`, `server.proxy['/api'] = { target: <backend>, changeOrigin: true, secure: false, cookieDomainRewrite: '', rewrite: p => p.replace(/^\/api/, '') }`. El `secure:false` acepta el certificado autofirmado de HTTPS. Apunta `VITE_API_*` a `/api` (mismo origen).
+- **Si el frontend es Next.js:** usa `rewrites()` en `next.config.mjs` para proxear `/api/:path*` → backend, y pon la URL base del API en dev a `/api`. **OJO (verificado empíricamente):** a diferencia de Vite, el proxy de dev de Next (undici/Turbopack) **NO** permite saltarse un certificado autofirmado y **`NODE_TLS_REJECT_UNAUTHORIZED=0` no lo evita** (da `500 DEPTH_ZERO_SELF_SIGNED_CERT`). Por eso, en Next, **apunta el proxy al puerto HTTP del backend**, no al HTTPS. Es tráfico server-to-server, invisible al navegador, y no afecta la seguridad de la cookie (el tramo navegador↔Next sigue siendo HTTP en dev, así que `Secure` ya es `false`). Hazlo configurable por env var. Recuerda además el punto 6 del backend: el backend no debe redirigir HTTP→HTTPS en dev, o el proxy recibirá un 307 al HTTPS autofirmado.
+
+Con esto, `SameSite=Lax` + `Secure` condicional al entorno funciona sin fricción y dev queda alineado con prod.
+
+## Verificación OBLIGATORIA antes de terminar
+No te conformes con "compila". Levanta backend y frontend y haz **login real en un navegador**:
+1. Login → debe llegar al dashboard y **QUEDARSE** ahí (no rebotar a login). Verifica también el flujo 2FA si aplica.
+2. Pestaña Network: las llamadas autenticadas deben dar **200**, no 401. Confirma que la cookie del JWT existe con `HttpOnly`, `SameSite=Lax` y la expiración correcta, y que el body de login **ya no trae el token**.
+3. Logout → vuelve a login; al renavegar a una ruta protegida debe seguir bloqueando (prueba que el logout borró la cookie en el **servidor**, no solo el estado del cliente).
+4. Consola del navegador: sin errores ni violaciones de CSP.
+
+## Notas de producción (no romper el deploy)
+- En prod, frontend y API deben quedar en el **mismo host** (ej. `app.com` + `app.com/api`) detrás del reverse proxy con TLS; ahí `Secure=true` + `SameSite=Lax` + cookie host-only funcionan. El proxy de dev (rewrites/vite.proxy) debe quedar **solo para dev** (no afectar el ruteo de prod).
+- Si el backend corre en contenedor detrás de un proxy que termina TLS (Dokploy/Traefik/Nginx), no debe forzar redirect HTTP→HTTPS dentro del contenedor (loop). Sirve HTTP plano y deja el TLS al proxy.
+- La CSP también aplica en prod: revisa la consola en el primer deploy por si algún script externo (analytics) requiere ajustar `script-src`.
+
+Entrega: explica los archivos tocados, el porqué de cada gotcha, y pega evidencia de la verificación en navegador (status 200 de las llamadas autenticadas y la cookie httpOnly en DevTools).
