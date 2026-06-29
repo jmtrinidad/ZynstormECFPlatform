@@ -412,6 +412,25 @@ public class EcfTotalesRequest
     public decimal? TotalITBISRetenido { get; set; }
     public decimal? TotalISRRetencion { get; set; }
     public decimal? MontoImpuestoAdicional { get; set; }
+
+    // Desglose de impuestos adicionales (ISC) a nivel Totales. Solo lo llena el flujo de
+    // certificación por Excel; se lee tal cual del Excel.
+    public List<EcfImpuestoAdicionalRequest>? ImpuestosAdicionales { get; set; }
+}
+
+public class EcfSubcantidadRequest
+{
+    public decimal? Subcantidad { get; set; }
+    public string? CodigoSubcantidad { get; set; }
+}
+
+public class EcfImpuestoAdicionalRequest
+{
+    public string TipoImpuesto { get; set; } = string.Empty;
+    public decimal? TasaImpuestoAdicional { get; set; }
+    public decimal? MontoImpuestoSelectivoConsumoEspecifico { get; set; }
+    public decimal? MontoImpuestoSelectivoConsumoAdvalorem { get; set; }
+    public decimal? OtrosImpuestosAdicionales { get; set; }
 }
 
 public class EcfDetallesItemsRequest
@@ -439,6 +458,19 @@ public class EcfItemRequestDto
     public decimal? MontoISRRetenido { get; set; }
     public string? FechaElaboracion { get; set; }
     public string? FechaVencimientoItem { get; set; }
+
+    // Reference fields for regulated goods (ISC / alcohol). Only populated by the Excel
+    // certification flow; read verbatim from the source Excel.
+    public decimal? CantidadReferencia { get; set; }
+    public string? UnidadReferencia { get; set; }
+    public decimal? GradosAlcohol { get; set; }
+    public decimal? PrecioUnitarioReferencia { get; set; }
+
+    // Códigos de tipo de impuesto adicional (ISC) que aplican a esta línea (TipoImpuesto[i][j]).
+    public List<string>? ImpuestoAdicionalTipos { get; set; }
+
+    // Tabla de subcantidades de la línea (Subcantidad[i][j] / CodigoSubcantidad[i][j]). Verbatim.
+    public List<EcfSubcantidadRequest>? TablaSubcantidad { get; set; }
 
     // Additional Tax Fields
     public string? IscType { get; set; }

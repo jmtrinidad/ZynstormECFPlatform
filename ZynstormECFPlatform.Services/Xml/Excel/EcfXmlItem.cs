@@ -57,7 +57,7 @@ public class EcfXmlItem
     [XmlElement("CantidadItem", Order = 7)]
     public string CantidadItemString
     {
-        get => Tools.FormatDecimal(CantidadItem) ?? "0.00";
+        get => ExcelDecimal.Verbatim(CantidadItem) ?? "0";
         set => CantidadItem = Tools.ParseDecimal(value) ?? 0m;
     }
 
@@ -65,11 +65,52 @@ public class EcfXmlItem
     public int? UnidadMedida { get; set; }
     public bool ShouldSerializeUnidadMedida() => UnidadMedida.HasValue;
 
-    [XmlElement("FechaElaboracion", Order = 9)]
+    // ── Reference fields for regulated goods (ISC / alcohol). Verbatim from Excel.
+    //    XSD order: after UnidadMedida, before FechaElaboracion. ────────────────────
+
+    [XmlIgnore]
+    public decimal? CantidadReferencia { get; set; }
+    [XmlElement("CantidadReferencia", Order = 9)]
+    public string? CantidadReferenciaString
+    {
+        get => ExcelDecimal.Verbatim(CantidadReferencia);
+        set => CantidadReferencia = Tools.ParseDecimal(value);
+    }
+    public bool ShouldSerializeCantidadReferenciaString() => CantidadReferencia.HasValue;
+
+    [XmlElement("UnidadReferencia", Order = 10)]
+    public int? UnidadReferencia { get; set; }
+    public bool ShouldSerializeUnidadReferencia() => UnidadReferencia.HasValue;
+
+    [XmlElement("TablaSubcantidad", Order = 11)]
+    public EcfXmlTablaSubcantidad? TablaSubcantidad { get; set; }
+    public bool ShouldSerializeTablaSubcantidad() => TablaSubcantidad != null && TablaSubcantidad.SubcantidadItem.Count > 0;
+
+    [XmlIgnore]
+    public decimal? GradosAlcohol { get; set; }
+    [XmlElement("GradosAlcohol", Order = 12)]
+    public string? GradosAlcoholString
+    {
+        get => ExcelDecimal.Verbatim(GradosAlcohol);
+        set => GradosAlcohol = Tools.ParseDecimal(value);
+    }
+    public bool ShouldSerializeGradosAlcoholString() => GradosAlcohol.HasValue;
+
+    [XmlIgnore]
+    public decimal? PrecioUnitarioReferencia { get; set; }
+    [XmlElement("PrecioUnitarioReferencia", Order = 13)]
+    public string? PrecioUnitarioReferenciaString
+    {
+        get => ExcelDecimal.Verbatim(PrecioUnitarioReferencia);
+        set => PrecioUnitarioReferencia = Tools.ParseDecimal(value);
+    }
+    public bool ShouldSerializePrecioUnitarioReferenciaString() => PrecioUnitarioReferencia.HasValue;
+
+    [XmlElement("FechaElaboracion", Order = 14)]
     public string? FechaElaboracion { get; set; }
     public bool ShouldSerializeFechaElaboracion() => !string.IsNullOrEmpty(FechaElaboracion);
 
-    [XmlElement("FechaVencimientoItem", Order = 10)]
+    [XmlElement("FechaVencimientoItem", Order = 15)]
     public string? FechaVencimientoItem { get; set; }
     public bool ShouldSerializeFechaVencimientoItem() => !string.IsNullOrEmpty(FechaVencimientoItem);
 
@@ -79,7 +120,7 @@ public class EcfXmlItem
     [XmlIgnore]
     public int? PrecioUnitarioItemDecimals { get; set; }
 
-    [XmlElement("PrecioUnitarioItem", Order = 11)]
+    [XmlElement("PrecioUnitarioItem", Order = 16)]
     public string PrecioUnitarioItemString
     {
         get
@@ -92,36 +133,59 @@ public class EcfXmlItem
         set => PrecioUnitarioItem = Tools.ParseDecimal(value) ?? 0m;
     }
 
-    [XmlElement("DescuentoMonto", Order = 12)]
+    [XmlElement("DescuentoMonto", Order = 17)]
     public decimal? DescuentoMonto { get; set; }
     public bool ShouldSerializeDescuentoMonto() => DescuentoMonto.HasValue && DescuentoMonto > 0;
 
-    [XmlElement("TablaSubDescuento", Order = 13)]
+    [XmlElement("TablaSubDescuento", Order = 18)]
     public EcfXmlTablaSubDescuento? TablaSubDescuento { get; set; }
     public bool ShouldSerializeTablaSubDescuento() => TablaSubDescuento != null && TablaSubDescuento.SubDescuentos.Count > 0;
 
-    [XmlElement("RecargoMonto", Order = 14)]
+    [XmlElement("RecargoMonto", Order = 19)]
     public decimal? RecargoMonto { get; set; }
     public bool ShouldSerializeRecargoMonto() => RecargoMonto.HasValue && RecargoMonto > 0;
 
-    [XmlElement("TablaSubRecargo", Order = 15)]
+    [XmlElement("TablaSubRecargo", Order = 20)]
     public EcfXmlTablaSubRecargo? TablaSubRecargo { get; set; }
     public bool ShouldSerializeTablaSubRecargo() => TablaSubRecargo != null && TablaSubRecargo.SubRecargos.Count > 0;
 
-    [XmlElement("TablaImpuestoAdicional", Order = 16)]
+    [XmlElement("TablaImpuestoAdicional", Order = 21)]
     public EcfXmlTablaImpuestoAdicionalItem? TablaImpuestoAdicional { get; set; }
     public bool ShouldSerializeTablaImpuestoAdicional() => TablaImpuestoAdicional != null && EcfType != 41 && EcfType != 43;
 
     [XmlIgnore]
     public decimal MontoItem { get; set; }
 
-    [XmlElement("MontoItem", Order = 17)]
+    [XmlElement("MontoItem", Order = 22)]
     public string MontoItemString
     {
-        get => Tools.FormatDecimal(MontoItem) ?? "0.00";
+        get => ExcelDecimal.Verbatim(MontoItem) ?? "0";
         set => MontoItem = Tools.ParseDecimal(value) ?? 0m;
     }
 
+}
+
+public class EcfXmlTablaSubcantidad
+{
+    [XmlElement("SubcantidadItem")]
+    public List<EcfXmlSubcantidadItem> SubcantidadItem { get; set; } = new();
+}
+
+public class EcfXmlSubcantidadItem
+{
+    [XmlIgnore]
+    public decimal? Subcantidad { get; set; }
+    [XmlElement("Subcantidad", Order = 1)]
+    public string? SubcantidadString
+    {
+        get => ExcelDecimal.Verbatim(Subcantidad);
+        set => Subcantidad = Tools.ParseDecimal(value);
+    }
+    public bool ShouldSerializeSubcantidadString() => Subcantidad.HasValue;
+
+    [XmlElement("CodigoSubcantidad", Order = 2)]
+    public int? CodigoSubcantidad { get; set; }
+    public bool ShouldSerializeCodigoSubcantidad() => CodigoSubcantidad.HasValue;
 }
 
 public class EcfXmlTablaSubDescuento

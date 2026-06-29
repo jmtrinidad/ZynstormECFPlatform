@@ -285,8 +285,31 @@ public class CertificationExcelGeneratorService : ICertificationExcelGeneratorSe
                 };
             }
 
+            EcfXmlTablaSubcantidad? tablaSubcantidad = null;
+            if (item.TablaSubcantidad is { Count: > 0 })
+            {
+                tablaSubcantidad = new EcfXmlTablaSubcantidad
+                {
+                    SubcantidadItem = item.TablaSubcantidad.Select(s => new EcfXmlSubcantidadItem
+                    {
+                        Subcantidad = s.Subcantidad,
+                        CodigoSubcantidad = int.TryParse(s.CodigoSubcantidad, out int cs) ? cs : null
+                    }).ToList()
+                };
+            }
+
             EcfXmlTablaImpuestoAdicionalItem? tablaImpuesto = null;
-            if (!string.IsNullOrWhiteSpace(item.IscType))
+            if (item.ImpuestoAdicionalTipos is { Count: > 0 })
+            {
+                // Tal cual el Excel: referencias TipoImpuesto[i][j] de la línea.
+                tablaImpuesto = new EcfXmlTablaImpuestoAdicionalItem
+                {
+                    ImpuestoAdicional = item.ImpuestoAdicionalTipos
+                        .Select(t => new EcfXmlImpuestoAdicionalRef { TipoImpuesto = t })
+                        .ToList()
+                };
+            }
+            else if (!string.IsNullOrWhiteSpace(item.IscType))
             {
                 tablaImpuesto = new EcfXmlTablaImpuestoAdicionalItem
                 {
@@ -304,6 +327,11 @@ public class CertificationExcelGeneratorService : ICertificationExcelGeneratorSe
                 DescripcionItem = item.DescripcionItem,
                 CantidadItem = item.CantidadItem,
                 UnidadMedida = int.TryParse(item.UnidadMedida, out int um) ? um : null,
+                CantidadReferencia = item.CantidadReferencia,
+                UnidadReferencia = int.TryParse(item.UnidadReferencia, out int ur) ? ur : null,
+                TablaSubcantidad = tablaSubcantidad,
+                GradosAlcohol = item.GradosAlcohol,
+                PrecioUnitarioReferencia = item.PrecioUnitarioReferencia,
                 PrecioUnitarioItem = item.PrecioUnitarioItem,
                 PrecioUnitarioItemDecimals = item.PrecioUnitarioItemDecimals,
                 DescuentoMonto = item.DescuentoMonto,
@@ -323,10 +351,24 @@ public class CertificationExcelGeneratorService : ICertificationExcelGeneratorSe
             });
         }
 
-        // Build ImpuestosAdicionales in Totales from items
+        // Build ImpuestosAdicionales in Totales.
         EcfXmlImpuestosAdicionales? impuestosAdicionales = null;
-        var itemsWithTax = xmlItems.Where(i => i.TablaImpuestoAdicional?.ImpuestoAdicional?.Count > 0).ToList();
-        if (itemsWithTax.Count > 0)
+        if (e.Totales.ImpuestosAdicionales is { Count: > 0 })
+        {
+            // Tal cual el Excel: desglose por tipo con tasa y montos ISC (específico/advalorem).
+            impuestosAdicionales = new EcfXmlImpuestosAdicionales
+            {
+                Items = e.Totales.ImpuestosAdicionales.Select(t => new EcfXmlImpuestoAdicional
+                {
+                    TipoImpuesto = t.TipoImpuesto,
+                    TasaImpuestoAdicional = t.TasaImpuestoAdicional,
+                    MontoImpuestoSelectivoConsumoEspecifico = t.MontoImpuestoSelectivoConsumoEspecifico,
+                    MontoImpuestoSelectivoConsumoAdvalorem = t.MontoImpuestoSelectivoConsumoAdvalorem,
+                    OtrosImpuestosAdicionales = t.OtrosImpuestosAdicionales
+                }).ToList()
+            };
+        }
+        else if (xmlItems.Where(i => i.TablaImpuestoAdicional?.ImpuestoAdicional?.Count > 0).ToList() is { Count: > 0 } itemsWithTax)
         {
             var taxGroups = itemsWithTax
                 .SelectMany(i => i.TablaImpuestoAdicional!.ImpuestoAdicional.Select(ia => new { ia.TipoImpuesto }))

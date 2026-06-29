@@ -51,7 +51,7 @@ public class RfceXmlTotales
     [XmlElement("MontoExento", Order = 5)]
     public string? MontoExentoString
     {
-        get => Tools.FormatDecimal(MontoExento);
+        get => ExcelDecimal.Verbatim(MontoExento);
         set => MontoExento = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoExentoString() => MontoExento.HasValue;
@@ -62,7 +62,7 @@ public class RfceXmlTotales
     [XmlElement("TotalITBIS", Order = 6)]
     public string? TotalITBISString
     {
-        get => Tools.FormatDecimal(TotalITBIS);
+        get => ExcelDecimal.Verbatim(TotalITBIS);
         set => TotalITBIS = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalITBISString() => TotalITBIS.HasValue;
@@ -93,7 +93,7 @@ public class RfceXmlTotales
     [XmlElement("MontoTotal", Order = 12)]
     public string MontoTotalString
     {
-        get => Tools.FormatDecimal(MontoTotal) ?? "0.00";
+        get => ExcelDecimal.Verbatim(MontoTotal) ?? "0.00";
         set => MontoTotal = Tools.ParseDecimal(value) ?? 0m;
     }
 

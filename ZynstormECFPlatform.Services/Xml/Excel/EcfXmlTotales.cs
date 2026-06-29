@@ -20,7 +20,7 @@ public class EcfXmlTotales
     [XmlElement("MontoGravadoTotal", Order = 1)]
     public string? MontoGravadoTotalString
     {
-        get => Tools.FormatDecimal(MontoGravadoTotal);
+        get => ExcelDecimal.Verbatim(MontoGravadoTotal);
         set => MontoGravadoTotal = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoGravadoTotalString() => EcfType != 44 && (EcfType == 46 || (EcfType != 46 && EcfType != 47)) && MontoGravadoTotal.HasValue;
@@ -30,7 +30,7 @@ public class EcfXmlTotales
     [XmlElement("MontoGravadoI1", Order = 2)]
     public string? MontoGravadoI1String
     {
-        get => (EcfType == 46 || EcfType == 47) ? null : Tools.FormatDecimal(MontoGravadoI1);
+        get => (EcfType == 46 || EcfType == 47) ? null : ExcelDecimal.Verbatim(MontoGravadoI1);
         set => MontoGravadoI1 = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoGravadoI1String() => EcfType != 44 && EcfType != 46 && EcfType != 47 && MontoGravadoI1.HasValue;
@@ -40,7 +40,7 @@ public class EcfXmlTotales
     [XmlElement("MontoGravadoI2", Order = 3)]
     public string? MontoGravadoI2String
     {
-        get => (EcfType == 46 || EcfType == 47) ? null : Tools.FormatDecimal(MontoGravadoI2);
+        get => (EcfType == 46 || EcfType == 47) ? null : ExcelDecimal.Verbatim(MontoGravadoI2);
         set => MontoGravadoI2 = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoGravadoI2String() => EcfType != 44 && EcfType != 46 && EcfType != 47 && MontoGravadoI2.HasValue;
@@ -50,7 +50,7 @@ public class EcfXmlTotales
     [XmlElement("MontoGravadoI3", Order = 4)]
     public string? MontoGravadoI3String
     {
-        get => (EcfType == 47) ? null : Tools.FormatDecimal(MontoGravadoI3);
+        get => (EcfType == 47) ? null : ExcelDecimal.Verbatim(MontoGravadoI3);
         set => MontoGravadoI3 = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoGravadoI3String() => EcfType != 44 && (EcfType == 46 || (EcfType != 46 && EcfType != 47)) && MontoGravadoI3.HasValue;
@@ -60,7 +60,7 @@ public class EcfXmlTotales
     [XmlElement("MontoExento", Order = 5)]
     public string? MontoExentoString
     {
-        get => Tools.FormatDecimal(MontoExento);
+        get => ExcelDecimal.Verbatim(MontoExento);
         set => MontoExento = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoExentoString() => EcfType != 46 && MontoExento.HasValue && MontoExento > 0;
@@ -104,7 +104,7 @@ public class EcfXmlTotales
     [XmlElement("TotalITBIS", Order = 9)]
     public string? TotalITBISString
     {
-        get => (EcfType == 47) ? null : Tools.FormatDecimal(TotalITBIS);
+        get => (EcfType == 47) ? null : ExcelDecimal.Verbatim(TotalITBIS);
         set => TotalITBIS = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalITBISString() => EcfType != 44 && EcfType != 47 && TotalITBIS.HasValue;
@@ -114,7 +114,7 @@ public class EcfXmlTotales
     [XmlElement("TotalITBIS1", Order = 10)]
     public string? TotalITBIS1String
     {
-        get => (EcfType == 46 || EcfType == 47) ? null : Tools.FormatDecimal(TotalITBIS1);
+        get => (EcfType == 46 || EcfType == 47) ? null : ExcelDecimal.Verbatim(TotalITBIS1);
         set => TotalITBIS1 = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalITBIS1String() => EcfType != 44 && EcfType != 46 && EcfType != 47 && TotalITBIS1.HasValue;
@@ -124,7 +124,7 @@ public class EcfXmlTotales
     [XmlElement("TotalITBIS2", Order = 11)]
     public string? TotalITBIS2String
     {
-        get => (EcfType == 46 || EcfType == 47) ? null : Tools.FormatDecimal(TotalITBIS2);
+        get => (EcfType == 46 || EcfType == 47) ? null : ExcelDecimal.Verbatim(TotalITBIS2);
         set => TotalITBIS2 = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalITBIS2String() => EcfType != 44 && EcfType != 46 && EcfType != 47 && TotalITBIS2.HasValue;
@@ -134,7 +134,7 @@ public class EcfXmlTotales
     [XmlElement("TotalITBIS3", Order = 12)]
     public string? TotalITBIS3String
     {
-        get => (EcfType == 47) ? null : Tools.FormatDecimal(TotalITBIS3);
+        get => (EcfType == 47) ? null : ExcelDecimal.Verbatim(TotalITBIS3);
         set => TotalITBIS3 = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalITBIS3String() => EcfType != 44 && EcfType != 47 && TotalITBIS3.HasValue;
@@ -146,7 +146,7 @@ public class EcfXmlTotales
     [XmlElement("MontoImpuestoAdicional", Order = 13)]
     public string? MontoImpuestoAdicionalString
     {
-        get => Tools.FormatDecimal(MontoImpuestoAdicional);
+        get => ExcelDecimal.Verbatim(MontoImpuestoAdicional);
         set => MontoImpuestoAdicional = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoImpuestoAdicionalString() => EcfType != 46 && EcfType != 47 && MontoImpuestoAdicional.HasValue && MontoImpuestoAdicional > 0;
@@ -162,7 +162,7 @@ public class EcfXmlTotales
     [XmlElement("MontoTotal", Order = 15)]
     public string MontoTotalString
     {
-        get => Tools.FormatDecimal(MontoTotal) ?? "0.00";
+        get => ExcelDecimal.Verbatim(MontoTotal) ?? "0.00";
         set => MontoTotal = Tools.ParseDecimal(value) ?? 0m;
     }
 
@@ -173,7 +173,7 @@ public class EcfXmlTotales
     [XmlElement("MontoNoFacturable", Order = 16)]
     public string? MontoNoFacturableString
     {
-        get => Tools.FormatDecimal(MontoNoFacturable);
+        get => ExcelDecimal.Verbatim(MontoNoFacturable);
         set => MontoNoFacturable = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoNoFacturableString() => MontoNoFacturable.HasValue;
@@ -183,7 +183,7 @@ public class EcfXmlTotales
     [XmlElement("MontoPeriodo", Order = 17)]
     public string? MontoPeriodoString
     {
-        get => Tools.FormatDecimal(MontoPeriodo);
+        get => ExcelDecimal.Verbatim(MontoPeriodo);
         set => MontoPeriodo = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoPeriodoString() => MontoPeriodo.HasValue;
@@ -193,7 +193,7 @@ public class EcfXmlTotales
     [XmlElement("SaldoAnterior", Order = 18)]
     public string? SaldoAnteriorString
     {
-        get => Tools.FormatDecimal(SaldoAnterior);
+        get => ExcelDecimal.Verbatim(SaldoAnterior);
         set => SaldoAnterior = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeSaldoAnteriorString() => SaldoAnterior.HasValue;
@@ -203,7 +203,7 @@ public class EcfXmlTotales
     [XmlElement("MontoAvancePago", Order = 19)]
     public string? MontoAvancePagoString
     {
-        get => Tools.FormatDecimal(MontoAvancePago);
+        get => ExcelDecimal.Verbatim(MontoAvancePago);
         set => MontoAvancePago = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeMontoAvancePagoString() => MontoAvancePago.HasValue;
@@ -213,7 +213,7 @@ public class EcfXmlTotales
     [XmlElement("ValorPagar", Order = 20)]
     public string? ValorPagarString
     {
-        get => Tools.FormatDecimal(ValorPagar);
+        get => ExcelDecimal.Verbatim(ValorPagar);
         set => ValorPagar = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeValorPagarString() => ValorPagar.HasValue;
@@ -225,7 +225,7 @@ public class EcfXmlTotales
     [XmlElement("TotalITBISRetenido", Order = 21)]
     public string? TotalITBISRetenidoString
     {
-        get => (EcfType == 32 || EcfType == 43 || EcfType == 47) ? null : Tools.FormatDecimal(TotalITBISRetenido);
+        get => (EcfType == 32 || EcfType == 43 || EcfType == 47) ? null : ExcelDecimal.Verbatim(TotalITBISRetenido);
         set => TotalITBISRetenido = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalITBISRetenidoString() => TotalITBISRetenido.HasValue && TotalITBISRetenido >= 0 && EcfType != 32 && EcfType != 43 && EcfType != 47;
@@ -235,7 +235,7 @@ public class EcfXmlTotales
     [XmlElement("TotalISRRetencion", Order = 22)]
     public string? TotalISRRetencionString
     {
-        get => Tools.FormatDecimal(TotalISRRetencion);
+        get => ExcelDecimal.Verbatim(TotalISRRetencion);
         set => TotalISRRetencion = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalISRRetencionString() => TotalISRRetencion.HasValue && TotalISRRetencion >= 0 && EcfType != 32 && EcfType != 43;
@@ -245,7 +245,7 @@ public class EcfXmlTotales
     [XmlElement("TotalITBISPercepcion", Order = 23)]
     public string? TotalITBISPercepcionString
     {
-        get => Tools.FormatDecimal(TotalITBISPercepcion);
+        get => ExcelDecimal.Verbatim(TotalITBISPercepcion);
         set => TotalITBISPercepcion = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalITBISPercepcionString() => TotalITBISPercepcion.HasValue && EcfType != 32 && EcfType != 43;
@@ -255,7 +255,7 @@ public class EcfXmlTotales
     [XmlElement("TotalISRPercepcion", Order = 24)]
     public string? TotalISRPercepcionString
     {
-        get => Tools.FormatDecimal(TotalISRPercepcion);
+        get => ExcelDecimal.Verbatim(TotalISRPercepcion);
         set => TotalISRPercepcion = Tools.ParseDecimal(value);
     }
     public bool ShouldSerializeTotalISRPercepcionString() => TotalISRPercepcion.HasValue && EcfType != 32 && EcfType != 43;

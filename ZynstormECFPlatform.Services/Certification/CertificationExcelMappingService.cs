@@ -96,27 +96,31 @@ public class CertificationExcelMappingService : ICertificationExcelMappingServic
                         ResponsablePago = GetStr(row, "ResponsablePago"),
                         InformacionAdicionalComprador = GetStr(row, "InformacionAdicionalComprador")
                     },
+                    // Los totales se pasan tal cual están en el Excel (sin Math.Round): este
+                    // flujo es un orquestador 100%. El formato exacto (sin forzar decimales) se
+                    // aplica al serializar en Xml.Excel.EcfXmlTotales / RfceXmlExtra.
                     Totales = new EcfTotalesRequest
                     {
-                        MontoGravadoTotal = GetDec(row, "MontoGravadoTotal") is { } mgt ? Math.Round(mgt, 2) : null,
-                        MontoGravadoI1 = GetDec(row, "MontoGravadoI1") is { } mgi1 ? Math.Round(mgi1, 2) : null,
-                        MontoGravadoI2 = GetDec(row, "MontoGravadoI2") is { } mgi2 ? Math.Round(mgi2, 2) : null,
-                        MontoGravadoI3 = GetDec(row, "MontoGravadoI3") is { } mgi3 ? Math.Round(mgi3, 2) : null,
-                        MontoExento = GetDec(row, "MontoExento") is { } me ? Math.Round(me, 2) : null,
+                        MontoGravadoTotal = GetDec(row, "MontoGravadoTotal"),
+                        MontoGravadoI1 = GetDec(row, "MontoGravadoI1"),
+                        MontoGravadoI2 = GetDec(row, "MontoGravadoI2"),
+                        MontoGravadoI3 = GetDec(row, "MontoGravadoI3"),
+                        MontoExento = GetDec(row, "MontoExento"),
                         ITBIS1 = GetNullableInt(row, "ITBIS1"),
                         ITBIS2 = GetNullableInt(row, "ITBIS2"),
                         ITBIS3 = GetNullableInt(row, "ITBIS3"),
-                        TotalITBIS = GetDec(row, "TotalITBIS") is { } titbis ? Math.Round(titbis, 2) : null,
-                        TotalITBIS1 = GetDec(row, "TotalITBIS1") is { } titbis1 ? Math.Round(titbis1, 2) : null,
-                        TotalITBIS2 = GetDec(row, "TotalITBIS2") is { } titbis2 ? Math.Round(titbis2, 2) : null,
-                        TotalITBIS3 = GetDec(row, "TotalITBIS3") is { } titbis3 ? Math.Round(titbis3, 2) : null,
-                        MontoTotal = GetDec(row, "MontoTotal") is { } mt ? Math.Round(mt, 2) : 0,
+                        TotalITBIS = GetDec(row, "TotalITBIS"),
+                        TotalITBIS1 = GetDec(row, "TotalITBIS1"),
+                        TotalITBIS2 = GetDec(row, "TotalITBIS2"),
+                        TotalITBIS3 = GetDec(row, "TotalITBIS3"),
+                        MontoTotal = GetDec(row, "MontoTotal") ?? 0,
                         MontoNoFacturable = GetDec(row, "MontoNoFacturable"),
                         MontoPeriodo = GetDec(row, "MontoPeriodo"),
                         ValorPagar = GetDec(row, "ValorPagar"),
-                        TotalITBISRetenido = GetDec(row, "TotalITBISRetenido") is { } titbisr ? Math.Round(titbisr, 2) : null,
-                        TotalISRRetencion = GetDec(row, "TotalISRRetencion") is { } tisrr ? Math.Round(tisrr, 2) : null,
-                        MontoImpuestoAdicional = GetDecAny(row, "MontoImpuestoAdicional", "MontoImpuestosAdicionales", "Monto Impuesto Adicional")
+                        TotalITBISRetenido = GetDec(row, "TotalITBISRetenido"),
+                        TotalISRRetencion = GetDec(row, "TotalISRRetencion"),
+                        MontoImpuestoAdicional = GetDecAny(row, "MontoImpuestoAdicional", "MontoImpuestosAdicionales", "Monto Impuesto Adicional"),
+                        ImpuestosAdicionales = GetImpuestosAdicionales(row)
                     }
                 },
                 InformacionReferencia = (GetStr(row, "TipoeCF") == "33" || GetStr(row, "TipoeCF") == "34") ? new EcfInformacionReferenciaRequest
@@ -178,7 +182,25 @@ public class CertificationExcelMappingService : ICertificationExcelMappingServic
                 // In certification Excel, we often have to infer this. 
                 // Defaulting to 1 (18%) for items that have amounts, or using other logic.
                 // In the old project, it was derived in the generator.
-                billingIndicator = "1"; 
+                billingIndicator = "1";
+            }
+
+            // Tipos de impuesto adicional (ISC) que aplican a la línea: TipoImpuesto[i][j] (máx 2 por XSD)
+            var impuestoTipos = new List<string>();
+            for (int j = 1; j <= 2; j++)
+            {
+                var tipo = GetItemNestedStr(row, "TipoImpuesto", i, j);
+                if (!string.IsNullOrWhiteSpace(tipo)) impuestoTipos.Add(tipo);
+            }
+
+            // Tabla de subcantidades: Subcantidad[i][j] / CodigoSubcantidad[i][j] (máx 5 por XSD). Verbatim.
+            var subcantidades = new List<EcfSubcantidadRequest>();
+            for (int j = 1; j <= 5; j++)
+            {
+                var sub = GetItemNestedDec(row, "Subcantidad", i, j);
+                var cod = GetItemNestedStr(row, "CodigoSubcantidad", i, j);
+                if (!sub.HasValue && string.IsNullOrWhiteSpace(cod)) continue;
+                subcantidades.Add(new EcfSubcantidadRequest { Subcantidad = sub, CodigoSubcantidad = cod });
             }
 
             var item = new EcfItemRequestDto
@@ -192,15 +214,22 @@ public class CertificationExcelMappingService : ICertificationExcelMappingServic
                 UnidadMedida = GetItemStr(row, "UnidadMedida", i),
                 PrecioUnitarioItem = precioUnitarioItem.Value,
                 PrecioUnitarioItemDecimals = GetItemDecScale(row, "PrecioUnitarioItem", i),
-                DescuentoMonto = descuentoMonto.HasValue ? Math.Round(descuentoMonto.Value, 2) : null,
+                DescuentoMonto = descuentoMonto,
                 TablaSubDescuento = tablaSubDescuento,
-                MontoItem = Math.Round(montoItem.Value, 2),
-                RecargoMonto = recargoMonto.HasValue ? Math.Round(recargoMonto.Value, 2) : null,
+                MontoItem = montoItem.Value,
+                RecargoMonto = recargoMonto,
                 TablaSubRecargo = tablaSubRecargo,
                 MontoITBISRetenido = GetItemDec(row, "MontoITBISRetenido", i),
                 MontoISRRetenido = GetItemDec(row, "MontoISRRetenido", i),
                 FechaElaboracion = GetItemStr(row, "FechaElaboracion", i),
-                FechaVencimientoItem = GetItemStr(row, "FechaVencimientoItem", i)
+                FechaVencimientoItem = GetItemStr(row, "FechaVencimientoItem", i),
+                // Campos de referencia (bienes regulados / alcohol) — tal cual el Excel
+                CantidadReferencia = GetItemDec(row, "CantidadReferencia", i),
+                UnidadReferencia = GetItemStr(row, "UnidadReferencia", i),
+                GradosAlcohol = GetItemDec(row, "GradosAlcohol", i),
+                PrecioUnitarioReferencia = GetItemDec(row, "PrecioUnitarioReferencia", i),
+                ImpuestoAdicionalTipos = impuestoTipos.Count > 0 ? impuestoTipos : null,
+                TablaSubcantidad = subcantidades.Count > 0 ? subcantidades : null
             };
             dto.ECF.DetallesItems.Item.Add(item);
         }
@@ -366,6 +395,27 @@ public class CertificationExcelMappingService : ICertificationExcelMappingServic
         if (decimals < 0) return null;
         if (decimals > 4) decimals = 4;
         return decimals;
+    }
+
+    // Desglose de impuestos adicionales (ISC) a nivel Totales: TipoImpuesto[k] + montos/tasa. Verbatim.
+    private static List<EcfImpuestoAdicionalRequest>? GetImpuestosAdicionales(IDictionary<string, object> row)
+    {
+        var list = new List<EcfImpuestoAdicionalRequest>();
+        for (int k = 1; k <= 20; k++)
+        {
+            var tipo = GetStr(row, $"TipoImpuesto[{k}]");
+            if (string.IsNullOrWhiteSpace(tipo)) continue;
+
+            list.Add(new EcfImpuestoAdicionalRequest
+            {
+                TipoImpuesto = tipo,
+                TasaImpuestoAdicional = GetDec(row, $"TasaImpuestoAdicional[{k}]"),
+                MontoImpuestoSelectivoConsumoEspecifico = GetDec(row, $"MontoImpuestoSelectivoConsumoEspecifico[{k}]"),
+                MontoImpuestoSelectivoConsumoAdvalorem = GetDec(row, $"MontoImpuestoSelectivoConsumoAdvalorem[{k}]"),
+                OtrosImpuestosAdicionales = GetDec(row, $"OtrosImpuestosAdicionales[{k}]")
+            });
+        }
+        return list.Count > 0 ? list : null;
     }
 
     private static EcfTablaSubDescuentoRequest? GetItemTablaSubDescuento(IDictionary<string, object> row, int line)

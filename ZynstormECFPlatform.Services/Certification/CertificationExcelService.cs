@@ -333,6 +333,8 @@ public class CertificationExcelService : ICertificationExcelService
             status.TotalComprobantes = step1Rows.Count;
             status.TotalResumenes = rfceRows.Count;
 
+            await NotifyJobUpdateAsync(jobId, status);
+
             string jobDir = Path.Combine(webRootPath, "certification_files", jobId);
             if (Directory.Exists(jobDir)) Directory.Delete(jobDir, true);
             Directory.CreateDirectory(jobDir);
@@ -392,6 +394,8 @@ public class CertificationExcelService : ICertificationExcelService
                         }
 
                         if (test.Step > status.HighestCompletedStep) status.HighestCompletedStep = test.Step;
+
+                        await NotifyJobUpdateAsync(jobId, status);
                     }
                     catch (Exception ex)
                     {
@@ -528,7 +532,7 @@ public class CertificationExcelService : ICertificationExcelService
                         Console.WriteLine($"[DEBUG-JOB] Step {test.Step} completed for {test.ENcf}. Status: {(finalResult.Success ? "Aceptado" : "Rechazado")}");
 
                         // Notify listeners via SignalR
-                        await _hubContext.Clients.Group($"cert-job:{jobId}").SendAsync("ReceiveJobUpdate", status);
+                        await NotifyJobUpdateAsync(jobId, status);
 
                         if (!finalResult.Success && (test.Step == 1 || test.Step == 2))
                         {
@@ -571,6 +575,11 @@ public class CertificationExcelService : ICertificationExcelService
         {
             status.Status = "Failed";
             status.ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            // Always push the terminal state (Completed/Failed) so listeners stop waiting.
+            await NotifyJobUpdateAsync(jobId, status);
         }
     }
 
@@ -673,7 +682,7 @@ public class CertificationExcelService : ICertificationExcelService
                     }
 
                     // Notify listeners via SignalR
-                    await _hubContext.Clients.Group($"cert-job:{jobId}").SendAsync("ReceiveJobUpdate", status);
+                    await NotifyJobUpdateAsync(jobId, status);
 
                     if (!result.Success)
                     {
@@ -699,6 +708,11 @@ public class CertificationExcelService : ICertificationExcelService
         {
             status.Status = "Failed";
             status.ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            // Always push the terminal state (Completed/Failed) so listeners stop waiting.
+            await NotifyJobUpdateAsync(jobId, status);
         }
     }
 
@@ -754,6 +768,19 @@ public class CertificationExcelService : ICertificationExcelService
         var fileName = $"{rnc}_signed.xml";
 
         return (signedBytes, fileName);
+    }
+
+    private async Task NotifyJobUpdateAsync(string jobId, CertificationJobStatusDto status)
+    {
+        try
+        {
+            await _hubContext.Clients.Group($"cert-job:{jobId}").SendAsync("ReceiveJobUpdate", status);
+        }
+        catch (Exception ex)
+        {
+            // Never let a notification failure break the certification flow.
+            Console.WriteLine($"[DEBUG-JOB] SignalR notify failed for job {jobId}: {ex.Message}");
+        }
     }
 
     private async Task<DgiiStatusResponse> PollDgiiStatusAsync(string trackId, string rnc)

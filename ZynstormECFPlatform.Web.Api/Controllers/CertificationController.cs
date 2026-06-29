@@ -323,7 +323,9 @@ public class CertificationController(
 
         if (stepResult != null)
         {
-            string jobDir = System.IO.Path.Combine(env.WebRootPath, "certification_files", $"suite_{jobId}");
+            // El job escribe los XML en certification_files/{jobId}/ (sin prefijo "suite_";
+            // ese prefijo solo aplica al .xlsx subido).
+            string jobDir = System.IO.Path.Combine(env.WebRootPath, "certification_files", jobId);
             string filePath = System.IO.Path.Combine(jobDir, stepResult.XmlFileName);
 
             if (System.IO.File.Exists(filePath))
