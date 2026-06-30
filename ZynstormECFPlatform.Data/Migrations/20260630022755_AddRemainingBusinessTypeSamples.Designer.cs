@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ZynstormECFPlatform.Data;
@@ -11,9 +12,11 @@ using ZynstormECFPlatform.Data;
 namespace ZynstormECFPlatform.Data.Migrations
 {
     [DbContext(typeof(StorageContext))]
-    partial class StorageContextModelSnapshot : ModelSnapshot
+    [Migration("20260630022755_AddRemainingBusinessTypeSamples")]
+    partial class AddRemainingBusinessTypeSamples
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -312,7 +315,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "98765432-1234-5678-90ab-cdef12345615",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}",
                             Name = "Comprobante de Compras",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -429,7 +432,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "98765432-1234-5678-90ab-cdef12345628",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"SERVICIO DE ENCUADERNACION\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"SERVICIO DE ENCUADERNACION\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}",
                             Name = "Librería - Comprobante de Compras",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -715,7 +718,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0002-000000000041",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}",
                             Name = "Farmacia - Tipo 41",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -845,7 +848,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0003-000000000041",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}",
                             Name = "Repuesto - Tipo 41",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -962,7 +965,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0004-000000000041",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}",
                             Name = "Taller de Mecánica - Tipo 41",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -1079,7 +1082,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0005-000000000041",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}",
                             Name = "Surtidora - Tipo 41",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -1196,7 +1199,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0007-000000000041",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}",
                             Name = "Tienda de pintura - Tipo 41",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -1313,7 +1316,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0008-000000000041",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}",
                             Name = "Boutique - Tipo 41",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -1430,7 +1433,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0009-000000000041",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}",
                             Name = "Colchoneria - Tipo 41",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -1547,7 +1550,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0010-000000000041",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}",
                             Name = "Restaurante - Tipo 41",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -1664,7 +1667,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0011-000000000041",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}",
                             Name = "Cafeteria - Tipo 41",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -1768,7 +1771,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0012-000000000041",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}",
                             Name = "Tienda de electrodomésticos - Tipo 41",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -1872,7 +1875,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0013-000000000041",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}",
                             Name = "Mueblería - Tipo 41",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },

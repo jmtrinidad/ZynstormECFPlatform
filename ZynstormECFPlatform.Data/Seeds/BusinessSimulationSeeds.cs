@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ZynstormECFPlatform.Core.Entities;
 
 namespace ZynstormECFPlatform.Data.Seeds;
@@ -61,10 +62,10 @@ public static class BusinessSimulationSeeds
             },
             new BusinessSimulationSample 
             { 
-                BusinessSimulationSampleId = 15, BusinessTypeId = 1, EcfType = "41", 
+                BusinessSimulationSampleId = 15, BusinessTypeId = 1, EcfType = "41",
                 Name = "Comprobante de Compras", Description = "Ejemplo validado para Tipo 41.",
                 GuidId = "98765432-1234-5678-90ab-cdef12345615", RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
-                JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}"
+                JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"COMISION VERIFON TARJETAS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}"
             },
             new BusinessSimulationSample 
             { 
@@ -100,6 +101,74 @@ public static class BusinessSimulationSeeds
                 Name = "Pagos Exterior", Description = "Ejemplo validado para Tipo 47.",
                 GuidId = "98765432-1234-5678-90ab-cdef12345620", RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
                 JsonData = "{\"ncf\":\"E470000000001\",\"customerForeignId\":\"533445888\",\"customerName\":\"ALEJA FERMIN SANTOS\",\"currencyTipoMoneda\":\"USD\",\"currencyTipoCambio\":60.0,\"items\":[{\"name\":\"SERVICIO PROFESIONAL EXTERIOR\",\"quantity\":1,\"unitPrice\":3000.0,\"billingIndicator\":4}]}"
+            },
+
+            // --- LIBRERÍAS (Full Certification Samples) ---
+            // Clonadas del set validado de Transporte (Tipo 1): se conservan RNC de
+            // comprador, montos, referencias y campos de exportación/moneda tal cual,
+            // solo se temátican los nombres de los ítems. El tipo 32 ya existe (Id 6).
+            new BusinessSimulationSample
+            {
+                BusinessSimulationSampleId = 25, BusinessTypeId = 6, EcfType = "31",
+                Name = "Librería - Factura de Crédito Fiscal", Description = "Ejemplo validado para Tipo 31.",
+                GuidId = "98765432-1234-5678-90ab-cdef12345625", RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"ncf\":\"E310000000001\",\"customerRnc\":\"130862346\",\"customerName\":\"IT SOLUCLICK SRL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"RESMA PAPEL BOND 8.5X11\",\"quantity\":1,\"unitPrice\":244.00,\"billingIndicator\":4}]}"
+            },
+            new BusinessSimulationSample
+            {
+                BusinessSimulationSampleId = 26, BusinessTypeId = 6, EcfType = "33",
+                Name = "Librería - Nota de Crédito", Description = "Ejemplo validado para Tipo 33.",
+                GuidId = "98765432-1234-5678-90ab-cdef12345626", RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"ncf\":\"E330000000001\",\"customerRnc\":\"131880657\",\"customerName\":\"CLIENTES DE LA ADMINISTRACION\",\"incomeType\":\"01\",\"paymentType\":1,\"referenceNcf\":\"E310000000002\",\"referenceReasonCode\":3,\"items\":[{\"name\":\"AJUSTE DEVOLUCION UTILES\",\"quantity\":1,\"unitPrice\":203898.31,\"billingIndicator\":4}]}"
+            },
+            new BusinessSimulationSample
+            {
+                BusinessSimulationSampleId = 27, BusinessTypeId = 6, EcfType = "34",
+                Name = "Librería - Nota de Débito", Description = "Ejemplo validado para Tipo 34.",
+                GuidId = "98765432-1234-5678-90ab-cdef12345627", RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"ncf\":\"E340000000001\",\"customerRnc\":\"131880657\",\"customerName\":\"CLIENTES DE LA ADMINISTRACION\",\"incomeType\":\"01\",\"paymentType\":2,\"referenceNcf\":\"E310000000002\",\"referenceReasonCode\":3,\"items\":[{\"name\":\"CARGO ADICIONAL PAPELERIA\",\"quantity\":5,\"unitPrice\":601.00,\"billingIndicator\":4}]}"
+            },
+            new BusinessSimulationSample
+            {
+                BusinessSimulationSampleId = 28, BusinessTypeId = 6, EcfType = "41",
+                Name = "Librería - Comprobante de Compras", Description = "Ejemplo validado para Tipo 41.",
+                GuidId = "98765432-1234-5678-90ab-cdef12345628", RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"SERVICIO DE ENCUADERNACION\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}"
+            },
+            new BusinessSimulationSample
+            {
+                BusinessSimulationSampleId = 29, BusinessTypeId = 6, EcfType = "43",
+                Name = "Librería - Gastos Menores", Description = "Ejemplo validado para Tipo 43.",
+                GuidId = "98765432-1234-5678-90ab-cdef12345629", RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"ncf\":\"E430000000001\",\"customerRnc\":\"\",\"customerName\":\"\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"REEMBOLSO CAJA CHICA PAPELERIA\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}"
+            },
+            new BusinessSimulationSample
+            {
+                BusinessSimulationSampleId = 30, BusinessTypeId = 6, EcfType = "44",
+                Name = "Librería - Regímenes Especiales", Description = "Ejemplo validado para Tipo 44.",
+                GuidId = "98765432-1234-5678-90ab-cdef12345630", RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"ncf\":\"E440000000001\",\"customerRnc\":\"131098843\",\"customerName\":\"ZONA FRANCA 6 DE NOVIEMBRE SRL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"LIBRO TEXTO EDUCATIVO\",\"quantity\":1,\"unitPrice\":29.50,\"billingIndicator\":4}]}"
+            },
+            new BusinessSimulationSample
+            {
+                BusinessSimulationSampleId = 31, BusinessTypeId = 6, EcfType = "45",
+                Name = "Librería - Gubernamental", Description = "Ejemplo validado para Tipo 45.",
+                GuidId = "98765432-1234-5678-90ab-cdef12345631", RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"ncf\":\"E450000000001\",\"customerRnc\":\"401506459\",\"customerName\":\"PLAN DE ASISTENCIA SOCIAL DE LA PRESIDENCIA\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"KIT UTILES ESCOLARES\",\"quantity\":1,\"unitPrice\":1197.00,\"billingIndicator\":4}]}"
+            },
+            new BusinessSimulationSample
+            {
+                BusinessSimulationSampleId = 32, BusinessTypeId = 6, EcfType = "46",
+                Name = "Librería - Exportación", Description = "Ejemplo validado para Tipo 46.",
+                GuidId = "98765432-1234-5678-90ab-cdef12345632", RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"ncf\":\"E460000000001\",\"customerRnc\":\"131880681\",\"customerName\":\"ZONA FRANCA LOI\",\"customerForeignId\":\"533445888\",\"customerCountry\":\"PUERTO RICO\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"LIBROS EDUCATIVOS EXPORTACION\",\"quantity\":100,\"unitPrice\":18000.00,\"billingIndicator\":3}],\"exportRegimenAduanero\":\"EXPORTACION NACIONAL\",\"transpViaTransporte\":\"02\",\"transpPaisDestino\":\"PUERTO RICO\"}"
+            },
+            new BusinessSimulationSample
+            {
+                BusinessSimulationSampleId = 33, BusinessTypeId = 6, EcfType = "47",
+                Name = "Librería - Pagos Exterior", Description = "Ejemplo validado para Tipo 47.",
+                GuidId = "98765432-1234-5678-90ab-cdef12345633", RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                JsonData = "{\"ncf\":\"E470000000001\",\"customerForeignId\":\"533445888\",\"customerName\":\"ALEJA FERMIN SANTOS\",\"currencyTipoMoneda\":\"USD\",\"currencyTipoCambio\":60.0,\"items\":[{\"name\":\"REGALIAS EDITORIALES EXTERIOR\",\"quantity\":1,\"unitPrice\":3000.0,\"billingIndicator\":4}]}"
             },
 
             // --- Other business types fallback samples ---
@@ -197,6 +266,45 @@ public static class BusinessSimulationSeeds
                 JsonData = "{\"ncf\":\"E320000000001\",\"customerRnc\":\"22400000000\",\"customerName\":\"CONSUMIDOR FINAL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"SOFA SECCIONAL EN TELA GRIS\",\"quantity\":1,\"unitPrice\":38000.00,\"billingIndicator\":1},{\"name\":\"CAMA QUEEN SIZE CON BASE\",\"quantity\":1,\"unitPrice\":22000.00,\"billingIndicator\":1}]}"
             }
         };
+
+        // Completar el set para TODOS los tipos de negocio reusando las plantillas
+        // validadas de Transporte (Tipo 1). Solo se agregan los tipos e-CF que falten
+        // para cada negocio (evita duplicar la clave EcfType, que rompería el
+        // ToDictionary del servicio de simulación). Datos deterministas para que
+        // no se generen migraciones espurias.
+        var requiredTypes = new[] { "31", "32", "33", "34", "41", "43", "44", "45", "46", "47" };
+        var templatesByType = samples
+            .Where(s => s.BusinessTypeId == 1)
+            .ToDictionary(s => s.EcfType, s => s.JsonData);
+        var existingPairs = samples
+            .Select(s => (s.BusinessTypeId, s.EcfType))
+            .ToHashSet();
+
+        var nextId = samples.Max(s => s.BusinessSimulationSampleId) + 1;
+
+        foreach (var businessType in businessTypes.Where(b => b.BusinessTypeId != 1))
+        {
+            foreach (var ecfType in requiredTypes)
+            {
+                if (existingPairs.Contains((businessType.BusinessTypeId, ecfType))) continue;
+                if (!templatesByType.TryGetValue(ecfType, out var json)) continue;
+
+                samples.Add(new BusinessSimulationSample
+                {
+                    BusinessSimulationSampleId = nextId,
+                    BusinessTypeId = businessType.BusinessTypeId,
+                    EcfType = ecfType,
+                    Name = $"{businessType.Name} - Tipo {ecfType}",
+                    Description = $"Muestra generada (plantilla validada) para Tipo {ecfType}.",
+                    // GuidId determinista y único por (negocio, tipo).
+                    GuidId = $"00000000-0000-0000-{businessType.BusinessTypeId:D4}-0000000000{ecfType}",
+                    RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z"),
+                    JsonData = json
+                });
+                existingPairs.Add((businessType.BusinessTypeId, ecfType));
+                nextId++;
+            }
+        }
 
         modelBuilder.Entity<BusinessSimulationSample>().HasData(samples);
     }

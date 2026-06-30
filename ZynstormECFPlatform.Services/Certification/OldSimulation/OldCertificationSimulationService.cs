@@ -228,6 +228,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
             var approvedXmls = new Dictionary<string, string>();
             var manualUploadXmls = new Dictionary<string, string>();
             var hasRejectedDocuments = false;
+            var stopRequested = false;
 
             // 1. PROCESS AUTOMATIC ITEMS (Non-manual)
             foreach (var item in matrix.Where(m => !m.IsManual))
@@ -305,7 +306,9 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
                     foreach (var itm in currentDto.Items)
                     {
-                        itm.ItemType ??= 1;
+                        // DGII acepta IndicadorBienoServicio = 2 (servicio) para todos los tipos
+                        // en certificación; el tipo 47 además lo exige obligatoriamente.
+                        itm.ItemType ??= 2;
                         itm.Description ??= itm.Name;
                         itm.UnitOfMeasure ??= 43;
                     }
@@ -326,6 +329,13 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                         currentDto.ReferenceIssueDate = reference.IssueDate;
                         currentDto.ReferenceReasonCode = 3;
                         currentDto.ReferenceReasonDescription = "Ajuste parcial de montos";
+
+                        // Las notas (33/34) NO llevan TerminoPago en IdDoc: el esquema XSD
+                        // solo admite FechaDesde/FechaHasta/TotalPaginas. Forzamos contado
+                        // y limpiamos los términos de pago que pudo traer la muestra.
+                        currentDto.PaymentType = 1;
+                        currentDto.PaymentDeadline = null;
+                        currentDto.PaymentTerms = null;
                     }
                     else
                     {
@@ -379,54 +389,92 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                     string xmlFileName = $"Paso_{status.CurrentStep}_{currentDto.Ncf}.xml";
                     decimal total = currentDto.ManualMontoTotal ?? CalculateTransmissionTotal(currentDto);
                     string resultMessage = "Error en transmision";
-
                     string signedIndividualXmlForPool = string.Empty;
 
-                    if (item.IsSummary)
+                    // Reintento por "secuencia ya utilizada": si DGII rechaza el eNCF por estar
+                    // duplicado, avanzamos la secuencia y reenviamos el MISMO comprobante.
+                    // Se intenta 3 veces en total (envío inicial + 2 reintentos). Si aún falla,
+                    // queda rechazado y el flujo se detiene notificando el error.
+                    const int MaxSequenceAttempts = 3;
+                    int sequenceAttempt = 1;
+                    bool retryWithNewSequence;
+
+                    do
                     {
-                        indDtoForPool = PrepareRfceIndividualDto(currentDto, signatureDate, certBase64, certPass);
-                        string indUnsignedXml = _generatorService.GenerateUnsignedXml(indDtoForPool, false);
-                        signedIndividualXmlForPool = _signerService.SignXml(indUnsignedXml, certBase64, certPass);
-                        securityCode = ExtractSecurityCodeFromSignature(signedIndividualXmlForPool);
-                        currentDto.SecurityCodeOverride = securityCode;
-                        indDtoForPool.SecurityCodeOverride = securityCode;
-                    }
+                        retryWithNewSequence = false;
+                        isAccepted = false;
+                        trackId = null;
+                        securityCode = string.Empty;
+                        signedIndividualXmlForPool = string.Empty;
+                        xmlFileName = $"Paso_{status.CurrentStep}_{currentDto.Ncf}.xml";
 
-                    string unsignedXml = _generatorService.GenerateUnsignedXml(currentDto, item.IsSummary);
-                    LogGeneratedXmlDiagnostics(jobId, status.CurrentStep, currentDto.Ncf, item.Type, xmlFileName, unsignedXml, item.IsSummary);
-                    signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
-
-                    if (string.IsNullOrWhiteSpace(securityCode))
-                    {
-                        securityCode = ExtractSecurityCodeFromSignature(signedXml);
-                    }
-
-                    var result = await _transmissionService.SendEcfAsync(DgiiEnvironment.CerteCF, token, signedXml, item.Type, total, dto.IssuerRnc, currentDto.Ncf, item.IsSummary);
-                    trackId = result.TrackId;
-
-                    if (result.Success)
-                    {
-                        if (!string.IsNullOrEmpty(result.TrackId))
+                        if (item.IsSummary)
                         {
-                            await Task.Delay(2000);
-                            var finalStatus = await PollDgiiStatusAsync(result.TrackId, dto.IssuerRnc);
-                            isAccepted = finalStatus.Estado == "Aceptado" || (item.IsSummary && finalStatus.Estado == "Generado");
-                            resultMessage = isAccepted ? $"TrackId: {trackId}" : BuildDgiiStatusError(finalStatus);
+                            indDtoForPool = PrepareRfceIndividualDto(currentDto, signatureDate, certBase64, certPass);
+                            string indUnsignedXml = _generatorService.GenerateUnsignedXml(indDtoForPool, false);
+                            signedIndividualXmlForPool = _signerService.SignXml(indUnsignedXml, certBase64, certPass);
+                            securityCode = ExtractSecurityCodeFromSignature(signedIndividualXmlForPool);
+                            currentDto.SecurityCodeOverride = securityCode;
+                            indDtoForPool.SecurityCodeOverride = securityCode;
+                        }
+
+                        string unsignedXml = _generatorService.GenerateUnsignedXml(currentDto, item.IsSummary);
+                        LogGeneratedXmlDiagnostics(jobId, status.CurrentStep, currentDto.Ncf, item.Type, xmlFileName, unsignedXml, item.IsSummary);
+                        signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
+
+                        if (string.IsNullOrWhiteSpace(securityCode))
+                        {
+                            securityCode = ExtractSecurityCodeFromSignature(signedXml);
+                        }
+
+                        // Validación XSD contra los esquemas de la DGII ANTES de enviar.
+                        // Un XML inválido por esquema no se resuelve reintentando: se detiene.
+                        var xsdErrors = _generatorService.ValidateXmlAgainstSchema(signedXml, item.Type);
+                        if (xsdErrors.Any(e => e.StartsWith("[ERROR]") || e.StartsWith("[XML malformado]")))
+                        {
+                            resultMessage = "El formato del XML no es válido (XSD): " + string.Join(" | ", xsdErrors);
+                            Console.WriteLine($"[Simulation] XSD inválido en paso {status.CurrentStep} ({currentDto.Ncf}): {resultMessage}");
+                            break;
+                        }
+
+                        var result = await _transmissionService.SendEcfAsync(DgiiEnvironment.CerteCF, token, signedXml, item.Type, total, dto.IssuerRnc, currentDto.Ncf, item.IsSummary);
+                        trackId = result.TrackId;
+
+                        if (result.Success)
+                        {
+                            if (!string.IsNullOrEmpty(result.TrackId))
+                            {
+                                await Task.Delay(2000);
+                                var finalStatus = await PollDgiiStatusAsync(result.TrackId, dto.IssuerRnc);
+                                isAccepted = finalStatus.Estado == "Aceptado" || (item.IsSummary && finalStatus.Estado == "Generado");
+                                resultMessage = isAccepted ? $"TrackId: {trackId}" : BuildDgiiStatusError(finalStatus);
+                            }
+                            else
+                            {
+                                isAccepted = string.Equals(result.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase)
+                                    || (item.IsSummary && string.Equals(result.Estado, "Generado", StringComparison.OrdinalIgnoreCase))
+                                    || result.Codigo is 0 or 1;
+                                resultMessage = isAccepted
+                                    ? $"DGII: {result.Estado ?? "Aceptado"}"
+                                    : BuildDgiiTransmissionError(result);
+                            }
                         }
                         else
                         {
-                            isAccepted = string.Equals(result.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase)
-                                || (item.IsSummary && string.Equals(result.Estado, "Generado", StringComparison.OrdinalIgnoreCase))
-                                || result.Codigo is 0 or 1;
-                            resultMessage = isAccepted
-                                ? $"DGII: {result.Estado ?? "Aceptado"}"
-                                : BuildDgiiTransmissionError(result);
+                            resultMessage = BuildDgiiTransmissionError(result);
+                        }
+
+                        // Secuencia ya utilizada -> avanzar secuencia y reenviar el mismo comprobante.
+                        if (!isAccepted && IsSequenceAlreadyUsed(resultMessage) && sequenceAttempt < MaxSequenceAttempts)
+                        {
+                            sequenceAttempt++;
+                            (encfRecord, reservedNcf) = await ReserveNextNcfAsync(client.ClientId, ecfTypeRecord!, item.Type);
+                            currentDto.Ncf = reservedNcf;
+                            Console.WriteLine($"[Simulation] Secuencia ya utilizada en paso {status.CurrentStep}; intento {sequenceAttempt}/{MaxSequenceAttempts} con nuevo eNCF {reservedNcf}.");
+                            retryWithNewSequence = true;
                         }
                     }
-                    else
-                    {
-                        resultMessage = BuildDgiiTransmissionError(result);
-                    }
+                    while (retryWithNewSequence);
 
                     if (isAccepted)
                     {
@@ -480,7 +528,17 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                     }
 
                     await NotifyUpdate(jobId, status);
+
+                    // Validar que fue aceptado para continuar: si se rechazó (XSD o DGII),
+                    // detenemos el proceso en vez de seguir enviando los demás comprobantes.
+                    if (!isAccepted)
+                    {
+                        stopRequested = true;
+                        break;
+                    }
                 }
+
+                if (stopRequested) break;
             }
 
             // 2. CREATE INTERMEDIATE ZIP (Ready for user to download while manual ones run)
@@ -493,6 +551,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
             // 3. PROCESS MANUAL ITEMS (Step 4 documents that must be uploaded manually)
             foreach (var item in matrix.Where(m => m.IsManual))
             {
+                if (stopRequested) break;
                 for (int i = 0; i < item.Count; i++)
                 {
                     status.CurrentStep++;
@@ -544,7 +603,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                     // PERSISTENCE: Save manual documents too
                     var ecfTypeRecordManual = await _ecfTypeService.GetByAsync(t => t.Code == item.Type.ToString());
                     var encfRecordManual = await _context.Set<ENcf>().FirstOrDefaultAsync(e => e.ClientId == client.ClientId && e.NcfTypeId == ecfTypeRecordManual!.EcfTypeId);
-                    
+
                     var certDocManual = new CertificationDocument
                     {
                         CertificationProcessId = process.CertificationProcessId,
@@ -644,7 +703,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
     public async Task<CertificationJobStatusDto> GetLastSimulationResultsByClientAsync(string clientGuidId)
     {
         var client = await _clientService.GetByAsync(c => c.GuidId == clientGuidId);
-        if (client == null) 
+        if (client == null)
         {
             Console.WriteLine($"[Simulation] Client not found: {clientGuidId}");
             return new CertificationJobStatusDto { Status = "NotFound" };
@@ -662,7 +721,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
         Console.WriteLine($"[Simulation] Found {processes.Count} processes for client.");
 
         var process = processes.FirstOrDefault(p => p.CertificationDocuments.Any());
-        
+
         if (process == null)
         {
             Console.WriteLine("[Simulation] No process found with documents.");
@@ -674,7 +733,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
         var completedSteps = new List<CertificationStepResultDto>();
         foreach (var d in process.CertificationDocuments)
         {
-            try 
+            try
             {
                 var doc = XDocument.Parse(d.XmlSent);
                 var total = GetDecimal(doc, "Encabezado", "Totales", "MontoTotal") ?? 0m;
@@ -902,6 +961,8 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
         foreach (var item in dto.Items)
         {
+            // Tipo 47 (Pagos al Exterior): DGII solo permite IndicadorBienoServicio = 2 (servicio).
+            item.ItemType = 2;
             item.BillingIndicator = 4;
             item.TaxPercentage = 0;
             item.ItbisAmount = 0;
@@ -977,6 +1038,14 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
         return error.Contains("ya ha sido utilizado") || error.Contains("1701");
     }
 
+    // Detecta el rechazo de DGII por eNCF duplicado ("Este número de secuencia ya ha sido utilizado").
+    private static bool IsSequenceAlreadyUsed(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message)) return false;
+        var m = message.ToLowerInvariant();
+        return m.Contains("secuencia") && m.Contains("utilizad");
+    }
+
     private string BuildDgiiStatusError(DgiiStatusResponse status)
     {
         if (status.Mensajes == null || !status.Mensajes.Any()) return $"DGII: {status.Estado}";
@@ -1012,11 +1081,53 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
     private async Task<(ENcf Record, string Ncf)> ReserveNextNcfAsync(int clientId, EcfTypeEntity type, int typeCode, int jump = 0)
     {
+        const int MinSequence = 1;
+        const int MaxSequence = 10_000_000;
+
         var encf = await _context.Set<ENcf>()
-            .FirstOrDefaultAsync(e => e.ClientId == clientId && e.NcfTypeId == type.EcfTypeId)
-            ?? throw new Exception($"No hay secuencias e-NCF configuradas para el tipo {typeCode}.");
+            .FirstOrDefaultAsync(e => e.ClientId == clientId && e.NcfTypeId == type.EcfTypeId);
+
+        // Si el cliente no tiene secuencia configurada para este tipo, la creamos
+        // iniciando desde 1 en vez de fallar. Los comprobantes van de 1 a 10,000,000.
+        if (encf == null)
+        {
+            encf = new ENcf
+            {
+                ClientId = clientId,
+                NcfTypeId = type.EcfTypeId,
+                Sequence = MinSequence,
+                GuidId = Guid.NewGuid().ToString(),
+                RegisteredAt = DateTimeExtensions.DrNow
+            };
+            await _context.Set<ENcf>().AddAsync(encf);
+        }
 
         if (jump > 0) encf.Sequence += jump;
+
+        // Nunca reutilizar un eNCF: la secuencia siempre arranca por encima del mayor
+        // número ya registrado para este cliente y tipo (incluye los consumidos por otros
+        // flujos como el de Excel). Cada comprobante enviado quema su número de forma durable.
+        var prefix = $"E{typeCode}";
+        var usedSequences = await (
+            from d in _context.Set<CertificationDocument>()
+            join p in _context.Set<CertificationProcess>() on d.CertificationProcessId equals p.CertificationProcessId
+            where p.ClientId == clientId && d.ENcfSecuence.StartsWith(prefix)
+            select d.ENcfSecuence
+        ).ToListAsync();
+
+        long maxUsed = 0;
+        foreach (var s in usedSequences)
+        {
+            if (!string.IsNullOrEmpty(s) && s.Length > prefix.Length
+                && long.TryParse(s.Substring(prefix.Length), out var n))
+                maxUsed = Math.Max(maxUsed, n);
+        }
+        if (encf.Sequence <= maxUsed) encf.Sequence = (int)(maxUsed + 1);
+
+        // Normalizar al rango válido [1, 10,000,000].
+        if (encf.Sequence < MinSequence) encf.Sequence = MinSequence;
+        if (encf.Sequence > MaxSequence)
+            throw new Exception($"Se agotó la secuencia e-NCF para el tipo {typeCode} (máximo {MaxSequence}).");
 
         string ncf = $"E{typeCode}{encf.Sequence.ToString().PadLeft(10, '0')}";
         encf.Sequence++;
@@ -1058,7 +1169,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                 Discount = 0,
                 TaxPercentage = 18,
                 ItbisAmount = itbisAmount,
-                ItemType = sourceItem?.ItemType ?? 1,
+                ItemType = sourceItem?.ItemType ?? 2,
                 UnitOfMeasure = sourceItem?.UnitOfMeasure ?? 43,
                 BillingIndicator = 1,
                 ManualMontoItem = taxableAmount

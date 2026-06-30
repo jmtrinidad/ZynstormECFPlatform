@@ -603,9 +603,13 @@ public class CertificationExcelService : ICertificationExcelService
 
         foreach (var row in rows)
         {
+            // Usar la MISMA fuente de NCF que el procesamiento (MapRowToAcecfRequest)
+            // para que la entrada "Pendiente" inicial coincida con la entrada de
+            // resultado que se agrega luego. Igual que en el flujo de ECF (Paso 2).
+            var encf = _mappingService.MapRowToAcecfRequest(row).ENcf;
             status.CompletedSteps.Add(new CertificationStepResultDto
             {
-                Ncf = GetStr(row, "ENCF") ?? GetStr(row, "eNCF") ?? "N/A",
+                Ncf = string.IsNullOrWhiteSpace(encf) ? "N/A" : encf,
                 Step = "3",
                 Status = "Pendiente",
                 Message = "Esperando procesamiento..."
@@ -669,16 +673,18 @@ public class CertificationExcelService : ICertificationExcelService
 
                     Console.WriteLine($"[DEBUG-AC] Sent AC for {requestDto.ENcf}. Success: {result.Success}");
 
+                    // Agregar una entrada de resultado nueva (no mutar la "Pendiente" en sitio),
+                    // igual que el flujo de ECF (Paso 2). El frontend toma la última coincidencia
+                    // por NCF, por lo que reflejará el estado real (Aceptado/Rechazado) en vivo.
                     lock (status.CompletedSteps)
                     {
-                        var stepResult = status.CompletedSteps.FirstOrDefault(s => s.Ncf == requestDto.ENcf)
-                                        ?? new CertificationStepResultDto { Ncf = requestDto.ENcf };
-
-                        stepResult.Status = result.Success ? "Aceptado" : "Rechazado";
-                        stepResult.Message = result.Success ? "Aprobación Comercial exitosa" : result.Error;
-                        stepResult.Step = "3";
-
-                        if (!status.CompletedSteps.Contains(stepResult)) status.CompletedSteps.Add(stepResult);
+                        status.CompletedSteps.Add(new CertificationStepResultDto
+                        {
+                            Ncf = requestDto.ENcf,
+                            Step = "3",
+                            Status = result.Success ? "Aceptado" : "Rechazado",
+                            Message = result.Success ? "Aprobación Comercial exitosa" : result.Error
+                        });
                     }
 
                     // Notify listeners via SignalR

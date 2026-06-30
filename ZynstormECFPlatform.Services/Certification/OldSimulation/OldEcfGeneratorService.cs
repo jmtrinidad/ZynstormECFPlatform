@@ -404,8 +404,11 @@ public class OldEcfGeneratorService : IOldEcfGeneratorService
             MontoTotal = dto.ManualMontoTotal ?? finalTotal,
             MontoPeriodo = dto.ManualMontoPeriodo,
             ValorPagar = dto.ManualValorPagar,
-            TotalITBISRetenido = dto.ManualTotalITBISRetenido,
-            TotalISRRetencion = dto.ManualTotalISRRetencion
+            // Los tipos 41 y 47 (compras / pagos al exterior) deben emitir los totales de
+            // retención aunque sean 0.00 (DGII los rechaza si están ausentes mientras el ítem
+            // declara una Retencion). El ShouldSerialize del modelo excluye los tipos no aplicables.
+            TotalITBISRetenido = dto.ManualTotalITBISRetenido ?? (ecfType == 41 ? 0m : null),
+            TotalISRRetencion = dto.ManualTotalISRRetencion ?? (ecfType is 41 or 47 ? 0m : null)
         };
 
         int? derivedIndicador = null;
