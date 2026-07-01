@@ -26,7 +26,8 @@ public class CertificationController(
     IWebHostEnvironment env,
     IClientService clientService,
     ICertificationProcessService certificationProcessService,
-    ICertificationDocumentService documentService) : ControllerBase
+    ICertificationDocumentService documentService,
+    ICertificationRiModelService riModelService) : ControllerBase
 {
     [HttpGet("clients/{clientGuidId}/progress")]
     public async Task<ActionResult<ClientCertificationProgressDto>> GetClientProgress(string clientGuidId, CancellationToken cancellationToken)
@@ -449,6 +450,168 @@ public class CertificationController(
         {
             var (content, fileName) = await excelService.SignXmlAsync(xmlFile.OpenReadStream(), rnc);
             return File(content, "application/xml", fileName);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("print-templates")]
+    public async Task<ActionResult> UploadRiModel([FromForm] IFormFile pdfFile, [FromForm] string clientGuidId,
+        [FromForm] string name, [FromForm] List<string> ecfTypeCodes)
+    {
+        if (pdfFile == null || pdfFile.Length == 0)
+            return BadRequest("Debe proporcionar un archivo PDF.");
+
+        if (pdfFile.ContentType != "application/pdf")
+            return BadRequest("El archivo debe ser PDF.");
+
+        try
+        {
+            using var ms = new MemoryStream();
+            await pdfFile.CopyToAsync(ms);
+            var dto = await riModelService.UploadAsync(clientGuidId, name, ecfTypeCodes, ms.ToArray(), pdfFile.FileName);
+            return Ok(dto);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpGet("print-templates/{clientGuidId}")]
+    public async Task<ActionResult> ListRiModels(string clientGuidId)
+    {
+        try
+        {
+            return Ok(await riModelService.ListByClientAsync(clientGuidId));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpGet("print-templates/{templateGuidId}/preview")]
+    public async Task<ActionResult> PreviewRiModel(string templateGuidId)
+    {
+        try
+        {
+            var bytes = await riModelService.GetReferenceRiAsync(templateGuidId);
+            return bytes is null ? NotFound() : File(bytes, "application/pdf");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPut("print-templates/{templateGuidId}")]
+    public async Task<ActionResult> UpdateRiModel(string templateGuidId, [FromForm] string? name,
+        [FromForm] List<string>? ecfTypeCodes, [FromForm] bool? confirm, [FromForm] IFormFile? pdfFile)
+    {
+        try
+        {
+            byte[]? src = null;
+            string? fn = null;
+            if (pdfFile is not null)
+            {
+                using var ms = new MemoryStream();
+                await pdfFile.CopyToAsync(ms);
+                src = ms.ToArray();
+                fn = pdfFile.FileName;
+            }
+
+            return Ok(await riModelService.UpdateAsync(templateGuidId, name, ecfTypeCodes, confirm, src, fn));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpDelete("print-templates/{templateGuidId}")]
+    public async Task<ActionResult> DeleteRiModel(string templateGuidId)
+    {
+        try
+        {
+            await riModelService.DeleteAsync(templateGuidId);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpGet("ri/{clientGuidId}/{ncf}/preview")]
+    public async Task<ActionResult> PreviewRi(string clientGuidId, string ncf)
+    {
+        try
+        {
+            var bytes = await riModelService.RenderRiForDocumentAsync(clientGuidId, ncf);
+            return File(bytes, "application/pdf");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpGet("ri/{clientGuidId}/{ncf}/download")]
+    public async Task<ActionResult> DownloadRi(string clientGuidId, string ncf)
+    {
+        try
+        {
+            var bytes = await riModelService.RenderRiForDocumentAsync(clientGuidId, ncf);
+            return File(bytes, "application/pdf", $"RI_{ncf}.pdf");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpGet("ri/{clientGuidId}/zip")]
+    public async Task<ActionResult> DownloadRiZip(string clientGuidId)
+    {
+        try
+        {
+            var bytes = await riModelService.RenderAllZipAsync(clientGuidId, env.WebRootPath);
+            return File(bytes, "application/zip", $"RI_{clientGuidId}.zip");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
