@@ -8,7 +8,7 @@ public partial class EcfType : BaseEntity
 
     public string Name { get; set; } = null!;
 
-    public virtual ICollection<CertificationInvoicePrintTemplate> CertificationInvoicePrintTemplates { get; set; } = [];
+    public virtual ICollection<CertificationInvoicePrintTemplateEcfType> CertificationInvoicePrintTemplates { get; set; } = [];
 
     public virtual ICollection<EcfDocument> EcfDocuments { get; set; } = [];
 

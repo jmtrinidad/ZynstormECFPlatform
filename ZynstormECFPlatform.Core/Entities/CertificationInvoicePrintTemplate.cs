@@ -1,33 +1,27 @@
-﻿namespace ZynstormECFPlatform.Core.Entities;
+namespace ZynstormECFPlatform.Core.Entities;
 
 public class CertificationInvoicePrintTemplate : BaseEntity
 {
     public int CertificationInvoicePrintTemplateId { get; set; }
 
-    // Identificación
     public string Name { get; set; } = null!;
-
     public string? Description { get; set; }
 
-    // Relación lógica
     public int ClientId { get; set; }
 
-    public int EcfTypeId { get; set; }
-
-    // Archivo (elige UNA estrategia principal)
-
-    // Opción A: Guardar en base de datos
+    // RI de referencia generada (PDF). El PDF fuente NO se persiste.
     public byte[]? FileData { get; set; }
-
-    // Opción B: Guardar en filesystem / cloud
-    public string? FileUrl { get; set; }
-
-    // Metadata del archivo
     public string FileName { get; set; } = null!;
-
     public string ContentType { get; set; } = "application/pdf";
 
-    public virtual Client Client { get; set; } = null!;
+    // Descriptor de layout extraído (JSON) — se usa para renderizar cada RI.
+    public string? LayoutJson { get; set; }
 
-    public virtual EcfType EcfType { get; set; } = null!;
+    public CertificationRiTemplateStatus Status { get; set; } = CertificationRiTemplateStatus.PendingExtraction;
+
+    // Lista JSON de anclas no encontradas / avisos de extracción.
+    public string? ExtractionWarnings { get; set; }
+
+    public virtual Client Client { get; set; } = null!;
+    public virtual ICollection<CertificationInvoicePrintTemplateEcfType> EcfTypes { get; set; } = [];
 }
