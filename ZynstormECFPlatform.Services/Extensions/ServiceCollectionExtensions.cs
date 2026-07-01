@@ -46,6 +46,9 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Certification.OldSimulation.IOldEcfGeneratorService, Certification.OldSimulation.OldEcfGeneratorService>();
         services.AddTransient<Certification.OldSimulation.IOldCertificationSimulationService, Certification.OldSimulation.OldCertificationSimulationService>();
 
+        // --- Certification: Representación Impresa (RI) ---
+        services.AddTransient<ICertificationRiModelService, Ri.CertificationRiModelService>();
+
         // --- Production ---
         services.AddTransient<IEcfProductionGeneratorService, Production.EcfProductionGeneratorService>();
         services.AddTransient<IEcfProductionService, Production.EcfProductionService>();
