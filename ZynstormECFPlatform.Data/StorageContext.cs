@@ -170,6 +170,8 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             .HavePrecision(18, 2);
     }
 
+    public DbSet<CertificationInvoicePrintTemplateEcfType> CertificationInvoicePrintTemplateEcfTypes { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -1595,51 +1597,19 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
         modelBuilder.Entity<CertificationInvoicePrintTemplate>(entity =>
         {
             entity.HasKey(c => c.CertificationInvoicePrintTemplateId);
+            entity.Property(e => e.Name).HasMaxLength(100).IsUnicode(false).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(250).IsUnicode(false);
+            entity.Property(e => e.FileName).HasMaxLength(100).IsUnicode(false).IsRequired();
+            entity.Property(e => e.ContentType).HasMaxLength(50).IsUnicode(false).HasDefaultValue("application/pdf").IsRequired();
+            entity.Property(e => e.LayoutJson);            // nvarchar(max)
+            entity.Property(e => e.ExtractionWarnings);    // nvarchar(max)
+            entity.Property(e => e.Status).HasConversion<int>().HasDefaultValue(CertificationRiTemplateStatus.PendingExtraction);
 
-            entity.Property(e => e.Name)
-                  .HasMaxLength(100)
-                  .IsUnicode(false)
-                  .IsRequired();
-
-            entity.Property(e => e.Description)
-                  .HasMaxLength(250)
-                  .IsUnicode(false);
-
-            entity.Property(e => e.FileUrl)
-                  .HasMaxLength(500)
-                  .IsUnicode(false);
-
-            entity.Property(e => e.FileName)
-                  .HasMaxLength(100)
-                  .IsUnicode(false)
-                  .IsRequired();
-
-            entity.Property(e => e.ContentType)
-                  .HasMaxLength(50)
-                  .IsUnicode(false)
-                  .HasDefaultValue("application/pdf")
-                  .IsRequired();
-
-            entity.Property(c => c.RegisteredAt)
-                  .HasColumnType(DateTimeColumnType)
-                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
-
-            entity.Property(c => c.LastUpdateUtc)
-                  .HasColumnType(DateTimeColumnType);
-
-            entity.Property(c => c.DeletedTimeUtc)
-                  .HasColumnType(DateTimeColumnType);
-
-            entity.Property(e => e.IsDeleted)
-                  .HasDefaultValue(false)
-                  .IsRequired();
-
-            entity.Property(e => e.GuidId)
-                  .IsRequired()
-                  .HasMaxLength(450)
-                  .IsUnicode(false)
-                  .HasDefaultValueSql(DefaultGUIDSqlValue);
-
+            entity.Property(c => c.RegisteredAt).HasColumnType(DateTimeColumnType).HasDefaultValueSql(DefaultDateTimeSqlValue);
+            entity.Property(c => c.LastUpdateUtc).HasColumnType(DateTimeColumnType);
+            entity.Property(c => c.DeletedTimeUtc).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false).IsRequired();
+            entity.Property(e => e.GuidId).IsRequired().HasMaxLength(450).IsUnicode(false).HasDefaultValueSql(DefaultGUIDSqlValue);
             entity.HasQueryFilter(c => !c.IsDeleted);
 
             entity.HasOne(d => d.Client)
@@ -1647,12 +1617,20 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasForeignKey(d => d.ClientId)
                   .OnDelete(DeleteBehavior.ClientSetNull)
                   .HasConstraintName("FK_CertificationInvoicePrintTemplate_Client");
+        });
 
+        modelBuilder.Entity<CertificationInvoicePrintTemplateEcfType>(entity =>
+        {
+            entity.HasKey(c => c.CertificationInvoicePrintTemplateEcfTypeId);
+            entity.HasIndex(c => new { c.CertificationInvoicePrintTemplateId, c.EcfTypeId }).IsUnique();
+            entity.HasOne(d => d.Template)
+                  .WithMany(p => p.EcfTypes)
+                  .HasForeignKey(d => d.CertificationInvoicePrintTemplateId)
+                  .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(d => d.EcfType)
                   .WithMany(p => p.CertificationInvoicePrintTemplates)
                   .HasForeignKey(d => d.EcfTypeId)
-                  .OnDelete(DeleteBehavior.ClientSetNull)
-                  .HasConstraintName("FK_CertificationInvoicePrintTemplate_EcfType");
+                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ENcf>(entity =>
