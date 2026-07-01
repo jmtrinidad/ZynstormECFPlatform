@@ -1021,6 +1021,19 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
     private static string ExtractSecurityCodeFromSignature(string signedXml)
     {
+        if (string.IsNullOrEmpty(signedXml)) return string.Empty;
+
+        // RFCE (Resumen Factura Consumo, tipo 32 < 250k): la DGII registra el
+        // <CodigoSeguridadeCF> embebido en el resumen, que NO coincide con los
+        // primeros 6 del SignatureValue del propio resumen. Hay que priorizarlo igual
+        // que en producción (ReceivedEcfProductionService.ExtractSecurityCode); de lo
+        // contrario, al recargar desde BD el QR del RFCE muestra un código distinto al
+        // registrado y el portal FC (ConsultaTimbreFC) responde "No fue encontrada la
+        // factura". Para los demás tipos el elemento no existe y se usa el SignatureValue.
+        var codigoSeguridadeCf = ExtractElementValue(signedXml, "CodigoSeguridadeCF");
+        if (!string.IsNullOrWhiteSpace(codigoSeguridadeCf))
+            return codigoSeguridadeCf.Trim();
+
         const string tag = "<SignatureValue>";
         int start = signedXml.IndexOf(tag, StringComparison.Ordinal);
         if (start == -1) return string.Empty;
@@ -1030,6 +1043,17 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
         var content = signedXml[(start + tag.Length)..]
             .Replace("\n", "").Replace("\r", "").Replace(" ", "").Trim();
         return content.Length >= 6 ? content[..6] : string.Empty;
+    }
+
+    private static string ExtractElementValue(string xml, string localName)
+    {
+        var open = $"<{localName}>";
+        var close = $"</{localName}>";
+        int start = xml.IndexOf(open, StringComparison.Ordinal);
+        if (start == -1) return string.Empty;
+        start += open.Length;
+        int end = xml.IndexOf(close, start, StringComparison.Ordinal);
+        return end == -1 ? string.Empty : xml[start..end];
     }
 
     private bool IsDuplicateSequenceError(string? error)
