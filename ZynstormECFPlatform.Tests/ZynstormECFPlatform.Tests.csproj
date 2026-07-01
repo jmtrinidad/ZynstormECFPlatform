@@ -24,4 +24,10 @@
     <ProjectReference Include="..\ZynstormECFPlatform.Services\ZynstormECFPlatform.Services.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Ri\Fixtures\**\*.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>
