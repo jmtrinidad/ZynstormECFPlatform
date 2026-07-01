@@ -20,6 +20,9 @@ public class EcfRiDataMapperTests
         Assert.Equal("QuGoOA", data.SecurityCode);
         Assert.Contains("fc.dgii.gov.do/CerteCF/ConsultaTimbreFC", data.QrUrl);
         Assert.Contains($"CodigoSeguridad={data.SecurityCode}", data.QrUrl);
+        // I1: MontoTotal must be populated (drives the FC-portal decision and the QR amount).
+        Assert.Equal(6029.00m, data.Totals.Total);
+        Assert.Contains("MontoTotal=6029", data.QrUrl);
     }
 
     [Fact]

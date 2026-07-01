@@ -193,7 +193,7 @@ public static class RiPdfRenderer
         foreach (var row in totalRows)
         {
             var value = TotalFieldValue(data.Totals, row.Field);
-            var isTotal = string.Equals(row.Field, "Total", StringComparison.OrdinalIgnoreCase);
+            var isTotal = string.Equals(row.Field, "total", StringComparison.OrdinalIgnoreCase);
             TotalRowItem(col, string.IsNullOrWhiteSpace(row.Label) ? row.Field.ToUpperInvariant() + ":" : row.Label, value, isTotal);
         }
     }
@@ -219,50 +219,53 @@ public static class RiPdfRenderer
         return qrCode.GetGraphic(10);
     }
 
+    // Field keys are the lowercase-Spanish vocabulary emitted by RiModelExtractor
+    // (descripcion/cantidad/precio/itbis/valor; subtotal/itbis/total). Match
+    // case-insensitively so both extracted layouts and the defaults below agree.
     private static List<ItemColumn> DefaultItemColumns() =>
     [
-        new ItemColumn { Field = "Description", Align = "left" },
-        new ItemColumn { Field = "Quantity", Align = "right" },
-        new ItemColumn { Field = "Price", Align = "right" },
-        new ItemColumn { Field = "Itbis", Align = "right" },
-        new ItemColumn { Field = "Amount", Align = "right" }
+        new ItemColumn { Field = "descripcion", Align = "left" },
+        new ItemColumn { Field = "cantidad", Align = "right" },
+        new ItemColumn { Field = "precio", Align = "right" },
+        new ItemColumn { Field = "itbis", Align = "right" },
+        new ItemColumn { Field = "valor", Align = "right" }
     ];
 
     private static List<TotalRow> DefaultTotalRows() =>
     [
-        new TotalRow { Field = "SubTotal", Label = "SUBTOTAL:" },
-        new TotalRow { Field = "Itbis", Label = "ITBIS:" },
-        new TotalRow { Field = "Exento", Label = "EXENTO:" },
-        new TotalRow { Field = "Total", Label = "TOTAL:" }
+        new TotalRow { Field = "subtotal", Label = "SUBTOTAL:" },
+        new TotalRow { Field = "itbis", Label = "ITBIS:" },
+        new TotalRow { Field = "exento", Label = "EXENTO:" },
+        new TotalRow { Field = "total", Label = "TOTAL:" }
     ];
 
-    private static string ColumnLabel(string field) => field switch
+    private static string ColumnLabel(string field) => (field ?? string.Empty).ToLowerInvariant() switch
     {
-        "Description" => "DESCRIPCIÓN",
-        "Quantity" => "CANT.",
-        "Price" => "PRECIO",
-        "Itbis" => "ITBIS",
-        "Amount" => "VALOR",
-        _ => field.ToUpperInvariant()
+        "descripcion" => "DESCRIPCIÓN",
+        "cantidad" => "CANT.",
+        "precio" => "PRECIO",
+        "itbis" => "ITBIS",
+        "valor" or "importe" => "VALOR",
+        _ => (field ?? string.Empty).ToUpperInvariant()
     };
 
-    private static string ItemFieldValue(RiItem item, string field) => field switch
+    private static string ItemFieldValue(RiItem item, string field) => (field ?? string.Empty).ToLowerInvariant() switch
     {
-        "Description" => item.Description,
-        "Quantity" => item.Quantity.ToString("0.##", CultureInfo.InvariantCulture),
-        "Price" => Money(item.Price),
-        "Itbis" => Money(item.Itbis),
-        "Amount" => Money(item.Amount),
+        "descripcion" => item.Description,
+        "cantidad" => item.Quantity.ToString("0.##", CultureInfo.InvariantCulture),
+        "precio" => Money(item.Price),
+        "itbis" => Money(item.Itbis),
+        "valor" or "importe" => Money(item.Amount),
         _ => string.Empty
     };
 
-    private static decimal TotalFieldValue(RiTotals totals, string field) => field switch
+    private static decimal TotalFieldValue(RiTotals totals, string field) => (field ?? string.Empty).ToLowerInvariant() switch
     {
-        "SubTotal" => totals.SubTotal,
-        "Itbis" => totals.Itbis,
-        "Exento" => totals.Exento,
-        "Gravado" => totals.Gravado,
-        "Total" => totals.Total,
+        "subtotal" => totals.SubTotal,
+        "itbis" => totals.Itbis,
+        "exento" => totals.Exento,
+        "gravado" => totals.Gravado,
+        "total" => totals.Total,
         _ => 0m
     };
 

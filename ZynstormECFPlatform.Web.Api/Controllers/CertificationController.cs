@@ -458,6 +458,7 @@ public class CertificationController(
     }
 
     [HttpPost("print-templates")]
+    [RequestSizeLimit(10_000_000)]
     public async Task<ActionResult> UploadRiModel([FromForm] IFormFile pdfFile, [FromForm] string clientGuidId,
         [FromForm] string name, [FromForm] List<string> ecfTypeCodes)
     {
@@ -520,6 +521,7 @@ public class CertificationController(
     }
 
     [HttpPut("print-templates/{templateGuidId}")]
+    [RequestSizeLimit(10_000_000)]
     public async Task<ActionResult> UpdateRiModel(string templateGuidId, [FromForm] string? name,
         [FromForm] List<string>? ecfTypeCodes, [FromForm] bool? confirm, [FromForm] IFormFile? pdfFile)
     {
