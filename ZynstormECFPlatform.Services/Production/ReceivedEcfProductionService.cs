@@ -838,51 +838,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         decimal montoTotal,
         string fechaFirma,
         string securityCode)
-    {
-        var rncEmisor = OnlyDigits(rncEmisorRaw);
-        var rncComprador = OnlyDigits(rncCompradorRaw);
-        var fechaEmisionUrl = !string.IsNullOrWhiteSpace(fechaEmision)
-            ? fechaEmision.Split(' ')[0].Replace("/", "-")
-            : DateTime.Now.ToString("dd-MM-yyyy");
-        var fechaFirmaUrl = (!string.IsNullOrWhiteSpace(fechaFirma)
-            ? fechaFirma.Replace("/", "-")
-            : DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss")).Replace(" ", "%20");
-        var montoTotalUrl = montoTotal.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-
-        // E32 (Factura de Consumo) con monto menor a 250K usa el portal FC
-        // URLs:
-        //   Test:       https://fc.dgii.gov.do/testecf/ConsultaTimbreFC
-        //   CerteCF:    https://fc.dgii.gov.do/CerteCF/ConsultaTimbreFC
-        //   Production: https://fc.dgii.gov.do/ecf/ConsultaTimbreFC
-        if (ecfType == 32 && montoTotal < 250000m)
-        {
-            string fcBase = environment == DgiiEnvironment.Production
-                ? "https://fc.dgii.gov.do/ecf"
-                : environment == DgiiEnvironment.Test
-                    ? "https://fc.dgii.gov.do/testecf"
-                    : "https://fc.dgii.gov.do/CerteCF";
-
-            return $"{fcBase}/ConsultaTimbreFC?RncEmisor={rncEmisor}&ENCF={encf}&MontoTotal={montoTotalUrl}&CodigoSeguridad={Uri.EscapeDataString(securityCode)}";
-        }
-
-        // Base URL segun ambiente para ConsultaTimbre (todos los demas tipos de e-CF)
-        // URLs:
-        //   Test:       https://ecf.dgii.gov.do/TesteCF/ConsultaTimbre
-        //   CerteCF:    https://ecf.dgii.gov.do/CerteCF/ConsultaTimbre
-        //   Production: https://ecf.dgii.gov.do/ecf/ConsultaTimbre
-        string baseUrl = environment == DgiiEnvironment.Production
-            ? "https://ecf.dgii.gov.do/ecf"
-            : environment == DgiiEnvironment.Test
-                ? "https://ecf.dgii.gov.do/TesteCF"
-                : "https://ecf.dgii.gov.do/CerteCF";
-
-        if (string.IsNullOrEmpty(rncComprador))
-        {
-            return $"{baseUrl}/ConsultaTimbre?RncEmisor={rncEmisor}&ENCF={encf}&FechaEmision={fechaEmisionUrl}&MontoTotal={montoTotalUrl}&FechaFirma={fechaFirmaUrl}&CodigoSeguridad={Uri.EscapeDataString(securityCode)}";
-        }
-
-        return $"{baseUrl}/ConsultaTimbre?RncEmisor={rncEmisor}&RncComprador={rncComprador}&ENCF={encf}&FechaEmision={fechaEmisionUrl}&MontoTotal={montoTotalUrl}&FechaFirma={fechaFirmaUrl}&CodigoSeguridad={Uri.EscapeDataString(securityCode)}";
-    }
+        => ZynstormECFPlatform.Core.Ecf.EcfQrUrlBuilder.Build(
+            environment, ecfType, rncEmisorRaw, rncCompradorRaw, encf, fechaEmision, montoTotal, fechaFirma, securityCode);
 
     private static string GetEcfTypeName(int ecfType)
     {
