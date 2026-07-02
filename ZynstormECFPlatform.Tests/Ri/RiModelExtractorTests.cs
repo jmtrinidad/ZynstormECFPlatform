@@ -14,16 +14,31 @@ public class RiModelExtractorTests
     }
 
     [Fact]
-    public void KnownFormat_DetectsColumnsAndFieldSlots()
+    public void KnownFormat_ClassifiesStaticVsDynamicAndDetectsColumnsAndFields()
     {
         var pdfBytes = BuildKnownFormatPdf();
 
         var result = RiModelExtractor.Extract(pdfBytes);
 
         Assert.True(result.Success);
-        Assert.NotNull(result.Layout);
-        Assert.True(result.Layout!.Items.Columns.Count >= 3);
-        Assert.Contains("eNCF", result.Layout.FieldSlots.Keys);
+        Assert.NotNull(result.Page);
+
+        var page = result.Page!;
+
+        var staticTexts = page.StaticRuns.Select(r => r.Text.ToUpperInvariant()).ToList();
+        Assert.Contains(staticTexts, t => t.Contains("SUB-TOTAL"));
+        Assert.Contains(staticTexts, t => t.Contains("DESCRIPCI"));
+
+        var fieldKeys = page.Fields.Select(f => f.FieldKey).ToList();
+        Assert.Contains("eNCF", fieldKeys);
+        Assert.Contains("total", fieldKeys);
+
+        Assert.True(page.Items.Columns.Count >= 2);
+        Assert.Contains(page.Items.Columns, c => string.Equals(c.Field, "importe", StringComparison.OrdinalIgnoreCase));
+
+        // Sample values must NOT leak into StaticRuns.
+        Assert.DoesNotContain(staticTexts, t => t.Contains("E320000000028"));
+        Assert.DoesNotContain(staticTexts, t => t.Contains("PRODUCTO X"));
     }
 
     [Fact]
@@ -35,6 +50,7 @@ public class RiModelExtractorTests
 
         Assert.False(result.Success);
         Assert.NotEmpty(result.Warnings);
+        Assert.Null(result.Page);
     }
 
     private static byte[] BuildKnownFormatPdf()
@@ -49,7 +65,7 @@ public class RiModelExtractorTests
 
                 page.Content().Column(col =>
                 {
-                    col.Item().Text("MI EMPRESA SRL").FontSize(16).Bold();
+                    col.Item().Text("MI EMPRESA").FontSize(16).Bold();
                     col.Item().Text("RNC: 132293894");
                     col.Item().Text("NCF: E320000000028");
                     col.Item().Text("Fecha: 30-06-2026");
@@ -74,10 +90,10 @@ public class RiModelExtractorTests
                             header.Cell().Text("Cantidad");
                             header.Cell().Text("Precio");
                             header.Cell().Text("ITBIS");
-                            header.Cell().Text("Valor");
+                            header.Cell().Text("Total");
                         });
 
-                        table.Cell().Text("Servicio X");
+                        table.Cell().Text("Producto X");
                         table.Cell().Text("1");
                         table.Cell().Text("100.00");
                         table.Cell().Text("18.00");
