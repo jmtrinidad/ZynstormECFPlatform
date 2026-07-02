@@ -43,7 +43,7 @@ public class CertificationRiModelService(
 
         var extraction = RiModelExtractor.Extract(sourcePdf);
 
-        if (!extraction.Success || extraction.Layout is null)
+        if (!extraction.Success || extraction.Page is null)
         {
             template.Status = CertificationRiTemplateStatus.Failed;
             template.ExtractionWarnings = JsonSerializer.Serialize(extraction.Warnings);
@@ -56,10 +56,10 @@ public class CertificationRiModelService(
             return ToDto(template, extraction.Warnings);
         }
 
-        template.LayoutJson = JsonSerializer.Serialize(extraction.Layout, LayoutJsonOptions);
+        template.LayoutJson = JsonSerializer.Serialize(extraction.Page, LayoutJsonOptions);
         template.ExtractionWarnings = extraction.Warnings.Count > 0 ? JsonSerializer.Serialize(extraction.Warnings) : null;
         template.Status = CertificationRiTemplateStatus.Extracted;
-        template.FileData = RiPdfRenderer.Render(extraction.Layout, SampleRiData(client));
+        template.FileData = RiPdfRenderer.Render(extraction.Page, SampleRiData(client));
 
         context.Set<CertificationInvoicePrintTemplate>().Add(template);
         await context.SaveChangesAsync();
@@ -90,7 +90,7 @@ public class CertificationRiModelService(
             var extraction = RiModelExtractor.Extract(newSourcePdf);
             warnings = extraction.Warnings;
 
-            if (!extraction.Success || extraction.Layout is null)
+            if (!extraction.Success || extraction.Page is null)
             {
                 template.Status = CertificationRiTemplateStatus.Failed;
                 template.ExtractionWarnings = JsonSerializer.Serialize(warnings);
@@ -99,10 +99,10 @@ public class CertificationRiModelService(
             }
             else
             {
-                template.LayoutJson = JsonSerializer.Serialize(extraction.Layout, LayoutJsonOptions);
+                template.LayoutJson = JsonSerializer.Serialize(extraction.Page, LayoutJsonOptions);
                 template.ExtractionWarnings = warnings.Count > 0 ? JsonSerializer.Serialize(warnings) : null;
                 template.Status = CertificationRiTemplateStatus.Extracted;
-                template.FileData = RiPdfRenderer.Render(extraction.Layout, SampleRiData(template.Client));
+                template.FileData = RiPdfRenderer.Render(extraction.Page, SampleRiData(template.Client));
             }
 
             if (!string.IsNullOrWhiteSpace(fileName))
@@ -189,10 +189,10 @@ public class CertificationRiModelService(
             .FirstOrDefaultAsync(d => d.CertificationProcess.ClientId == client.ClientId && d.ENcfSecuence == ncf)
             ?? throw new InvalidOperationException($"No se encontró el comprobante {ncf} para el cliente.");
 
-        var (layout, _) = await GetConfirmedTemplateAsync(client.ClientId, doc.EcfTypeId, doc.EcfType.Code);
+        var (pageModel, _) = await GetConfirmedTemplateAsync(client.ClientId, doc.EcfTypeId, doc.EcfType.Code);
 
         var data = EcfRiDataMapper.Map(doc.XmlSent, DgiiEnvironment.CerteCF);
-        return RiPdfRenderer.Render(layout, data);
+        return RiPdfRenderer.Render(pageModel, data);
     }
 
     public async Task<byte[]> RenderAllZipAsync(string clientGuidId, string webRootPath)
@@ -236,9 +236,9 @@ public class CertificationRiModelService(
 
                 try
                 {
-                    var (layout, _) = await GetConfirmedTemplateAsync(client.ClientId, doc.EcfTypeId, doc.EcfType.Code);
+                    var (pageModel, _) = await GetConfirmedTemplateAsync(client.ClientId, doc.EcfTypeId, doc.EcfType.Code);
                     var data = EcfRiDataMapper.Map(doc.XmlSent, DgiiEnvironment.CerteCF);
-                    var pdfBytes = RiPdfRenderer.Render(layout, data);
+                    var pdfBytes = RiPdfRenderer.Render(pageModel, data);
 
                     var entry = archive.CreateEntry($"{doc.ENcfSecuence}.pdf", CompressionLevel.Optimal);
                     using var entryStream = entry.Open();
@@ -387,7 +387,7 @@ public class CertificationRiModelService(
     /// Resolves the <see cref="CertificationRiTemplateStatus.Confirmed"/> template assigned to
     /// <paramref name="ecfTypeId"/> for the given client, and deserializes its layout.
     /// </summary>
-    private async Task<(LayoutDescriptor Layout, CertificationInvoicePrintTemplate Template)> GetConfirmedTemplateAsync(int clientId, int ecfTypeId, string ecfTypeCode)
+    private async Task<(PageModel PageModel, CertificationInvoicePrintTemplate Template)> GetConfirmedTemplateAsync(int clientId, int ecfTypeId, string ecfTypeCode)
     {
         var template = await context.Set<CertificationInvoicePrintTemplate>()
             .Include(t => t.EcfTypes)
@@ -402,10 +402,10 @@ public class CertificationRiModelService(
             throw new InvalidOperationException($"No hay modelo confirmado para el tipo {ecfTypeCode}");
         }
 
-        var layout = JsonSerializer.Deserialize<LayoutDescriptor>(template.LayoutJson, LayoutJsonOptions)
+        var pageModel = JsonSerializer.Deserialize<PageModel>(template.LayoutJson, LayoutJsonOptions)
             ?? throw new InvalidOperationException($"El layout del modelo RI para el tipo {ecfTypeCode} es inválido.");
 
-        return (layout, template);
+        return (pageModel, template);
     }
 
     private static List<string> DeserializeWarnings(string? warningsJson)

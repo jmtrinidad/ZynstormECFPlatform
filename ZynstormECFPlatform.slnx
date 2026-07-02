@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/Apps/">
+    <Project Path="ZynstormECFPlatform.Tests/ZynstormECFPlatform.Tests.csproj" Id="636febe2-d5f3-470f-ae05-d368f7c39059" />
     <Project Path="ZynstormECFPlatform.Web.Api/ZynstormECFPlatform.Web.Api.csproj" />
   </Folder>
   <Folder Name="/Libraries/">
@@ -13,8 +14,5 @@
     <Project Path="ZynstormECFPlatform.Reports/ZynstormECFPlatform.Reports.csproj" />
     <Project Path="ZynstormECFPlatform.Schemas/ZynstormECFPlatform.Schemas.csproj" Id="f894f795-098a-4ac0-8e5c-9fb2fae6ec6c" />
     <Project Path="ZynstormECFPlatform.Services/ZynstormECFPlatform.Services.csproj" />
-  </Folder>
-  <Folder Name="/Tests/">
-    <Project Path="ZynstormECFPlatform.Tests/ZynstormECFPlatform.Tests.csproj" />
   </Folder>
 </Solution>
