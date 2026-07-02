@@ -137,8 +137,17 @@ public static class RiModelExtractor
         // confused with the column headers above it (both use ITBIS/TOTAL).
         var (columns, headerWords, itemBandWords, headerTopY, headerBottom) = BuildColumns(words, TopY);
         pageModel.Items.Columns = columns;
-        pageModel.Items.TopY = headerTopY;
+        // Items must start BELOW the header row (the first sample data row's position), not on
+        // the header itself, otherwise the rendered item collides with the column headers.
+        pageModel.Items.TopY = itemBandWords.Count > 0 ? itemBandWords.Min(w => TopY(w)) : headerTopY + 14;
         pageModel.Items.RowHeight = 14;
+
+        // Clamp column widths to the page so the last column's right-aligned value isn't
+        // drawn off the right edge (the last header has no neighbor to bound its width).
+        foreach (var c in pageModel.Items.Columns)
+        {
+            c.Width = Math.Max(10, Math.Min(c.Width, width - c.X - 2));
+        }
 
         if (columns.Count == 0)
         {
