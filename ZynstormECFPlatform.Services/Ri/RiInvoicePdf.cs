@@ -63,6 +63,13 @@ public class RiInvoicePdf(RiInvoiceModel model) : IDocument
                                  .FontSize(9.5f);
                     }
 
+                    if (!string.IsNullOrEmpty(company.Whatsapp))
+                    {
+                        c.Item().AlignCenter()
+                                 .Text($"WA: {company.Whatsapp}")
+                                 .FontSize(9.5f);
+                    }
+
                     c.Item().LineHorizontal(0.5f);
 
                     c.Item().PaddingVertical(3).AlignCenter()

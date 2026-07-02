@@ -51,6 +51,10 @@ public class RiPurchasePdf(RiPurchaseModel model) : IDocument
                         {
                             c.Item().Text($"Tel: {company.Phone}").FontSize(8).FontColor("#4A5568");
                         }
+                        if (!string.IsNullOrEmpty(company.Whatsapp))
+                        {
+                            c.Item().Text($"WA: {company.Whatsapp}").FontSize(8).FontColor("#4A5568");
+                        }
                     });
 
                     // Right: Title & Purchase Details

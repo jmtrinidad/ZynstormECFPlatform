@@ -29,7 +29,8 @@ public class CertificationRiModelService(
             .FirstOrDefaultAsync(d => d.CertificationProcess.ClientId == client.ClientId && d.ENcfSecuence == ncf)
             ?? throw new InvalidOperationException($"No se encontró el comprobante {ncf} para el cliente.");
 
-        return RiPdfRenderer.Render(ParseEcfType(doc.EcfType.Code), doc.XmlSent);
+        var company = await BuildCompanyHeaderAsync(client);
+        return RiPdfRenderer.Render(ParseEcfType(doc.EcfType.Code), doc.XmlSent, company);
     }
 
     public async Task<byte[]> RenderAllZipAsync(string clientGuidId, string webRootPath)
@@ -49,6 +50,7 @@ public class CertificationRiModelService(
         var zipFileName = $"ri_{client.Rnc}_{Guid.NewGuid():N}.zip";
         var zipPath = Path.Combine(zipDir, zipFileName);
 
+        var company = await BuildCompanyHeaderAsync(client);
         var faltantes = new List<string>();
 
         using (var zipStream = new FileStream(zipPath, FileMode.Create))
@@ -58,7 +60,7 @@ public class CertificationRiModelService(
             {
                 try
                 {
-                    var pdfBytes = RiPdfRenderer.Render(ParseEcfType(doc.EcfType.Code), doc.XmlSent);
+                    var pdfBytes = RiPdfRenderer.Render(ParseEcfType(doc.EcfType.Code), doc.XmlSent, company);
 
                     var entry = archive.CreateEntry($"{doc.ENcfSecuence}.pdf", CompressionLevel.Optimal);
                     using var entryStream = entry.Open();
@@ -80,6 +82,27 @@ public class CertificationRiModelService(
         }
 
         return await File.ReadAllBytesAsync(zipPath);
+    }
+
+    /// <summary>
+    /// Encabezado del emisor tomado del CLIENTE seleccionado (no del XML): nombre/RNC/teléfono
+    /// del Client, dirección de su sucursal principal (ClientBranche), y WhatsApp = mismo teléfono.
+    /// </summary>
+    private async Task<RiCompanyHeader> BuildCompanyHeaderAsync(Client client)
+    {
+        var branch = await context.Set<ClientBranche>()
+            .Where(b => b.ClientId == client.ClientId)
+            .OrderByDescending(b => b.IsMain)
+            .FirstOrDefaultAsync();
+
+        var phone = !string.IsNullOrWhiteSpace(client.Phone) ? client.Phone! : branch?.Phone ?? string.Empty;
+
+        return new RiCompanyHeader(
+            Name: client.Name,
+            Rnc: client.Rnc,
+            Address: branch?.Address ?? string.Empty,
+            Phone: phone,
+            Whatsapp: phone);
     }
 
     /// <summary>

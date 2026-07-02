@@ -50,6 +50,8 @@ public class RiInvoiceCompany
     public string Address { get; set; } = string.Empty;
 
     public string Phone { get; set; } = string.Empty;
+
+    public string Whatsapp { get; set; } = string.Empty;
 }
 
 public class RiInvoiceClient

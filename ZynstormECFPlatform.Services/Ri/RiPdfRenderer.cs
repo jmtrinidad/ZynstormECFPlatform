@@ -10,15 +10,45 @@ namespace ZynstormECFPlatform.Services.Ri;
 /// 80mm-receipt <see cref="RiInvoicePdf"/>. The XML-to-model mapping is delegated to
 /// <see cref="EcfRiTemplateMapper"/>.
 /// </summary>
+/// <summary>
+/// Datos del emisor para el encabezado de la RI, tomados del CLIENTE seleccionado
+/// (no del XML), porque varían por cliente. WA reusa el mismo teléfono.
+/// </summary>
+public record RiCompanyHeader(string Name, string Rnc, string Address, string Phone, string Whatsapp);
+
 public static class RiPdfRenderer
 {
-    public static byte[] Render(int ecfType, string signedXml)
+    public static byte[] Render(int ecfType, string signedXml, RiCompanyHeader? company = null)
     {
         if (ecfType == 41)
         {
-            return new RiPurchasePdf(EcfRiTemplateMapper.MapPurchase(signedXml, DgiiEnvironment.CerteCF)).GeneratePdf();
+            var model = EcfRiTemplateMapper.MapPurchase(signedXml, DgiiEnvironment.CerteCF);
+            if (company is not null)
+            {
+                model.Company = new RiPurchaseCompany
+                {
+                    Name = company.Name,
+                    Rnc = company.Rnc,
+                    Address = company.Address,
+                    Phone = company.Phone,
+                    Whatsapp = company.Whatsapp,
+                };
+            }
+            return new RiPurchasePdf(model).GeneratePdf();
         }
 
-        return new RiInvoicePdf(EcfRiTemplateMapper.MapInvoice(signedXml, DgiiEnvironment.CerteCF)).GeneratePdf();
+        var invoice = EcfRiTemplateMapper.MapInvoice(signedXml, DgiiEnvironment.CerteCF);
+        if (company is not null)
+        {
+            invoice.Company = new RiInvoiceCompany
+            {
+                Name = company.Name,
+                Rnc = company.Rnc,
+                Address = company.Address,
+                Phone = company.Phone,
+                Whatsapp = company.Whatsapp,
+            };
+        }
+        return new RiInvoicePdf(invoice).GeneratePdf();
     }
 }
