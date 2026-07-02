@@ -1,255 +1,252 @@
 using System.Globalization;
-using QuestPDF.Fluent;
-using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
+using PdfSharp.Drawing;
+using PdfSharp.Pdf;
 using QRCoder;
 
 namespace ZynstormECFPlatform.Services.Ri;
 
 /// <summary>
-/// Renders a Ri (Representación Impresa) PDF from a <see cref="LayoutDescriptor"/>
-/// (extracted visual layout hints) and <see cref="RiData"/> (the e-CF content).
-/// Ported from MechanicalServ's ElectronicInvoicePdf, adapted to be flow-based
-/// (QuestPDF Column/Table) rather than pixel-absolute, honoring layout hints
-/// (palette, page size, item columns, QR placement) where reasonably possible.
+/// Renders a Ri (Representación Impresa) PDF by repainting, from scratch, the positioned
+/// content extracted from a PDF model (<see cref="PageModel"/>) combined with the e-CF
+/// content (<see cref="RiData"/>). Static content (labels, header, table headers, footer,
+/// lines, images) is drawn verbatim at its extracted position; dynamic slots (Fields,
+/// Items, Qr) are drawn with the corresponding value from <paramref name="data"/>.
+/// Uses PDFsharp for absolute-coordinate drawing (QuestPDF, flow-based, is not suitable here
+/// and remains only for <c>ReportPdfGenerator</c>).
 /// </summary>
 public static class RiPdfRenderer
 {
     private static readonly CultureInfo DominicanCulture = new("es-DO");
 
-    static RiPdfRenderer()
+    public static byte[] Render(PageModel page, RiData data)
     {
-        QuestPDF.Settings.License = LicenseType.Community;
-    }
-
-    public static byte[] Render(LayoutDescriptor layout, RiData data)
-    {
-        layout ??= new LayoutDescriptor();
+        page ??= new PageModel();
         data ??= new RiData();
 
-        var qrPng = BuildQrPng(data.QrUrl);
-        var accentColor = ResolveColor(layout, "accent", Colors.Black);
+        RiFontResolver.EnsureRegistered();
 
-        return Document.Create(container =>
+        using var document = new PdfDocument();
+        var pdfPage = document.AddPage();
+        pdfPage.Width = XUnit.FromPoint(page.WidthPt > 0 ? page.WidthPt : 612);
+        pdfPage.Height = XUnit.FromPoint(page.HeightPt > 0 ? page.HeightPt : 792);
+
+        using (var gfx = XGraphics.FromPdfPage(pdfPage))
         {
-            container.Page(page =>
-            {
-                ConfigurePage(page, layout);
+            DrawImages(gfx, page);
+            DrawLines(gfx, page);
+            DrawStaticRuns(gfx, page);
+            DrawFields(gfx, page, data);
+            DrawItems(gfx, page, data);
+            DrawQr(gfx, page, data);
+        }
 
-                page.Content().Padding(10).Column(col =>
+        using var stream = new MemoryStream();
+        document.Save(stream);
+        return stream.ToArray();
+    }
+
+    private static void DrawStaticRuns(XGraphics gfx, PageModel page)
+    {
+        foreach (var run in page.StaticRuns)
+        {
+            if (string.IsNullOrEmpty(run.Text))
+            {
+                continue;
+            }
+
+            var font = new XFont(RiFontResolver.BaseFamily, run.FontSize > 0 ? run.FontSize : 9,
+                run.Bold ? XFontStyleEx.Bold : XFontStyleEx.Regular);
+            var brush = ResolveBrush(run.ColorHex);
+
+            gfx.DrawString(run.Text, font, brush, new XPoint(run.X, run.Y));
+        }
+    }
+
+    private static void DrawLines(XGraphics gfx, PageModel page)
+    {
+        foreach (var line in page.Lines)
+        {
+            var pen = new XPen(XColors.Black, line.Thickness > 0 ? line.Thickness : 1);
+            gfx.DrawLine(pen, line.X1, line.Y1, line.X2, line.Y2);
+        }
+    }
+
+    private static void DrawImages(XGraphics gfx, PageModel page)
+    {
+        foreach (var img in page.Images)
+        {
+            if (string.IsNullOrEmpty(img.Base64))
+            {
+                continue;
+            }
+
+            try
+            {
+                var bytes = Convert.FromBase64String(img.Base64);
+                using var ms = new MemoryStream(bytes);
+                using var xImage = XImage.FromStream(ms);
+                gfx.DrawImage(xImage, img.X, img.Y, img.W > 0 ? img.W : xImage.PointWidth, img.H > 0 ? img.H : xImage.PointHeight);
+            }
+            catch
+            {
+                // Best-effort: skip images that can't be decoded by PdfSharp.
+            }
+        }
+    }
+
+    private static void DrawFields(XGraphics gfx, PageModel page, RiData data)
+    {
+        foreach (var field in page.Fields)
+        {
+            var value = FieldValue(data, field.FieldKey);
+            if (string.IsNullOrEmpty(value))
+            {
+                continue;
+            }
+
+            var font = new XFont(RiFontResolver.BaseFamily, field.FontSize > 0 ? field.FontSize : 9, XFontStyleEx.Regular);
+            DrawAligned(gfx, value, font, XBrushes.Black, field.X, field.Y, field.Align, field.MaxWidth);
+        }
+    }
+
+    private static void DrawItems(XGraphics gfx, PageModel page, RiData data)
+    {
+        var columns = page.Items.Columns;
+        if (columns.Count == 0 || data.Items.Count == 0)
+        {
+            return;
+        }
+
+        var rowHeight = page.Items.RowHeight > 0 ? page.Items.RowHeight : 14;
+        var font = new XFont(RiFontResolver.BaseFamily, 8, XFontStyleEx.Regular);
+
+        for (int i = 0; i < data.Items.Count; i++)
+        {
+            var item = data.Items[i];
+            var y = page.Items.TopY + i * rowHeight;
+
+            foreach (var col in columns)
+            {
+                var value = ItemColumnValue(item, col.Field);
+                if (string.IsNullOrEmpty(value))
                 {
-                    col.Spacing(6);
-
-                    ComposeHeader(col, data, accentColor);
-                    Separator(col);
-                    ComposeDocumentInfo(col, data);
-                    Separator(col);
-                    ComposeBuyer(col, data);
-                    Separator(col);
-                    ComposeItems(col, layout, data);
-                    Separator(col);
-                    ComposeTotals(col, layout, data);
-                    ComposeQr(col, layout, data, qrPng);
-
-                    col.Item().AlignCenter().Text("REPRESENTACIÓN IMPRESA DEL e-CF").SemiBold().FontSize(9);
-                });
-            });
-        }).GeneratePdf();
-    }
-
-    private static void ConfigurePage(PageDescriptor page, LayoutDescriptor layout)
-    {
-        var width = layout.Page.WidthPt;
-        var height = layout.Page.HeightPt;
-
-        if (width > 0 && height > 0)
-        {
-            page.Size((float)width, (float)height, Unit.Point);
-        }
-        else
-        {
-            page.Size(PageSizes.Letter);
-        }
-
-        var margin = layout.Page.Margin;
-        page.Margin(margin > 0 ? (float)margin : 20, Unit.Point);
-    }
-
-    private static void ComposeHeader(ColumnDescriptor col, RiData data, string accentColor)
-    {
-        col.Item().AlignCenter().Column(header =>
-        {
-            header.Item().AlignCenter().Text(FirstNonEmpty(data.Issuer.Name, "EMISOR")).Bold().FontSize(13).FontColor(accentColor);
-
-            if (!string.IsNullOrWhiteSpace(data.Issuer.Address))
-            {
-                header.Item().AlignCenter().Text(data.Issuer.Address).FontSize(8);
-            }
-
-            if (!string.IsNullOrWhiteSpace(data.Issuer.Phone))
-            {
-                header.Item().AlignCenter().Text($"Tel.: {data.Issuer.Phone}").FontSize(8);
-            }
-
-            if (!string.IsNullOrWhiteSpace(data.Issuer.Document))
-            {
-                header.Item().AlignCenter().Text($"RNC: {data.Issuer.Document}").FontSize(8);
-            }
-        });
-    }
-
-    private static void ComposeDocumentInfo(ColumnDescriptor col, RiData data)
-    {
-        col.Item().AlignCenter().Text($"e-CF TIPO {data.TipoeCF}".Trim()).Bold().FontSize(9);
-
-        col.Item().AlignRight().Text(txt =>
-        {
-            txt.Span("e-NCF: ").SemiBold().FontSize(9);
-            txt.Span(data.ENcf).Bold().FontSize(9);
-        });
-
-        col.Item().Text(txt =>
-        {
-            txt.Span("Fecha Emisión: ").SemiBold().FontSize(8);
-            txt.Span(data.FechaEmision).FontSize(8);
-        });
-
-        if (!string.IsNullOrWhiteSpace(data.FechaFirma))
-        {
-            col.Item().Text(txt =>
-            {
-                txt.Span("Fecha Firma: ").SemiBold().FontSize(8);
-                txt.Span(data.FechaFirma).FontSize(8);
-            });
-        }
-    }
-
-    private static void ComposeBuyer(ColumnDescriptor col, RiData data)
-    {
-        col.Item().AlignCenter().Text("DATOS DEL COMPRADOR").SemiBold().FontSize(9);
-        LabelValue(col, "Cliente", data.Buyer.Name);
-        LabelValue(col, "RNC/Cédula", data.Buyer.Document);
-        LabelValue(col, "Dirección", data.Buyer.Address);
-        LabelValue(col, "Teléfono", data.Buyer.Phone);
-        LabelValue(col, "Correo", data.Buyer.Email);
-        LabelValue(col, "País", data.Buyer.Country);
-    }
-
-    private static void ComposeItems(ColumnDescriptor col, LayoutDescriptor layout, RiData data)
-    {
-        var columns = layout.Items.Columns.Count > 0 ? layout.Items.Columns : DefaultItemColumns();
-
-        col.Item().Table(tb =>
-        {
-            tb.ColumnsDefinition(cd =>
-            {
-                foreach (var _ in columns)
-                {
-                    cd.RelativeColumn();
+                    continue;
                 }
-            });
 
-            tb.Header(header =>
-            {
-                foreach (var column in columns)
-                {
-                    header.Cell().Padding(2).Text(ColumnLabel(column.Field)).Bold().FontSize(8);
-                }
-            });
-
-            if (data.Items.Count == 0)
-            {
-                tb.Cell().ColumnSpan((uint)columns.Count).Padding(2).Text("Sin detalle de bienes o servicios").FontSize(8);
-                return;
+                DrawAligned(gfx, value, font, XBrushes.Black, col.X, y, col.Align, col.Width);
             }
-
-            foreach (var item in data.Items)
-            {
-                foreach (var column in columns)
-                {
-                    var cell = tb.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9").Padding(2);
-
-                    switch (column.Align?.ToLowerInvariant())
-                    {
-                        case "right":
-                            cell.AlignRight().Text(ItemFieldValue(item, column.Field)).FontSize(8);
-                            break;
-                        case "center":
-                            cell.AlignCenter().Text(ItemFieldValue(item, column.Field)).FontSize(8);
-                            break;
-                        default:
-                            cell.AlignLeft().Text(ItemFieldValue(item, column.Field)).FontSize(8);
-                            break;
-                    }
-                }
-            }
-        });
-    }
-
-    private static void ComposeTotals(ColumnDescriptor col, LayoutDescriptor layout, RiData data)
-    {
-        var totalRows = layout.Totals.Count > 0 ? layout.Totals : DefaultTotalRows();
-
-        foreach (var row in totalRows)
-        {
-            var value = TotalFieldValue(data.Totals, row.Field);
-            var isTotal = string.Equals(row.Field, "total", StringComparison.OrdinalIgnoreCase);
-            TotalRowItem(col, string.IsNullOrWhiteSpace(row.Label) ? row.Field.ToUpperInvariant() + ":" : row.Label, value, isTotal);
         }
     }
 
-    private static void ComposeQr(ColumnDescriptor col, LayoutDescriptor layout, RiData data, byte[] qrPng)
+    private static void DrawQr(XGraphics gfx, PageModel page, RiData data)
     {
-        var size = layout.Qr.Size > 0 ? (float)layout.Qr.Size : 90;
+        var qr = page.Qr;
+        var size = qr.Size > 0 ? qr.Size : 90;
 
-        col.Item().AlignCenter().Width(size).Height(size).Image(qrPng);
-        LabelValue(col, "Código de Seguridad", data.SecurityCode);
+        DrawQrModules(gfx, data.QrUrl, qr.X, qr.Y, size);
 
-        if (!string.IsNullOrWhiteSpace(data.QrUrl))
-        {
-            col.Item().AlignCenter().Text(data.QrUrl).FontSize(6).FontColor(Colors.Grey.Darken1);
-        }
+        var font = new XFont(RiFontResolver.BaseFamily, 8, XFontStyleEx.Regular);
+        gfx.DrawString($"Código de Seguridad: {data.SecurityCode}", font, XBrushes.Black, new XPoint(qr.X, qr.Y + size + 12));
     }
 
-    private static byte[] BuildQrPng(string? url)
+    /// <summary>
+    /// Draws the QR as vector-filled squares (one per module) rather than rasterizing to a
+    /// PNG and decoding it through <see cref="XImage"/>: QRCoder emits a 1-bit grayscale PNG
+    /// that PdfSharp's PNG importer cannot decode ("Unsupported image format"), so we read the
+    /// module matrix directly instead.
+    /// </summary>
+    private static void DrawQrModules(XGraphics gfx, string? url, double x, double y, double size)
     {
         using var generator = new QRCodeGenerator();
         using var qrData = generator.CreateQrCode(url ?? string.Empty, QRCodeGenerator.ECCLevel.M);
-        var qrCode = new PngByteQRCode(qrData);
-        return qrCode.GetGraphic(10);
+        var matrix = qrData.ModuleMatrix;
+        var moduleCount = matrix.Count;
+
+        if (moduleCount == 0)
+        {
+            return;
+        }
+
+        var moduleSize = size / moduleCount;
+
+        gfx.DrawRectangle(XBrushes.White, x, y, size, size);
+
+        for (int row = 0; row < moduleCount; row++)
+        {
+            for (int col = 0; col < moduleCount; col++)
+            {
+                if (matrix[row][col])
+                {
+                    gfx.DrawRectangle(XBrushes.Black,
+                        x + col * moduleSize, y + row * moduleSize,
+                        moduleSize, moduleSize);
+                }
+            }
+        }
     }
 
-    // Field keys are the lowercase-Spanish vocabulary emitted by RiModelExtractor
-    // (descripcion/cantidad/precio/itbis/valor; subtotal/itbis/total). Match
-    // case-insensitively so both extracted layouts and the defaults below agree.
-    private static List<ItemColumn> DefaultItemColumns() =>
-    [
-        new ItemColumn { Field = "descripcion", Align = "left" },
-        new ItemColumn { Field = "cantidad", Align = "right" },
-        new ItemColumn { Field = "precio", Align = "right" },
-        new ItemColumn { Field = "itbis", Align = "right" },
-        new ItemColumn { Field = "valor", Align = "right" }
-    ];
-
-    private static List<TotalRow> DefaultTotalRows() =>
-    [
-        new TotalRow { Field = "subtotal", Label = "SUBTOTAL:" },
-        new TotalRow { Field = "itbis", Label = "ITBIS:" },
-        new TotalRow { Field = "exento", Label = "EXENTO:" },
-        new TotalRow { Field = "total", Label = "TOTAL:" }
-    ];
-
-    private static string ColumnLabel(string field) => (field ?? string.Empty).ToLowerInvariant() switch
+    private static void DrawAligned(XGraphics gfx, string text, XFont font, XBrush brush, double x, double y, string? align, double maxWidth)
     {
-        "descripcion" => "DESCRIPCIÓN",
-        "cantidad" => "CANT.",
-        "precio" => "PRECIO",
-        "itbis" => "ITBIS",
-        "valor" or "importe" => "VALOR",
-        _ => (field ?? string.Empty).ToUpperInvariant()
+        if (string.Equals(align, "Right", StringComparison.OrdinalIgnoreCase) && maxWidth > 0)
+        {
+            var size = gfx.MeasureString(text, font);
+            var offsetX = Math.Max(0, maxWidth - size.Width);
+            gfx.DrawString(text, font, brush, new XPoint(x + offsetX, y));
+        }
+        else if (string.Equals(align, "Center", StringComparison.OrdinalIgnoreCase) && maxWidth > 0)
+        {
+            var size = gfx.MeasureString(text, font);
+            var offsetX = Math.Max(0, (maxWidth - size.Width) / 2);
+            gfx.DrawString(text, font, brush, new XPoint(x + offsetX, y));
+        }
+        else
+        {
+            gfx.DrawString(text, font, brush, new XPoint(x, y));
+        }
+    }
+
+    private static XBrush ResolveBrush(string? colorHex)
+    {
+        if (string.IsNullOrWhiteSpace(colorHex))
+        {
+            return XBrushes.Black;
+        }
+
+        try
+        {
+            var color = XColor.FromArgb(int.Parse(colorHex.TrimStart('#'), NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            return new XSolidBrush(color);
+        }
+        catch
+        {
+            return XBrushes.Black;
+        }
+    }
+
+    // Field keys are the lowercase-Spanish vocabulary emitted by RiModelExtractor:
+    // eNCF, fechaEmision, fechaFirma, rncComprador, razonSocialComprador,
+    // direccionComprador, telefonoComprador, subtotal, itbis, total, exento, codigoSeguridad.
+    // Match case-insensitively so both extracted and hand-built PageModels agree.
+    private static string FieldValue(RiData data, string fieldKey) => (fieldKey ?? string.Empty).ToLowerInvariant() switch
+    {
+        "encf" => data.ENcf,
+        "fechaemision" => data.FechaEmision,
+        "fechafirma" => data.FechaFirma,
+        "rnccomprador" => data.Buyer.Document,
+        "razonsocialcomprador" => data.Buyer.Name,
+        "direccioncomprador" => data.Buyer.Address,
+        "telefonocomprador" => data.Buyer.Phone,
+        "subtotal" => Money(data.Totals.SubTotal),
+        "itbis" => Money(data.Totals.Itbis),
+        "total" => Money(data.Totals.Total),
+        "exento" => Money(data.Totals.Exento),
+        "codigoseguridad" => data.SecurityCode,
+        _ => string.Empty
     };
 
-    private static string ItemFieldValue(RiItem item, string field) => (field ?? string.Empty).ToLowerInvariant() switch
+    // Item column keys: descripcion, cantidad, precio, itbis, valor, importe
+    // (TOTAL/VALOR/IMPORTE header all map to column key "importe").
+    private static string ItemColumnValue(RiItem item, string field) => (field ?? string.Empty).ToLowerInvariant() switch
     {
         "descripcion" => item.Description,
         "cantidad" => item.Quantity.ToString("0.##", CultureInfo.InvariantCulture),
@@ -259,47 +256,5 @@ public static class RiPdfRenderer
         _ => string.Empty
     };
 
-    private static decimal TotalFieldValue(RiTotals totals, string field) => (field ?? string.Empty).ToLowerInvariant() switch
-    {
-        "subtotal" => totals.SubTotal,
-        "itbis" => totals.Itbis,
-        "exento" => totals.Exento,
-        "gravado" => totals.Gravado,
-        "total" => totals.Total,
-        _ => 0m
-    };
-
-    private static void TotalRowItem(ColumnDescriptor col, string label, decimal value, bool isTotal)
-    {
-        col.Item().Row(row =>
-        {
-            row.RelativeItem();
-            row.ConstantItem(110).AlignRight().Text(label).Bold().FontSize(isTotal ? 11 : 9);
-            row.ConstantItem(80).AlignRight().Text(Money(value)).Bold().FontSize(isTotal ? 11 : 9);
-        });
-    }
-
-    private static void LabelValue(ColumnDescriptor col, string label, string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return;
-        }
-
-        col.Item().Text(txt =>
-        {
-            txt.Span($"{label}: ").SemiBold().FontSize(8);
-            txt.Span(value).FontSize(8);
-        });
-    }
-
-    private static void Separator(ColumnDescriptor col) => col.Item().LineHorizontal(0.5f);
-
-    private static string Money(decimal value) => string.Format(DominicanCulture, "{0:C2}", value);
-
-    private static string FirstNonEmpty(params string?[] values) =>
-        values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v)) ?? string.Empty;
-
-    private static string ResolveColor(LayoutDescriptor layout, string key, string fallback) =>
-        layout.Palette.TryGetValue(key, out var color) && !string.IsNullOrWhiteSpace(color) ? color : fallback;
+    private static string Money(decimal value) => string.Format(DominicanCulture, "{0:N2}", value);
 }
