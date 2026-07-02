@@ -27,10 +27,10 @@ public static class RiModelExtractor
     // consecutive words on the same line before comparing.
     private static readonly (string[] Labels, string Field)[] HeaderFieldAnchors =
     [
-        (["E-NCF", "NCF ELECTRONICO", "NCF"], "eNCF"),
+        (["E-NCF", "E NCF", "ENCF", "NCF ELECTRONICO", "NCF"], "eNCF"),
         (["FECHA DE FIRMA"], "fechaFirma"),
         (["FECHA"], "fechaEmision"),
-        (["RNC/CEDULA", "RNC"], "rncComprador"),
+        (["RNC/CEDULA", "RNC/CED", "CEDULA"], "rncComprador"),
         (["CLIENTE", "RAZON SOCIAL"], "razonSocialComprador"),
         (["DIRECCION"], "direccionComprador"),
         (["TELEFONO"], "telefonoComprador"),
@@ -59,6 +59,39 @@ public static class RiModelExtractor
 
     private const string QrAnchorLabel = "CODIGO DE SEGURIDAD";
 
+    // Labels for receipt/invoice fields that are NOT e-CF data fields, but whose sample
+    // VALUES on a real-world model PDF must still be blanked (excluded from StaticRuns)
+    // because they don't correspond to anything we control at render time. The label text
+    // itself remains static; only the value run(s) to its right are removed.
+    private static readonly string[] BlankValueLabels =
+    [
+        "VALIDO HASTA",
+        "FACTURA",
+        "NUMERO",
+        "TIPO DE PAGO",
+        "TIPO PAGO",
+        "CONDICION DE PAGO",
+        "COND. PAGO",
+        "COND PAGO",
+        "CAJERO",
+        "ATENDIDO POR",
+        "ARTICULOS",
+        "CONTADO",
+        "EFECTIVO",
+        "TOTAL RECIBIDO",
+        "RECIBIDO",
+        "CAMBIO",
+        "SU CAMBIO",
+        "VUELTO",
+        "DESCUENTO",
+    ];
+
+    // Words normalizing to any of these (joined on the same line) form the
+    // "FACTURA ... FISCAL/CREDITO/ELECTRONICA" banner that marks the bottom edge of the
+    // fully-static emisor header block.
+    private static readonly string[] BannerRequiredTokens = ["FACTURA"];
+    private static readonly string[] BannerAnyTokens = ["FISCAL", "CREDITO", "ELECTRONICA"];
+
     public static RiExtractionResult Extract(byte[] pdfBytes)
     {
         var warnings = new List<string>();
@@ -86,14 +119,23 @@ public static class RiModelExtractor
             HeightPt = height
         };
 
-        // Words already consumed as a FieldSlot VALUE, a table header, or a sample item row
-        // are excluded from StaticRuns. The anchor LABEL words themselves stay static.
+        // Words already consumed as a FieldSlot VALUE, a blanked sample value, a table
+        // header, or a sample item row are excluded from StaticRuns. The anchor LABEL
+        // words themselves stay static.
         var consumed = new HashSet<Word>();
 
-        // 1) Table header row -> item columns, and the sample item row(s) beneath it
-        // (values excluded from StaticRuns). Done first so totals anchors below the table
-        // are never confused with the column headers above it (both use ITBIS/TOTAL).
-        var (columns, headerWords, itemRowWords, headerTopY, headerBottom) = BuildColumns(words, TopY);
+        // 0) Locate the emisor banner ("FACTURA ... FISCAL/CREDITO/ELECTRONICA"). Everything
+        // with Y strictly above the banner's line (i.e. higher on the page - larger
+        // BoundingBox.Top, since PdfPig's origin is bottom-left) belongs to the fully-static
+        // emisor header (name, RNC, address, Tel, WA) and must never be touched by
+        // value-exclusion logic below.
+        var bannerBottom = FindBannerBottom(words);
+
+        // 1) Table header row -> item columns, and the FULL item band beneath it down to the
+        // first totals label (SUB-TOTAL/SUBTOTAL), so every sample item row/sub-line is
+        // excluded from StaticRuns. Done first so totals anchors below the table are never
+        // confused with the column headers above it (both use ITBIS/TOTAL).
+        var (columns, headerWords, itemBandWords, headerTopY, headerBottom) = BuildColumns(words, TopY);
         pageModel.Items.Columns = columns;
         pageModel.Items.TopY = headerTopY;
         pageModel.Items.RowHeight = 14;
@@ -103,18 +145,25 @@ public static class RiModelExtractor
             warnings.Add("No se detecto la fila de encabezados de la tabla de items.");
         }
 
-        foreach (var w in itemRowWords) consumed.Add(w);
+        foreach (var w in itemBandWords) consumed.Add(w);
 
         // 2) Header/buyer field anchors (RNC, NCF, Fecha, Cliente, etc.) -> FieldSlot at the
-        // position of the VALUE run. Restricted to words at/above the item table (or all
-        // words if no table was found) so column headers/rows are never matched here.
+        // position of the FIRST VALUE run to the right of the label; ALL value runs on that
+        // label's line are excluded from StaticRuns. Restricted to words at/above the item
+        // table (or all words if no table was found) so column headers/rows are never matched
+        // here. The emisor header (above the banner) is excluded so e.g. the emisor's bare
+        // "RNC.:" can never be mistaken for the buyer's "RNC/CED:".
         var aboveTable = headerBottom.HasValue
             ? words.Where(w => w.BoundingBox.Bottom >= headerBottom.Value).ToList()
             : words;
 
+        var searchableForFields = bannerBottom.HasValue
+            ? aboveTable.Where(w => w.BoundingBox.Top < bannerBottom.Value).ToList()
+            : aboveTable;
+
         foreach (var (labels, field) in HeaderFieldAnchors)
         {
-            TryAddFieldSlot(pageModel, aboveTable, labels, field, consumed, TopY, warnings);
+            TryAddFieldSlot(pageModel, searchableForFields, labels, field, consumed, TopY, warnings);
         }
 
         // 3) Totals-region field anchors (Sub-Total, ITBIS, Total, Exento, Codigo de
@@ -128,7 +177,20 @@ public static class RiModelExtractor
             TryAddFieldSlot(pageModel, belowTable, labels, field, consumed, TopY, warnings);
         }
 
-        // 4) Lines/boxes.
+        // 4) Blank non-e-CF sample values (receipt-style labels like "CAJERO:", "CONTADO:",
+        // "SU CAMBIO:", the invoice-number "FACTURA:" line, etc.). Only below the emisor
+        // banner - the emisor header itself is never touched. No FieldSlot is created; the
+        // label stays static and its value run(s) are simply excluded.
+        var searchableForBlanks = bannerBottom.HasValue
+            ? words.Where(w => w.BoundingBox.Top < bannerBottom.Value).ToList()
+            : words;
+
+        foreach (var label in BlankValueLabels)
+        {
+            BlankLabelValues(searchableForBlanks, [label], consumed);
+        }
+
+        // 5) Lines/boxes.
         try
         {
             foreach (var path in page.Paths)
@@ -157,7 +219,7 @@ public static class RiModelExtractor
             warnings.Add("No se pudieron extraer las lineas/recuadros del PDF.");
         }
 
-        // 5) Images (logo, etc.), best effort.
+        // 6) Images (logo, etc.), best effort.
         try
         {
             foreach (var img in page.GetImages())
@@ -180,7 +242,10 @@ public static class RiModelExtractor
             warnings.Add("No se pudo extraer alguna imagen del PDF (formato no soportado).");
         }
 
-        // 6) QR default region unless we can anchor it to the "Codigo de Seguridad" label.
+        // 7) QR position: prefer anchoring to the "Codigo de Seguridad" label if present.
+        // Otherwise place it in the largest vertical gap between text lines in the lower
+        // ~60% of the page (a blank model has no QR to anchor to), falling back to
+        // bottom-center above the footer greeting.
         var qrAnchor = FindPhraseAnchor(words, [QrAnchorLabel], new HashSet<Word>());
         if (qrAnchor is not null)
         {
@@ -193,7 +258,7 @@ public static class RiModelExtractor
         }
         else
         {
-            pageModel.Qr = new QrSlot { X = width * 0.08, Y = height * 0.80, Size = Math.Min(width, height) * 0.15 };
+            pageModel.Qr = FindDefaultQrSlot(words, width, height, TopY);
             warnings.Add("No se detecto la region del QR (Codigo de Seguridad); se uso posicion por defecto.");
         }
 
@@ -203,7 +268,7 @@ public static class RiModelExtractor
         // (headerWords intentionally NOT added to consumed: table headers are static text.)
         _ = headerWords;
 
-        // 7) StaticRuns = all runs minus consumed value/sample-item runs.
+        // 8) StaticRuns = all runs minus consumed value/sample-item runs.
         foreach (var w in words)
         {
             if (consumed.Contains(w))
@@ -234,9 +299,119 @@ public static class RiModelExtractor
     }
 
     /// <summary>
+    /// Finds the bottom edge (in PdfPig's bottom-left-origin Y - i.e. the lowest
+    /// BoundingBox.Bottom of the matched line's words) of the "FACTURA ... FISCAL/CREDITO/
+    /// ELECTRONICA" banner line, if present. Words with BoundingBox.Top >= this value sit at
+    /// or above the banner and belong to the fully-static emisor header.
+    /// </summary>
+    private static double? FindBannerBottom(List<Word> words)
+    {
+        // Group words into visual lines (same Bottom within tolerance), then check whether
+        // the joined, normalized line text contains "FACTURA" plus at least one of
+        // FISCAL/CREDITO/ELECTRONICA (they may be split across two stacked lines in some
+        // layouts, so we also check 2-line windows).
+        var byLine = words
+            .GroupBy(w => Math.Round(w.BoundingBox.Bottom))
+            .OrderByDescending(g => g.Key)
+            .ToList();
+
+        for (int i = 0; i < byLine.Count; i++)
+        {
+            var lineText = NormalizeText(string.Join(" ", byLine[i].OrderBy(w => w.BoundingBox.Left).Select(w => w.Text)));
+            var combinedText = lineText;
+            var combinedBottom = byLine[i].Min(w => w.BoundingBox.Bottom);
+
+            if (i + 1 < byLine.Count)
+            {
+                var nextLineText = NormalizeText(string.Join(" ", byLine[i + 1].OrderBy(w => w.BoundingBox.Left).Select(w => w.Text)));
+                combinedText = lineText + " " + nextLineText;
+            }
+
+            if (BannerRequiredTokens.All(t => combinedText.Contains(t)) &&
+                BannerAnyTokens.Any(t => combinedText.Contains(t)))
+            {
+                // Use the lower of the (up to two) lines involved as the banner bottom.
+                var bottom = i + 1 < byLine.Count && NormalizeText(string.Join(" ", byLine[i + 1].Select(w => w.Text))).Length > 0
+                    ? Math.Min(combinedBottom, byLine[i + 1].Min(w => w.BoundingBox.Bottom))
+                    : combinedBottom;
+                return bottom;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Finds the largest vertical gap between consecutive text lines in the lower ~60% of the
+    /// page and centers a QR slot horizontally within it. Falls back to bottom-center above
+    /// the last (footer) line if no usable gap is found.
+    /// </summary>
+    private static QrSlot FindDefaultQrSlot(List<Word> words, double width, double height, Func<Word, double> topY)
+    {
+        const double minSize = 40;
+        double defaultSize = Math.Max(Math.Min(width, height) * 0.15, minSize);
+
+        var lineYs = words
+            .Select(w => Math.Round(topY(w)))
+            .Distinct()
+            .OrderBy(y => y)
+            .ToList();
+
+        double lowerBoundY = height * 0.40; // lower ~60% of the page starts here (Y grows downward)
+
+        var candidateYs = lineYs.Where(y => y >= lowerBoundY).ToList();
+
+        if (candidateYs.Count >= 2)
+        {
+            double bestGap = -1;
+            double bestGapStart = 0;
+            double bestGapEnd = 0;
+
+            for (int i = 0; i < candidateYs.Count - 1; i++)
+            {
+                var gap = candidateYs[i + 1] - candidateYs[i];
+                if (gap > bestGap)
+                {
+                    bestGap = gap;
+                    bestGapStart = candidateYs[i];
+                    bestGapEnd = candidateYs[i + 1];
+                }
+            }
+
+            if (bestGap >= minSize + 6)
+            {
+                double size = Math.Max(Math.Min(bestGap - 6, defaultSize * 1.3), minSize);
+                double centerY = (bestGapStart + bestGapEnd) / 2.0;
+                return new QrSlot
+                {
+                    X = (width - size) / 2.0,
+                    Y = centerY - size / 2.0,
+                    Size = size
+                };
+            }
+        }
+
+        // Fallback: bottom-center, above the footer (last text line) if we know where it is.
+        double footerY = lineYs.Count > 0 ? lineYs[^1] : height * 0.95;
+        double fallbackSize = defaultSize;
+        double fallbackY = Math.Max(footerY - fallbackSize - 10, height * 0.55);
+
+        return new QrSlot
+        {
+            X = (width - fallbackSize) / 2.0,
+            Y = fallbackY,
+            Size = fallbackSize
+        };
+    }
+
+    /// <summary>
     /// Finds the anchor label for <paramref name="field"/> within <paramref name="candidateWords"/>,
-    /// then the nearby value run, and adds a <see cref="FieldSlot"/> (skips if already present).
-    /// Only the VALUE word is marked consumed; the label stays in StaticRuns.
+    /// then ALL value run(s) to the right of it on the same line, and adds a
+    /// <see cref="FieldSlot"/> positioned at the PRIMARY value run - the first run that looks
+    /// like actual data (contains a letter or digit) rather than a decorative currency symbol
+    /// glued between the label and the value (e.g. a standalone "RD$:" token) - skips if
+    /// already present. All matched value words are marked consumed; the label stays in
+    /// StaticRuns.
     /// </summary>
     private static void TryAddFieldSlot(
         PageModel pageModel, List<Word> candidateWords, string[] labels, string field,
@@ -254,18 +429,19 @@ public static class RiModelExtractor
             return;
         }
 
-        var valueRun = FindValueRun(candidateWords, anchor, consumed);
+        var valueRuns = FindValueRuns(candidateWords, anchor, consumed);
 
         double x;
         double y;
         double fontSize;
 
-        if (valueRun is not null)
+        if (valueRuns.Count > 0)
         {
-            consumed.Add(valueRun);
-            x = valueRun.BoundingBox.Left;
-            y = topY(valueRun);
-            fontSize = valueRun.Letters.Count > 0 ? valueRun.Letters[0].GlyphRectangle.Height : 10;
+            var primary = valueRuns.FirstOrDefault(IsDataToken) ?? valueRuns[0];
+            foreach (var v in valueRuns) consumed.Add(v);
+            x = primary.BoundingBox.Left;
+            y = topY(primary);
+            fontSize = primary.Letters.Count > 0 ? primary.Letters[0].GlyphRectangle.Height : 10;
         }
         else
         {
@@ -283,6 +459,45 @@ public static class RiModelExtractor
             FontSize = fontSize > 0 ? fontSize : 10,
             Align = "Left"
         });
+    }
+
+    /// <summary>
+    /// Currency-prefix tokens that sometimes appear as their own separate word between a
+    /// label and its actual value (e.g. "RD$:", "RD$", "US$") - these must never be picked as
+    /// the FieldSlot's anchor position, even though they contain letters.
+    /// </summary>
+    private static readonly string[] CurrencyPrefixTokens = ["RD$", "RD$:", "US$", "US$:", "$", "$:"];
+
+    /// <summary>
+    /// True if the word looks like real data (contains a digit, or is a letter-only token that
+    /// isn't a bare currency-prefix placeholder) rather than a purely decorative/punctuation
+    /// token (e.g. "RD$:", "$", ":") glued between a label and its actual value.
+    /// </summary>
+    private static bool IsDataToken(Word word)
+    {
+        var trimmed = word.Text.Trim();
+        if (CurrencyPrefixTokens.Any(t => string.Equals(t, trimmed, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        return trimmed.Any(char.IsLetterOrDigit);
+    }
+
+    /// <summary>
+    /// Finds a "blank value" label (not an e-CF field) and excludes ALL its right-side value
+    /// run(s) from StaticRuns. The label itself stays static; no FieldSlot is created.
+    /// </summary>
+    private static void BlankLabelValues(List<Word> candidateWords, string[] labels, HashSet<Word> consumed)
+    {
+        var anchor = FindPhraseAnchor(candidateWords, labels, consumed);
+        if (anchor is null)
+        {
+            return;
+        }
+
+        var valueRuns = FindValueRuns(candidateWords, anchor, consumed);
+        foreach (var v in valueRuns) consumed.Add(v);
     }
 
     /// <summary>
@@ -338,17 +553,18 @@ public static class RiModelExtractor
         normalizedLabels.Any(l => normalized == l || normalized.StartsWith(l, StringComparison.Ordinal));
 
     /// <summary>
-    /// Given a label anchor word, finds the nearby value run: prefers a word to the right on
-    /// the same line (small Y difference), falling back to the nearest word below it.
-    /// Skips words already consumed and words that are themselves known anchor labels.
+    /// Given a label anchor word, finds ALL value runs to its right on the same visual line
+    /// (within <paramref name="baselineTolerance"/> points on the baseline - handles slightly
+    /// different font sizes/baselines between label and value), ordered left-to-right. Falls
+    /// back to the nearest single word below the anchor (labels stacked vertically) if none
+    /// are found on the same line. Skips words already consumed and words that are themselves
+    /// known anchor labels (so the NEXT label on the page is never swallowed as a value).
     /// </summary>
-    private static Word? FindValueRun(List<Word> words, Word anchor, HashSet<Word> consumed)
+    private static List<Word> FindValueRuns(List<Word> words, Word anchor, HashSet<Word> consumed, double baselineTolerance = 5.0)
     {
-        const double sameLineTolerance = 3.0;
-
         var candidatesSameLine = words
             .Where(w => w != anchor && !consumed.Contains(w))
-            .Where(w => Math.Abs(w.BoundingBox.Bottom - anchor.BoundingBox.Bottom) <= sameLineTolerance)
+            .Where(w => Math.Abs(w.BoundingBox.Bottom - anchor.BoundingBox.Bottom) <= baselineTolerance)
             .Where(w => w.BoundingBox.Left >= anchor.BoundingBox.Right - 1)
             .Where(w => !IsKnownAnchorLabel(w))
             .OrderBy(w => w.BoundingBox.Left)
@@ -356,7 +572,7 @@ public static class RiModelExtractor
 
         if (candidatesSameLine.Count > 0)
         {
-            return candidatesSameLine[0];
+            return candidatesSameLine;
         }
 
         // Fall back to the closest word directly below the anchor (labels stacked vertically).
@@ -368,7 +584,7 @@ public static class RiModelExtractor
             .OrderByDescending(w => w.BoundingBox.Top)
             .ToList();
 
-        return candidatesBelow.Count > 0 ? candidatesBelow[0] : null;
+        return candidatesBelow.Count > 0 ? [candidatesBelow[0]] : [];
     }
 
     private static bool IsKnownAnchorLabel(Word word)
@@ -382,10 +598,12 @@ public static class RiModelExtractor
     /// <summary>
     /// Attempts to locate the table header row by finding words that match the known column
     /// anchor labels and sit roughly on the same horizontal line (min Y variance). Also
-    /// captures the first data row beneath the header (the sample item row) so its VALUES can
-    /// be excluded from StaticRuns (the header words themselves remain static).
+    /// captures every word in the FULL item band beneath the header down to (but not
+    /// including) the first totals label (SUB-TOTAL/SUBTOTAL), so every sample item row and
+    /// its sub-lines (unit, quantity, "x", unit price, etc.) are excluded from StaticRuns -
+    /// not just the first row. The header words themselves remain static.
     /// </summary>
-    private static (List<ItemColumn> Columns, List<Word> HeaderWords, List<Word> ItemRowWords, double TopY, double? HeaderBottom) BuildColumns(
+    private static (List<ItemColumn> Columns, List<Word> HeaderWords, List<Word> ItemBandWords, double TopY, double? HeaderBottom) BuildColumns(
         List<Word> words, Func<Word, double> topY)
     {
         var headerWords = new List<(Word Word, string Field)>();
@@ -436,24 +654,25 @@ public static class RiModelExtractor
             });
         }
 
-        // Sample item row: words below the header row, on the first line encountered
-        // (closest Y below headerBottom).
-        var belowHeader = words
-            .Where(w => w.BoundingBox.Top < headerBottom)
-            .OrderByDescending(w => w.BoundingBox.Top)
+        // Full item band: every word strictly below the header row down to (but not
+        // including) the first totals label line (SUB-TOTAL/SUBTOTAL). This removes ALL
+        // sample item rows/sub-lines, not just the first.
+        var normalizedTotalsLabels = new[] { "SUB-TOTAL", "SUBTOTAL" };
+        double bandBottom = words
+            .Where(w =>
+            {
+                var normalized = NormalizeText(w.Text);
+                return normalizedTotalsLabels.Any(l => normalized == l || normalized.StartsWith(l, StringComparison.Ordinal));
+            })
+            .Select(w => w.BoundingBox.Bottom)
+            .DefaultIfEmpty(double.NegativeInfinity)
+            .Max();
+
+        var itemBandWords = words
+            .Where(w => w.BoundingBox.Top < headerBottom && w.BoundingBox.Bottom > bandBottom)
             .ToList();
 
-        var itemRowWords = new List<Word>();
-        if (belowHeader.Count > 0)
-        {
-            var firstRowTop = belowHeader[0].BoundingBox.Top;
-            const double rowTolerance = 3.0;
-            itemRowWords = belowHeader
-                .Where(w => Math.Abs(w.BoundingBox.Top - firstRowTop) <= rowTolerance)
-                .ToList();
-        }
-
-        return (columns, headerWords.Select(h => h.Word).ToList(), itemRowWords, topYValue, headerBottom);
+        return (columns, headerWords.Select(h => h.Word).ToList(), itemBandWords, topYValue, headerBottom);
     }
 
     /// <summary>

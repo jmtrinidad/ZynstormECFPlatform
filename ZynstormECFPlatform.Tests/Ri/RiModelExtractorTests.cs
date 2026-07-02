@@ -29,9 +29,20 @@ public class RiModelExtractorTests
         Assert.Contains(staticTexts, t => t.Contains("SUB-TOTAL"));
         Assert.Contains(staticTexts, t => t.Contains("DESCRIPCI"));
 
+        // Emisor header (above the "FACTURA DE CREDITO FISCAL" banner) is fully static,
+        // including the emisor's own RNC - it must never be picked up as rncComprador.
+        Assert.Contains(staticTexts, t => t.Contains("EMPRESA"));
+        Assert.Contains(staticTexts, t => t.Contains("132293894"));
+
         var fieldKeys = page.Fields.Select(f => f.FieldKey).ToList();
         Assert.Contains("eNCF", fieldKeys);
         Assert.Contains("total", fieldKeys);
+        Assert.Contains("rncComprador", fieldKeys);
+
+        // The buyer RNC/CED value (not the emisor's bare RNC) must be the one mapped.
+        var rncComprador = page.Fields.Single(f => f.FieldKey == "rncComprador");
+        var rncCompradorRun = page.StaticRuns.SingleOrDefault(r => r.Text.Contains("131880681"));
+        Assert.Null(rncCompradorRun); // buyer RNC value must be excluded from StaticRuns, not just relabeled.
 
         Assert.True(page.Items.Columns.Count >= 2);
         Assert.Contains(page.Items.Columns, c => string.Equals(c.Field, "importe", StringComparison.OrdinalIgnoreCase));
@@ -39,6 +50,12 @@ public class RiModelExtractorTests
         // Sample values must NOT leak into StaticRuns.
         Assert.DoesNotContain(staticTexts, t => t.Contains("E320000000028"));
         Assert.DoesNotContain(staticTexts, t => t.Contains("PRODUCTO X"));
+        Assert.DoesNotContain(staticTexts, t => t.Contains("131880681"));
+
+        // Blank (non e-CF) receipt label sample value must be blanked, with no FieldSlot.
+        Assert.DoesNotContain(staticTexts, t => t.Contains("MARIA"));
+        Assert.Contains(staticTexts, t => t.Contains("CAJERO"));
+        Assert.DoesNotContain(fieldKeys, k => k == "cajero");
     }
 
     [Fact]
@@ -67,11 +84,15 @@ public class RiModelExtractorTests
                 {
                     col.Item().Text("MI EMPRESA").FontSize(16).Bold();
                     col.Item().Text("RNC: 132293894");
-                    col.Item().Text("NCF: E320000000028");
+
+                    col.Item().PaddingTop(6).Text("FACTURA DE CREDITO FISCAL ELECTRONICA").Bold();
+
+                    col.Item().PaddingTop(6).Text("NCF: E320000000028");
                     col.Item().Text("Fecha: 30-06-2026");
+                    col.Item().Text("Cajero: Maria Diaz");
 
                     col.Item().PaddingTop(10).Text("Cliente: Juan Perez");
-                    col.Item().Text("RNC: 131880681");
+                    col.Item().Text("RNC/CED: 131880681");
 
                     col.Item().PaddingTop(15).Table(table =>
                     {
