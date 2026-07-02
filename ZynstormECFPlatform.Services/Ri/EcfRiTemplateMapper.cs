@@ -55,6 +55,52 @@ public static class EcfRiTemplateMapper
         };
     }
 
+    /// <summary>
+    /// Maps a signed e-CF type 41 (Comprobante de Compras) XML into the
+    /// <see cref="RiPurchaseModel"/> consumed by <see cref="RiPurchasePdf"/> (the
+    /// full-sheet QuestPDF template ported from EasyInvoice's PurchasePdf). Emisor maps
+    /// to Company and Comprador maps to Supplier, since in a compras e-CF the buyer
+    /// (comprador) is the one issuing the document to record a purchase from the
+    /// supplier identified in the emisor node.
+    /// </summary>
+    public static RiPurchaseModel MapPurchase(string signedXml, DgiiEnvironment environment)
+    {
+        var data = EcfRiDataMapper.Map(signedXml, environment);
+
+        return new RiPurchaseModel
+        {
+            Company = new RiPurchaseCompany
+            {
+                Name = data.Buyer.Name,
+                Rnc = data.Buyer.Document,
+                Address = data.Buyer.Address,
+                Phone = data.Buyer.Phone
+            },
+            Supplier = new RiPurchaseSupplier
+            {
+                Name = data.Issuer.Name,
+                Rnc = data.Issuer.Document,
+                Address = string.IsNullOrWhiteSpace(data.Issuer.Address) ? null : data.Issuer.Address
+            },
+            NcfNumber = data.ENcf,
+            FechaEmision = data.FechaEmision,
+            FechaFirma = data.FechaFirma,
+            Items = data.Items.ConvertAll(item => new RiPurchaseItem
+            {
+                Description = item.Description,
+                Quantity = item.Quantity,
+                Price = item.Price,
+                Itbis = item.Itbis,
+                Amount = item.Amount
+            }),
+            SubTotal = data.Totals.SubTotal,
+            Itbis = data.Totals.Itbis,
+            Total = data.Totals.Total,
+            Qr = data.QrUrl,
+            SecurityCode = data.SecurityCode
+        };
+    }
+
     /// <summary>DGII e-CF type code to display title, mirroring EasyInvoice's InvoicePdf label logic.</summary>
     private static string NcfTypeName(int ecfType) => ecfType switch
     {
