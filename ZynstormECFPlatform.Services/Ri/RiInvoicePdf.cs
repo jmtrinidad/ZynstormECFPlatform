@@ -8,8 +8,10 @@ namespace ZynstormECFPlatform.Services.Ri;
 /// QuestPDF Ri (Representación Impresa) template ported from EasyInvoice's
 /// <c>EasyInvoice.Reports/Invoices/InvoicePdf.cs</c>, adapted to read <see cref="RiInvoiceModel"/>
 /// instead of EasyInvoice's <c>Invoice</c> entity. Renders as an 80mm continuous receipt
-/// and covers most e-CF types (31, 32, 33, 34, 43-47); type 41 (Compras) uses a different,
-/// full-sheet template (RiPurchasePdf, added separately).
+/// and covers most e-CF types (31, 32, 33, 34, 44-47) con las variantes del original:
+/// VALIDO HASTA oculto para 32/34, bloques de factura afectada/modificación en notas,
+/// footer contado (recibido/cambio) vs crédito (FIRMA REQUERIDA). Type 41 (Compras) uses
+/// RiPurchasePdf and type 43 (Gastos Menores) uses RiExpensePdf.
 /// </summary>
 public class RiInvoicePdf(RiInvoiceModel model) : IDocument
 {
@@ -29,8 +31,10 @@ public class RiInvoicePdf(RiInvoiceModel model) : IDocument
         var company = _model.Company;
         var client = _model.Client;
 
-        var isCreditNote = _model.EcfType == 33;
-        var isDebitNote = _model.EcfType == 34;
+        // DGII: 33 = Nota de Débito, 34 = Nota de Crédito (paridad EasyInvoice E33/E34).
+        var isCreditNote = _model.EcfType == 34;
+        var isDebitNote = _model.EcfType == 33;
+        var isNote = isCreditNote || isDebitNote;
         var docTypeLabel = isCreditNote ? "NOTA CRÉDITO:" : (isDebitNote ? "NOTA DÉBITO:" : "FACTURA:");
 
         container.Page(page =>
@@ -52,9 +56,12 @@ public class RiInvoicePdf(RiInvoiceModel model) : IDocument
                               .Text($"RNC.: {company.Rnc}")
                               .FontSize(9.5f);
 
-                    c.Item().AlignCenter()
-                              .Text($"{company.Address}")
-                              .FontSize(9.5f);
+                    if (!string.IsNullOrEmpty(company.Address))
+                    {
+                        c.Item().AlignCenter()
+                                 .Text($"{company.Address}")
+                                 .FontSize(9.5f);
+                    }
 
                     if (!string.IsNullOrEmpty(company.Phone))
                     {
@@ -91,37 +98,94 @@ public class RiInvoicePdf(RiInvoiceModel model) : IDocument
                     tb.Cell().Text("eNCF:").SemiBold().FontSize(8.5f);
                     tb.Cell().AlignRight().Text(_model.NcfNumber).FontSize(8.5f);
 
-                    tb.Cell().Text(docTypeLabel).SemiBold().FontSize(8.5f);
-                    tb.Cell().AlignRight().Text(_model.NcfNumber).FontSize(8.5f);
+                    // Oculto para 32 y 34, como el isEcfNote del InvoicePdf original.
+                    var hideValidUntil = _model.EcfType == 32 || _model.EcfType == 34;
+                    if (!hideValidUntil && !string.IsNullOrEmpty(_model.ValidUntil))
+                    {
+                        tb.Cell().Text("VALIDO HASTA:").SemiBold().FontSize(8.5f);
+                        tb.Cell().AlignRight().Text(_model.ValidUntil).FontSize(8.5f);
+                    }
 
-                    if (!isCreditNote && !isDebitNote && !string.IsNullOrEmpty(_model.PaymentType))
+                    if (!string.IsNullOrEmpty(_model.InternalInvoiceNumber))
+                    {
+                        tb.Cell().Text(docTypeLabel).SemiBold().FontSize(8.5f);
+                        tb.Cell().AlignRight().Text(_model.InternalInvoiceNumber).FontSize(8.5f);
+                    }
+
+                    if (!isNote && !string.IsNullOrEmpty(_model.PaymentType))
                     {
                         tb.Cell().Text("TIPO DE PAGO:").SemiBold().FontSize(8.5f);
                         tb.Cell().AlignRight().Text(_model.PaymentType.ToUpper()).FontSize(8.5f);
+
+                        if (!string.IsNullOrEmpty(_model.PaymentCondition))
+                        {
+                            tb.Cell().Text("COND. PAGO:").SemiBold().FontSize(8.5f);
+                            tb.Cell().AlignRight().Text(_model.PaymentCondition.ToUpper()).FontSize(8.5f);
+                        }
                     }
 
                     tb.Cell().Text("FECHA:").SemiBold().FontSize(8.5f);
                     tb.Cell().AlignRight().Text(_model.FechaEmision).FontSize(8.5f);
+
+                    if (!string.IsNullOrEmpty(_model.Cashier))
+                    {
+                        tb.Cell().Text("CAJERO:").SemiBold().FontSize(8.5f);
+                        tb.Cell().AlignRight().Text(_model.Cashier).FontSize(8.5f);
+                    }
                 });
 
                 col.Item().LineHorizontal(0.5f);
 
-                col.Item().Table(tb =>
+                if (!string.IsNullOrEmpty(client.Name) || !string.IsNullOrEmpty(client.Rnc))
                 {
-                    tb.ColumnsDefinition(columns =>
+                    col.Item().Table(tb =>
                     {
-                        columns.RelativeColumn();
-                        columns.RelativeColumn();
+                        tb.ColumnsDefinition(columns =>
+                        {
+                            columns.RelativeColumn();
+                            columns.RelativeColumn();
+                        });
+
+                        tb.Cell().Text("CLIENTE:").SemiBold().FontSize(8.5f);
+                        tb.Cell().AlignRight().Text($"{client.Name}").FontSize(8.5f);
+
+                        tb.Cell().Text("RNC/CED:").SemiBold().FontSize(8.5f);
+                        tb.Cell().AlignRight().Text(string.IsNullOrEmpty(client.Rnc) ? "N/D" : client.Rnc).FontSize(8.5f);
                     });
 
-                    tb.Cell().Text("CLIENTE:").SemiBold().FontSize(8.5f);
-                    tb.Cell().AlignRight().Text($"{client.Name}").FontSize(8.5f);
+                    col.Item().LineHorizontal(0.5f);
+                }
 
-                    tb.Cell().Text("RNC/CED:").SemiBold().FontSize(8.5f);
-                    tb.Cell().AlignRight().Text(string.IsNullOrEmpty(client.Rnc) ? "N/D" : client.Rnc).FontSize(8.5f);
-                });
+                if (isNote && !string.IsNullOrEmpty(_model.AffectedNcf))
+                {
+                    col.Item().Table(tb =>
+                    {
+                        tb.ColumnsDefinition(columns =>
+                        {
+                            columns.RelativeColumn();
+                            columns.RelativeColumn();
+                        });
 
-                col.Item().LineHorizontal(0.5f);
+                        tb.Cell().ColumnSpan(2).PaddingBottom(2).Text("DATOS FACTURA AFECTADA").Bold().FontSize(8.5f);
+
+                        tb.Cell().Text("NCF MODIFICADO:").SemiBold().FontSize(8.5f);
+                        tb.Cell().AlignRight().Text(_model.AffectedNcf).FontSize(8.5f);
+
+                        if (!string.IsNullOrEmpty(_model.PaymentType))
+                        {
+                            tb.Cell().Text("TIPO DE PAGO:").SemiBold().FontSize(8.5f);
+                            tb.Cell().AlignRight().Text(_model.PaymentType.ToUpper()).FontSize(8.5f);
+                        }
+
+                        if (!string.IsNullOrEmpty(_model.PaymentCondition))
+                        {
+                            tb.Cell().Text("COND. PAGO:").SemiBold().FontSize(8.5f);
+                            tb.Cell().AlignRight().Text(_model.PaymentCondition.ToUpper()).FontSize(8.5f);
+                        }
+                    });
+
+                    col.Item().LineHorizontal(0.5f);
+                }
 
                 col.Item().Table(tb =>
                 {
@@ -144,7 +208,10 @@ public class RiInvoicePdf(RiInvoiceModel model) : IDocument
                         tb.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9").Padding(2).Column(productCol =>
                         {
                             productCol.Item().Text(item.Description).FontSize(8);
-                            var qtyLabel = $"{item.Quantity.ToString("0.##", CultureInfo.InvariantCulture)}  x  {item.Price:F2}";
+                            var quantity = item.Quantity.ToString("0.##", CultureInfo.InvariantCulture);
+                            var qtyLabel = string.IsNullOrEmpty(item.Unit)
+                                ? $"{quantity}  x  {item.Price:F2}"
+                                : $"{quantity} {item.Unit}  x  {item.Price:F2}";
                             productCol.Item().Text(qtyLabel).FontSize(7.5f).FontColor("#7F7F7F");
                         });
                         tb.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9").Padding(2).Text(string.Format(Culture, "{0:C2}", item.Itbis)).FontSize(8);
@@ -178,6 +245,31 @@ public class RiInvoicePdf(RiInvoiceModel model) : IDocument
                     tb.Cell().AlignRight().Text(string.Format(Culture, "{0:C2}", _model.Total)).Bold().FontSize(11);
                 });
 
+                if (isNote && (!string.IsNullOrEmpty(_model.ModificationCode) || !string.IsNullOrEmpty(_model.ModificationReason)))
+                {
+                    col.Item().LineHorizontal(0.5f);
+                    col.Item().PaddingVertical(2).Column(noteCol =>
+                    {
+                        noteCol.Item().Text("INFORMACIÓN DE MODIFICACIÓN").Bold().FontSize(8);
+                        if (!string.IsNullOrEmpty(_model.ModificationCode))
+                        {
+                            noteCol.Item().Text(txt =>
+                            {
+                                txt.Span("Código Mod.: ").Bold().FontSize(7.5f);
+                                txt.Span(_model.ModificationCode).FontSize(7.5f);
+                            });
+                        }
+                        if (!string.IsNullOrEmpty(_model.ModificationReason))
+                        {
+                            noteCol.Item().Text(txt =>
+                            {
+                                txt.Span("Razón / Concepto: ").Bold().FontSize(7.5f);
+                                txt.Span(_model.ModificationReason).FontSize(7.5f);
+                            });
+                        }
+                    });
+                }
+
                 if (!string.IsNullOrEmpty(_model.Note))
                 {
                     col.Item().LineHorizontal(0.5f);
@@ -186,6 +278,42 @@ public class RiInvoicePdf(RiInvoiceModel model) : IDocument
                         noteCol.Item().Text("NOTA").Bold().FontSize(8);
                         noteCol.Item().Text(_model.Note).FontSize(7.5f);
                     });
+                }
+
+                col.Item().Text("");
+
+                col.Item().Table(tb =>
+                {
+                    tb.ColumnsDefinition(columns =>
+                    {
+                        columns.RelativeColumn();
+                        columns.RelativeColumn();
+                    });
+
+                    tb.Cell().Text("ATENDIDO POR:").SemiBold().FontSize(8.5f);
+                    tb.Cell().AlignRight().Text(_model.Cashier).FontSize(8.5f);
+
+                    tb.Cell().Text("ARTÍCULOS:").SemiBold().FontSize(8.5f);
+                    tb.Cell().AlignRight().Text($"{_model.Items.Count}").FontSize(8.5f);
+
+                    tb.Cell().Text(_model.IsCredit ? "CRÉDITO:" : "CONTADO:").SemiBold().FontSize(8.5f);
+                    tb.Cell().AlignRight().Text(string.Format(Culture, "{0:C2}", _model.Total)).FontSize(8.5f);
+
+                    if (!_model.IsCredit)
+                    {
+                        tb.Cell().Text("TOTAL RECIBIDO:").SemiBold().FontSize(8.5f);
+                        tb.Cell().AlignRight().Text(string.Format(Culture, "{0:C2}", _model.ReceivedAmount)).FontSize(8.5f);
+
+                        tb.Cell().Text("SU CAMBIO:").SemiBold().FontSize(8.5f);
+                        tb.Cell().AlignRight().Text(string.Format(Culture, "{0:C2}", _model.ChangeAmount)).FontSize(8.5f);
+                    }
+                });
+
+                if (_model.IsCredit)
+                {
+                    col.Item().Text("");
+                    col.Item().LineHorizontal(0.5f);
+                    col.Item().AlignCenter().Text("FIRMA REQUERIDA").SemiBold().FontSize(8.5f);
                 }
 
                 col.Item().LineHorizontal(0.5f);
