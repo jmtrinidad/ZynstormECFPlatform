@@ -103,6 +103,7 @@ public static class EcfRiTemplateMapper
                 Address = string.IsNullOrWhiteSpace(data.Buyer.Address) ? null : data.Buyer.Address
             },
             NcfNumber = data.ENcf,
+            ValidUntil = FormatDate(data.FechaVencimientoSecuencia),
             FechaEmision = data.FechaEmision,
             FechaFirma = data.FechaFirma,
             Items = data.Items.ConvertAll(item =>

@@ -70,6 +70,7 @@ public class RiPurchasePdfTests
             Company = new RiPurchaseCompany { Name = "EMPRESA COMPRADORA", Rnc = "132293894", Address = "AVE. ISABEL AGUIAR NO. 269" },
             Supplier = new RiPurchaseSupplier { Name = "SUPLIDOR INFORMAL", Rnc = "533445861" },
             NcfNumber = "E410000000007",
+            ValidUntil = "31/12/2028",
             FechaEmision = "01-04-2020",
             Items = [new RiPurchaseItem { Description = "Servicio Profesional", Quantity = 15, Price = 385.00m, Itbis = 1049.90m, Amount = 5832.75m, ItbisRate = 18m }],
             SubTotal = 16064.05m,
@@ -89,5 +90,7 @@ public class RiPurchasePdfTests
         Assert.Contains("Retención ITBIS", text);
         Assert.Contains("18%", text);         // ITBIS% de la línea
         Assert.Contains("14,502.64", text);   // Total Neto = 18955.58 - 2846.53 - 1606.41
+        Assert.Contains("Válido hasta:", text);
+        Assert.Contains("31/12/2028", text);
     }
 }

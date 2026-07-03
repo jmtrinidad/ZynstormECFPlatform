@@ -14,6 +14,9 @@ public class RiPurchaseModel
 
     public string NcfNumber { get; set; } = string.Empty;
 
+    /// <summary>FechaVencimientoSecuencia formateada dd/MM/yyyy; vacío si no viene.</summary>
+    public string ValidUntil { get; set; } = string.Empty;
+
     public string FechaEmision { get; set; } = string.Empty;
 
     public string FechaFirma { get; set; } = string.Empty;

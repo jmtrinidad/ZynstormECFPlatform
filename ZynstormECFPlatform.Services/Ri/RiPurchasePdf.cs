@@ -62,6 +62,10 @@ public class RiPurchasePdf(RiPurchaseModel model) : IDocument
                     {
                         c.Item().Text(title).Bold().FontSize(11).FontColor("#2B6CB0");
                         c.Item().Text($"eNCF: {_model.NcfNumber}").Bold().FontSize(9);
+                        if (!string.IsNullOrEmpty(_model.ValidUntil))
+                        {
+                            c.Item().Text($"Válido hasta: {_model.ValidUntil}").FontSize(8);
+                        }
                         c.Item().Text($"Fecha: {_model.FechaEmision}").FontSize(8);
                     });
                 });

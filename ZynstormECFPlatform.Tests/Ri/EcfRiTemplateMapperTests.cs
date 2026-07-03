@@ -106,6 +106,7 @@ public class EcfRiTemplateMapperTests
         Assert.Equal("132293894", model.Company.Rnc);
         Assert.Equal("DOCUMENTOS ELECTRONICOS DE 11", model.Supplier.Name);
         Assert.Equal("533445861", model.Supplier.Rnc);
+        Assert.Equal("31/12/2028", model.ValidUntil);
         Assert.Equal(2846.53m, model.ItbisRetentionAmount);
         Assert.Equal(1606.41m, model.IsrRetentionAmount);
         Assert.Equal(10.0m, Math.Round(model.IsrRetentionRate, 1)); // 1606.41 / 16064.05 * 100

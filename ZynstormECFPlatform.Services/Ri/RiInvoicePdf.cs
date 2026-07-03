@@ -192,8 +192,8 @@ public class RiInvoicePdf(RiInvoiceModel model) : IDocument
                     tb.ColumnsDefinition(columns =>
                     {
                         columns.RelativeColumn();
-                        columns.ConstantColumn(60);
-                        columns.ConstantColumn(60);
+                        columns.ConstantColumn(65);
+                        columns.ConstantColumn(70);
                     });
 
                     tb.Header(header =>
@@ -205,17 +205,18 @@ public class RiInvoicePdf(RiInvoiceModel model) : IDocument
 
                     foreach (var item in _model.Items)
                     {
-                        tb.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9").Padding(2).Column(productCol =>
-                        {
-                            productCol.Item().Text(item.Description).FontSize(8);
-                            var quantity = item.Quantity.ToString("0.##", CultureInfo.InvariantCulture);
-                            var qtyLabel = string.IsNullOrEmpty(item.Unit)
-                                ? $"{quantity}  x  {item.Price:F2}"
-                                : $"{quantity} {item.Unit}  x  {item.Price:F2}";
-                            productCol.Item().Text(qtyLabel).FontSize(7.5f).FontColor("#7F7F7F");
-                        });
-                        tb.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9").Padding(2).Text(string.Format(Culture, "{0:C2}", item.Itbis)).FontSize(8);
-                        tb.Cell().AlignRight().BorderBottom(0.5f).BorderColor("#D9D9D9").Padding(2).Text(string.Format(Culture, "{0:C2}", item.Amount)).FontSize(8);
+                        // La descripción ocupa toda la línea; debajo van la cantidad,
+                        // el ITBIS y el total alineados con las columnas del header.
+                        tb.Cell().ColumnSpan(3).PaddingHorizontal(2).PaddingTop(2).Text(item.Description).FontSize(8);
+
+                        var quantity = item.Quantity.ToString("0.##", CultureInfo.InvariantCulture);
+                        var qtyLabel = string.IsNullOrEmpty(item.Unit)
+                            ? $"{quantity}  x  {item.Price:F2}"
+                            : $"{quantity} {item.Unit}  x  {item.Price:F2}";
+
+                        tb.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9").PaddingHorizontal(2).PaddingBottom(2).Text(qtyLabel).FontSize(7.5f).FontColor("#7F7F7F");
+                        tb.Cell().BorderBottom(0.5f).BorderColor("#D9D9D9").PaddingHorizontal(2).PaddingBottom(2).Text(string.Format(Culture, "{0:C2}", item.Itbis)).FontSize(8);
+                        tb.Cell().AlignRight().BorderBottom(0.5f).BorderColor("#D9D9D9").PaddingHorizontal(2).PaddingBottom(2).Text(string.Format(Culture, "{0:C2}", item.Amount)).FontSize(8);
                     }
                 });
 
