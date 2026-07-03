@@ -20,8 +20,8 @@ La siguiente tabla resume los nodos clave y campos que deben estar presentes seg
 | :---: | :--- | :--- | :--- |
 | **31** | 🧾 **Crédito Fiscal** | `Comprador` | 🔹 `RNCComprador`<br>🔹 `RazonSocialComprador` |
 | **32** | 🛒 **Consumo** | `Comprador` | ⚠️ Requerido si **MontoTotal ≥ RD$ 250,000** |
-| **33** | 📉 **Nota de Crédito** | `Inf. Referencia` | 🔸 `NCFModificado`<br>🔸 `FechaNCFModificado`<br>🔸 `CodigoModificacion` |
-| **34** | 📈 **Nota de Débito** | `Inf. Referencia` | 🔸 `NCFModificado`<br>🔸 `FechaNCFModificado`<br>🔸 `CodigoModificacion` |
+| **33** | 📈 **Nota de Débito** | `Inf. Referencia` | 🔸 `NCFModificado`<br>🔸 `FechaNCFModificado`<br>🔸 `CodigoModificacion` |
+| **34** | 📉 **Nota de Crédito** | `Inf. Referencia` | 🔸 `NCFModificado`<br>🔸 `FechaNCFModificado`<br>🔸 `CodigoModificacion` |
 | **41** | 🛍️ **Compras** | `Comprador` | 🔹 `RNCComprador`<br>🔹 `RazonSocialComprador` |
 | **43** | ☕ **Gastos Menores** | *N/A* | ✅ No requiere datos de comprador |
 | **44** | 🏢 **Regímenes Esp.** | `Comprador` | 🔹 `RNCComprador`<br>🔹 `RazonSocialComprador` |

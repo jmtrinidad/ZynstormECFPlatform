@@ -59,7 +59,10 @@ public static class EcfRiTemplateMapper
                 Description = item.Description,
                 Quantity = item.Quantity,
                 Price = item.Price,
-                Itbis = item.Itbis,
+                // Los XML de DGII no siempre traen MontoITBIS por ítem: derivarlo de la tasa.
+                Itbis = item.Itbis > 0
+                    ? item.Itbis
+                    : Math.Round(item.Amount * ItbisRateFor(item.IndicadorFacturacion, data.Totals) / 100m, 2),
                 Amount = item.Amount,
                 Unit = UnitAbbreviation(item.UnidadMedida),
                 Discount = item.Discount
