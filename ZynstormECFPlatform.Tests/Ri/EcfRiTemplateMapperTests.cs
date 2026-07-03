@@ -113,4 +113,25 @@ public class EcfRiTemplateMapperTests
         Assert.Equal(18m, model.Items[0].ItbisRate);
         Assert.Equal(Math.Round(model.Items[0].Amount * 0.18m, 2), model.Items[0].Itbis);
     }
+
+    [Fact]
+    public void MapExpense_E43_PopulatesModel()
+    {
+        // Paso_E430000000008.xml: sin Comprador ni TipoPago; MontoExento=4950;
+        // 1 ítem "Gasto personal en comida (kiosko)"; FechaVencimientoSecuencia=31-12-2028.
+        var model = EcfRiTemplateMapper.MapExpense(Load("Paso_E430000000008.xml"), DgiiEnvironment.CerteCF);
+
+        Assert.Equal("DOCUMENTOS ELECTRONICOS DE 02", model.Company.Name);
+        Assert.Equal("E430000000008", model.NcfNumber);
+        Assert.Equal("31/12/2028", model.ValidUntil);
+        Assert.Equal(string.Empty, model.PaymentMethod);
+        Assert.Equal("PEDRO", model.UserName);
+        Assert.Equal("Gasto personal en comida (kiosko)", model.Concept);
+        Assert.Equal(4950.00m, model.SubTotal);
+        Assert.Equal(0m, model.Itbis);
+        Assert.Equal("EXENTO:", model.ItbisLabel);
+        Assert.Equal(4950.00m, model.Total);
+        Assert.NotEmpty(model.Qr);
+        Assert.NotEmpty(model.SecurityCode);
+    }
 }

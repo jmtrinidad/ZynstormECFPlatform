@@ -128,6 +128,46 @@ public static class EcfRiTemplateMapper
         };
     }
 
+    /// <summary>
+    /// Maps a signed e-CF type 43 (Gastos Menores) XML into the <see cref="RiExpenseModel"/>
+    /// consumed by <see cref="RiExpensePdf"/> (plantilla portada del ExpensePdf informal de
+    /// EasyInvoice). El 43 no lleva comprador: solo emisor, totales e ítems.
+    /// </summary>
+    public static RiExpenseModel MapExpense(string signedXml, DgiiEnvironment environment)
+    {
+        var data = EcfRiDataMapper.Map(signedXml, environment);
+
+        var itbisLabel = data.Totals.Itbis <= 0
+            ? "EXENTO:"
+            : (data.Totals.Itbis1Rate == 16m ? "ITBIS 16%:" : "ITBIS 18%:");
+
+        return new RiExpenseModel
+        {
+            Company = new RiInvoiceCompany
+            {
+                Name = data.Issuer.Name,
+                Rnc = data.Issuer.Document,
+                Address = data.Issuer.Address,
+                Phone = data.Issuer.Phone
+            },
+            NcfNumber = data.ENcf,
+            ValidUntil = FormatDate(data.FechaVencimientoSecuencia),
+            PaymentMethod = PaymentTypeLabel(data.TipoPago),
+            FechaEmision = data.FechaEmision,
+            FechaFirma = data.FechaFirma,
+            UserName = CertificationCashier,
+            Concept = string.Join("; ", data.Items
+                .Select(item => item.Description)
+                .Where(description => !string.IsNullOrWhiteSpace(description))),
+            SubTotal = data.Totals.SubTotal,
+            Itbis = data.Totals.Itbis,
+            Total = data.Totals.Total,
+            ItbisLabel = itbisLabel,
+            Qr = data.QrUrl,
+            SecurityCode = data.SecurityCode
+        };
+    }
+
     /// <summary>IndicadorFacturacion del ítem → tasa ITBIS de Totales (1→ITBIS1, 2→ITBIS2, 3→ITBIS3; 4/0→exento).</summary>
     private static decimal ItbisRateFor(int indicadorFacturacion, RiTotals totals) => indicadorFacturacion switch
     {

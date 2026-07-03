@@ -30,11 +30,27 @@ public class RiPdfRendererTests
     [Fact]
     public void Render_Type41_DispatchesToPurchaseTemplate_AndProducesPdf()
     {
-        // No dedicated type-41 fixture exists yet; reuse a general e-CF XML to verify
-        // the ecfType==41 branch routes to RiPurchasePdf (full-sheet) without throwing.
-        var bytes = RiPdfRenderer.Render(41, Load("Paso_1_E310000000402.xml"));
+        // Paso_E410000000007.xml: TipoeCF=41 -> RiPurchasePdf (full-sheet).
+        var bytes = RiPdfRenderer.Render(41, Load("Paso_E410000000007.xml"));
 
         Assert.True(bytes.Length > 500);
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
+    }
+
+    [Fact]
+    public void Render_Type43_DispatchesToExpenseTemplate_AndProducesPdf()
+    {
+        // Paso_E430000000008.xml: TipoeCF=43 -> RiExpensePdf (recibo de gastos menores).
+        var bytes = RiPdfRenderer.Render(43, Load("Paso_E430000000008.xml"));
+
+        Assert.True(bytes.Length > 500);
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
+
+        using var pdf = UglyToad.PdfPig.PdfDocument.Open(bytes);
+        var text = string.Join(" ", pdf.GetPages().SelectMany(p => p.GetWords().Select(w => w.Text)));
+        Assert.Contains("GASTOS MENORES ELECTRÓNICO", text);
+        Assert.Contains("CONCEPTO:", text);
+        Assert.Contains("EXENTO", text);
+        Assert.Contains("Gastos Menores E43", text);
     }
 }
