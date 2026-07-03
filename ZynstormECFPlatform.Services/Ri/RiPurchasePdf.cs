@@ -113,7 +113,7 @@ public class RiPurchasePdf(RiPurchaseModel model) : IDocument
 
                     foreach (var item in _model.Items)
                     {
-                        var itbisPct = item.Amount != 0 ? (item.Itbis / item.Amount) * 100m : 0m;
+                        var itbisPct = item.ItbisRate;
                         tb.Cell().BorderBottom(0.5f).BorderColor("#E2E8F0").Padding(4).Text(item.Description).FontSize(7.5f);
                         tb.Cell().BorderBottom(0.5f).BorderColor("#E2E8F0").Padding(4).Text($"{item.Quantity:F2}").FontSize(7.5f);
                         tb.Cell().BorderBottom(0.5f).BorderColor("#E2E8F0").Padding(4).Text(string.Format(Culture, "{0:C2}", item.Price)).FontSize(7.5f);
@@ -176,10 +176,20 @@ public class RiPurchasePdf(RiPurchaseModel model) : IDocument
                             });
                         }
 
+                        // ITBIS Retention
+                        if (_model.ItbisRetentionAmount > 0)
+                        {
+                            totalsCol.Item().Row(r =>
+                            {
+                                r.RelativeItem().Text("Retención ITBIS:").FontSize(7.5f);
+                                r.RelativeItem().AlignRight().Text($"-{string.Format(Culture, "{0:C2}", _model.ItbisRetentionAmount)}").FontSize(7.5f);
+                            });
+                        }
+
                         totalsCol.Item().LineHorizontal(0.5f).LineColor("#E2E8F0");
 
                         // Total Neto
-                        var finalTotal = _model.Total - _model.IsrRetentionAmount;
+                        var finalTotal = _model.Total - _model.IsrRetentionAmount - _model.ItbisRetentionAmount;
                         totalsCol.Item().Row(r =>
                         {
                             r.RelativeItem().Text("Total Neto RD$:").Bold().FontSize(10).FontColor("#1A365D");

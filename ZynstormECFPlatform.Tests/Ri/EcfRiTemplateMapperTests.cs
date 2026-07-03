@@ -93,4 +93,24 @@ public class EcfRiTemplateMapperTests
         Assert.Equal(18956m, model.ReceivedAmount);
         Assert.Equal(0.42m, model.ChangeAmount);
     }
+
+    [Fact]
+    public void MapPurchase_E41_CompanyIsEmisor_SupplierIsComprador_WithRetentions()
+    {
+        // Paso_E410000000007.xml: Emisor=DOCUMENTOS ELECTRONICOS DE 02 (la empresa),
+        // Comprador=DOCUMENTOS ELECTRONICOS DE 11 (suplidor informal),
+        // TotalITBISRetenido=2846.53, TotalISRRetencion=1606.41, ITBIS1=18.
+        var model = EcfRiTemplateMapper.MapPurchase(Load("Paso_E410000000007.xml"), DgiiEnvironment.CerteCF);
+
+        Assert.Equal("DOCUMENTOS ELECTRONICOS DE 02", model.Company.Name);
+        Assert.Equal("132293894", model.Company.Rnc);
+        Assert.Equal("DOCUMENTOS ELECTRONICOS DE 11", model.Supplier.Name);
+        Assert.Equal("533445861", model.Supplier.Rnc);
+        Assert.Equal(2846.53m, model.ItbisRetentionAmount);
+        Assert.Equal(1606.41m, model.IsrRetentionAmount);
+        Assert.Equal(10.0m, Math.Round(model.IsrRetentionRate, 1)); // 1606.41 / 16064.05 * 100
+        Assert.Equal(16064.05m, model.SubTotal);
+        Assert.Equal(18m, model.Items[0].ItbisRate);
+        Assert.Equal(Math.Round(model.Items[0].Amount * 0.18m, 2), model.Items[0].Itbis);
+    }
 }

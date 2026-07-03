@@ -34,6 +34,9 @@ public class RiPurchaseModel
     /// <summary>ISR retention amount. Defaults to 0.</summary>
     public decimal IsrRetentionAmount { get; set; }
 
+    /// <summary>ITBIS retenido (Totales/TotalITBISRetenido). Defaults to 0.</summary>
+    public decimal ItbisRetentionAmount { get; set; }
+
     public string? Note { get; set; }
 
     /// <summary>DGII ConsultaTimbre/ConsultaTimbreFC URL, also used to render the QR image.</summary>
@@ -75,4 +78,7 @@ public class RiPurchaseItem
     public decimal Itbis { get; set; }
 
     public decimal Amount { get; set; }
+
+    /// <summary>Tasa ITBIS de la línea según IndicadorFacturacion (ej. 18); 0 = exento.</summary>
+    public decimal ItbisRate { get; set; }
 }

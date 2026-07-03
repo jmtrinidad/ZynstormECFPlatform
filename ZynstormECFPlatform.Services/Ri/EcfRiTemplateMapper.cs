@@ -75,11 +75,10 @@ public static class EcfRiTemplateMapper
 
     /// <summary>
     /// Maps a signed e-CF type 41 (Comprobante de Compras) XML into the
-    /// <see cref="RiPurchaseModel"/> consumed by <see cref="RiPurchasePdf"/> (the
-    /// full-sheet QuestPDF template ported from EasyInvoice's PurchasePdf). Emisor maps
-    /// to Company and Comprador maps to Supplier, since in a compras e-CF the buyer
-    /// (comprador) is the one issuing the document to record a purchase from the
-    /// supplier identified in the emisor node.
+    /// <see cref="RiPurchaseModel"/> consumed by <see cref="RiPurchasePdf"/>. En el 41 el
+    /// EMISOR del XML es la empresa que registra la compra (ella emite el comprobante) y el
+    /// nodo COMPRADOR contiene al suplidor informal al que se le compró
+    /// (dgii_ecf_requirements.md §41): Company ← Emisor, Supplier ← Comprador.
     /// </summary>
     public static RiPurchaseModel MapPurchase(string signedXml, DgiiEnvironment environment)
     {
@@ -89,35 +88,54 @@ public static class EcfRiTemplateMapper
         {
             Company = new RiPurchaseCompany
             {
-                Name = data.Buyer.Name,
-                Rnc = data.Buyer.Document,
-                Address = data.Buyer.Address,
-                Phone = data.Buyer.Phone
+                Name = data.Issuer.Name,
+                Rnc = data.Issuer.Document,
+                Address = data.Issuer.Address,
+                Phone = data.Issuer.Phone
             },
             Supplier = new RiPurchaseSupplier
             {
-                Name = data.Issuer.Name,
-                Rnc = data.Issuer.Document,
-                Address = string.IsNullOrWhiteSpace(data.Issuer.Address) ? null : data.Issuer.Address
+                Name = data.Buyer.Name,
+                Rnc = data.Buyer.Document,
+                Address = string.IsNullOrWhiteSpace(data.Buyer.Address) ? null : data.Buyer.Address
             },
             NcfNumber = data.ENcf,
             FechaEmision = data.FechaEmision,
             FechaFirma = data.FechaFirma,
-            Items = data.Items.ConvertAll(item => new RiPurchaseItem
+            Items = data.Items.ConvertAll(item =>
             {
-                Description = item.Description,
-                Quantity = item.Quantity,
-                Price = item.Price,
-                Itbis = item.Itbis,
-                Amount = item.Amount
+                var rate = ItbisRateFor(item.IndicadorFacturacion, data.Totals);
+                return new RiPurchaseItem
+                {
+                    Description = item.Description,
+                    Quantity = item.Quantity,
+                    Price = item.Price,
+                    ItbisRate = rate,
+                    Itbis = item.Itbis > 0 ? item.Itbis : Math.Round(item.Amount * rate / 100m, 2),
+                    Amount = item.Amount
+                };
             }),
             SubTotal = data.Totals.SubTotal,
             Itbis = data.Totals.Itbis,
             Total = data.Totals.Total,
+            IsrRetentionAmount = data.Totals.IsrRetencion,
+            IsrRetentionRate = data.Totals.SubTotal > 0
+                ? data.Totals.IsrRetencion / data.Totals.SubTotal * 100m
+                : 0m,
+            ItbisRetentionAmount = data.Totals.ItbisRetenido,
             Qr = data.QrUrl,
             SecurityCode = data.SecurityCode
         };
     }
+
+    /// <summary>IndicadorFacturacion del ítem → tasa ITBIS de Totales (1→ITBIS1, 2→ITBIS2, 3→ITBIS3; 4/0→exento).</summary>
+    private static decimal ItbisRateFor(int indicadorFacturacion, RiTotals totals) => indicadorFacturacion switch
+    {
+        1 => totals.Itbis1Rate,
+        2 => totals.Itbis2Rate,
+        3 => totals.Itbis3Rate,
+        _ => 0m
+    };
 
     /// <summary>DGII e-CF type code to display title, mirroring EasyInvoice's InvoicePdf label logic.</summary>
     private static string NcfTypeName(int ecfType) => ecfType switch
