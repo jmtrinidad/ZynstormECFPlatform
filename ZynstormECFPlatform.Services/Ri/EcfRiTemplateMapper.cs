@@ -19,6 +19,10 @@ public static class EcfRiTemplateMapper
             ? parsed
             : 0;
 
+        var received = data.Totals.Total == decimal.Truncate(data.Totals.Total)
+            ? data.Totals.Total
+            : Math.Ceiling(data.Totals.Total);
+
         return new RiInvoiceModel
         {
             Company = new RiInvoiceCompany
@@ -39,15 +43,29 @@ public static class EcfRiTemplateMapper
             EcfType = ecfType,
             FechaEmision = data.FechaEmision,
             FechaFirma = data.FechaFirma,
+            ValidUntil = FormatDate(data.FechaVencimientoSecuencia),
+            InternalInvoiceNumber = data.NumeroFacturaInterna,
+            PaymentType = PaymentTypeLabel(data.TipoPago),
+            PaymentCondition = PaymentCondition(data),
+            IsCredit = data.TipoPago == 2,
+            Cashier = CertificationCashier,
+            ReceivedAmount = received,
+            ChangeAmount = received - data.Totals.Total,
+            AffectedNcf = data.NcfModificado,
+            ModificationCode = ModificationCodeLabel(data.CodigoModificacion),
+            ModificationReason = data.RazonModificacion,
             Items = data.Items.ConvertAll(item => new RiInvoiceItem
             {
                 Description = item.Description,
                 Quantity = item.Quantity,
                 Price = item.Price,
                 Itbis = item.Itbis,
-                Amount = item.Amount
+                Amount = item.Amount,
+                Unit = UnitAbbreviation(item.UnidadMedida),
+                Discount = item.Discount
             }),
             SubTotal = data.Totals.SubTotal,
+            Discount = data.Items.Sum(item => item.Discount),
             Itbis = data.Totals.Itbis,
             Total = data.Totals.Total,
             Qr = data.QrUrl,
@@ -106,8 +124,9 @@ public static class EcfRiTemplateMapper
     {
         31 => "FACTURA DE CRÉDITO FISCAL ELECTRÓNICA",
         32 => "FACTURA DE CONSUMO ELECTRÓNICA",
-        33 => "NOTA DE CRÉDITO ELECTRÓNICA",
-        34 => "NOTA DE DÉBITO ELECTRÓNICA",
+        // DGII: 33 = Nota de Débito, 34 = Nota de Crédito (igual que E33/E34 en EasyInvoice).
+        33 => "NOTA DE DÉBITO ELECTRÓNICA",
+        34 => "NOTA DE CRÉDITO ELECTRÓNICA",
         41 => "COMPRAS ELECTRÓNICO",
         43 => "GASTO MENOR ELECTRÓNICO",
         44 => "REGÍMENES ESPECIALES ELECTRÓNICO",
@@ -115,5 +134,93 @@ public static class EcfRiTemplateMapper
         46 => "EXPORTACIONES ELECTRÓNICO",
         47 => "PAGOS AL EXTERIOR ELECTRÓNICO",
         _ => "COMPROBANTE FISCAL ELECTRÓNICO"
+    };
+
+    /// <summary>Nombre fijo usado en las RI de certificación (decisión de producto).</summary>
+    internal const string CertificationCashier = "PEDRO";
+
+    internal static string PaymentTypeLabel(int tipoPago) => tipoPago switch
+    {
+        1 => "CONTADO",
+        2 => "CRÉDITO",
+        _ => string.Empty
+    };
+
+    /// <summary>"dd-MM-yyyy" del XML -> "dd/MM/yyyy" para mostrar; vacío se preserva.</summary>
+    internal static string FormatDate(string xmlDate) => xmlDate.Replace('-', '/');
+
+    private static string PaymentCondition(RiData data)
+    {
+        if (!string.IsNullOrEmpty(data.TerminoPago))
+        {
+            return data.TerminoPago;
+        }
+
+        if (data.TipoPago == 1)
+        {
+            return "CONTADO";
+        }
+
+        if (data.TipoPago == 2)
+        {
+            var days = DaysBetween(data.FechaEmision, data.FechaLimitePago);
+            if (days <= 0)
+            {
+                days = 30;
+            }
+            return $"{days} DÍAS";
+        }
+
+        return string.Empty;
+    }
+
+    private static int DaysBetween(string fromDdMmYyyy, string toDdMmYyyy) =>
+        DateTime.TryParseExact(fromDdMmYyyy, "dd-MM-yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var from)
+        && DateTime.TryParseExact(toDdMmYyyy, "dd-MM-yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var to)
+            ? (int)(to.Date - from.Date).TotalDays
+            : 0;
+
+    /// <summary>Códigos DGII de unidad de medida (enum UnitOfMeasure) -> abreviatura corta del recibo.</summary>
+    internal static string UnitAbbreviation(int code) => code switch
+    {
+        0 => string.Empty,
+        2 => "Bolsa",
+        5 => "Bot",
+        6 => "Caja",
+        12 => "Día",
+        13 => "Doc",
+        15 => "Gal",
+        17 => "g",
+        19 => "Hora",
+        21 => "Kg",
+        23 => "Lb",
+        24 => "L",
+        26 => "m",
+        27 => "m²",
+        28 => "m³",
+        30 => "Min",
+        31 => "Paq",
+        32 => "Par",
+        34 => "Pza",
+        39 => "Ton",
+        45 => "Millar",
+        46 => "Saco",
+        47 => "Lata",
+        59 => "ml",
+        60 => "mg",
+        61 => "Oz",
+        _ => "Und"
+    };
+
+    /// <summary>Catálogo DGII de códigos de modificación (InformacionReferencia).</summary>
+    private static string ModificationCodeLabel(string code) => code switch
+    {
+        "1" => "1 - Anula el NCF modificado",
+        "2" => "2 - Corrige texto del NCF modificado",
+        "3" => "3 - Corrige montos del NCF modificado",
+        "4" => "4 - Reemplazo NCF emitido en contingencia",
+        "5" => "5 - Referencia Factura de Consumo Electrónica",
+        "" => string.Empty,
+        _ => code
     };
 }

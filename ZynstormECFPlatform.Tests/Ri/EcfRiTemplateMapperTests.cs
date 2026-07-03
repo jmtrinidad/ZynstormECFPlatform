@@ -46,4 +46,51 @@ public class EcfRiTemplateMapperTests
         Assert.Contains("RncComprador=102620717", model.Qr);
         Assert.NotEmpty(model.SecurityCode);
     }
+
+    [Fact]
+    public void MapInvoice_E31_Credito_PopulatesNewFields()
+    {
+        // Paso_1_E310000000402.xml: TipoPago=2, TerminoPago="15 DIAS",
+        // FechaVencimientoSecuencia=31-12-2028, sin NumeroFacturaInterna,
+        // MontoExento=6001 (exento), item con UnidadMedida=43.
+        var model = EcfRiTemplateMapper.MapInvoice(Load("Paso_1_E310000000402.xml"), DgiiEnvironment.CerteCF);
+
+        Assert.Equal("31/12/2028", model.ValidUntil);
+        Assert.Equal(string.Empty, model.InternalInvoiceNumber);
+        Assert.Equal("CRÉDITO", model.PaymentType);
+        Assert.True(model.IsCredit);
+        Assert.Equal("15 DIAS", model.PaymentCondition);
+        Assert.Equal("PEDRO", model.Cashier);
+        Assert.Equal(6001.00m, model.SubTotal);
+        Assert.Equal("Und", model.Items[0].Unit);
+        Assert.Equal(6001.00m, model.ReceivedAmount); // entero -> igual al total
+        Assert.Equal(0m, model.ChangeAmount);
+    }
+
+    [Fact]
+    public void MapInvoice_E34_IsCreditNote_WithReferenceInfo()
+    {
+        // Paso_E340000000002.xml: TipoeCF=34 (Nota de CRÉDITO según DGII),
+        // NCFModificado=E310000000034, CodigoModificacion=3, RazonModificacion="Error en monto".
+        var model = EcfRiTemplateMapper.MapInvoice(Load("Paso_E340000000002.xml"), DgiiEnvironment.CerteCF);
+
+        Assert.Equal(34, model.EcfType);
+        Assert.Equal("NOTA DE CRÉDITO ELECTRÓNICA", model.NcfTypeName);
+        Assert.Equal("E310000000034", model.AffectedNcf);
+        Assert.StartsWith("3 - ", model.ModificationCode);
+        Assert.Equal("Error en monto", model.ModificationReason);
+        Assert.Equal("123456789016", model.InternalInvoiceNumber);
+        Assert.Equal(string.Empty, model.ValidUntil);
+        Assert.Equal(566695.00m, model.ReceivedAmount);
+    }
+
+    [Fact]
+    public void MapInvoice_ReceivedAmount_RoundsUpDecimals()
+    {
+        // E41 fixture reutilizado solo por sus totales: MontoTotal=18955.58 -> recibido 18956, cambio 0.42.
+        var model = EcfRiTemplateMapper.MapInvoice(Load("Paso_E410000000007.xml"), DgiiEnvironment.CerteCF);
+
+        Assert.Equal(18956m, model.ReceivedAmount);
+        Assert.Equal(0.42m, model.ChangeAmount);
+    }
 }
