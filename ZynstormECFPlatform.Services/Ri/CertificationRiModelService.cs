@@ -86,7 +86,8 @@ public class CertificationRiModelService(
 
     /// <summary>
     /// Encabezado del emisor tomado del CLIENTE seleccionado (no del XML): nombre/RNC/teléfono
-    /// del Client, dirección de su sucursal principal (ClientBranche), y WhatsApp = mismo teléfono.
+    /// del Client, dirección de Client.Address con fallback a la sucursal principal
+    /// (ClientBranche), y WhatsApp = mismo teléfono.
     /// </summary>
     private async Task<RiCompanyHeader> BuildCompanyHeaderAsync(Client client)
     {
@@ -100,7 +101,7 @@ public class CertificationRiModelService(
         return new RiCompanyHeader(
             Name: client.Name,
             Rnc: client.Rnc,
-            Address: branch?.Address ?? string.Empty,
+            Address: !string.IsNullOrWhiteSpace(client.Address) ? client.Address! : branch?.Address ?? string.Empty,
             Phone: phone,
             Whatsapp: phone);
     }

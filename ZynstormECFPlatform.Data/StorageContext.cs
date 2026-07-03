@@ -411,6 +411,10 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .IsUnicode(false)
                   .HasColumnName("RNC");
 
+            entity.Property(e => e.Address)
+                  .HasMaxLength(300)
+                  .IsUnicode(false);
+
             entity.Property(c => c.LastUpdateUtc)
                   .HasColumnType(DateTimeColumnType);
 
