@@ -30,6 +30,7 @@ public static class EcfRiDataMapper
         var securityCode = GetSecurityCode(doc);
         var rncEmisor = Value(emisor, "RNCEmisor");
         var rncComprador = Value(comprador, "RNCComprador");
+        var infoReferencia = First(doc, "InformacionReferencia");
 
         var issuer = new Party
         {
@@ -66,6 +67,14 @@ public static class EcfRiDataMapper
             Buyer = buyer,
             ENcf = encf,
             TipoeCF = tipoeCF,
+            FechaVencimientoSecuencia = Value(idDoc, "FechaVencimientoSecuencia"),
+            TipoPago = (int)DecimalValue(idDoc, "TipoPago"),
+            FechaLimitePago = Value(idDoc, "FechaLimitePago"),
+            TerminoPago = Value(idDoc, "TerminoPago"),
+            NumeroFacturaInterna = Value(emisor, "NumeroFacturaInterna"),
+            NcfModificado = Value(infoReferencia, "NCFModificado"),
+            CodigoModificacion = Value(infoReferencia, "CodigoModificacion"),
+            RazonModificacion = Value(infoReferencia, "RazonModificacion"),
             FechaEmision = fechaEmision,
             FechaFirma = fechaFirma,
             SecurityCode = securityCode,
@@ -73,11 +82,16 @@ public static class EcfRiDataMapper
             Items = BuildItems(doc),
             Totals = new RiTotals
             {
-                SubTotal = DecimalValue(totales, "MontoGravadoTotal"),
+                SubTotal = DecimalValue(totales, "MontoGravadoTotal") + DecimalValue(totales, "MontoExento"),
                 Itbis = DecimalValue(totales, "TotalITBIS"),
                 Exento = DecimalValue(totales, "MontoExento"),
                 Gravado = DecimalValue(totales, "MontoGravadoTotal"),
-                Total = montoTotal
+                Total = montoTotal,
+                ItbisRetenido = DecimalValue(totales, "TotalITBISRetenido"),
+                IsrRetencion = DecimalValue(totales, "TotalISRRetencion"),
+                Itbis1Rate = DecimalValue(totales, "ITBIS1"),
+                Itbis2Rate = DecimalValue(totales, "ITBIS2"),
+                Itbis3Rate = DecimalValue(totales, "ITBIS3")
             }
         };
     }
@@ -98,7 +112,10 @@ public static class EcfRiDataMapper
             Quantity = DecimalValue(item, "CantidadItem"),
             Price = DecimalValue(item, "PrecioUnitarioItem"),
             Itbis = DecimalValue(item, "MontoITBIS"),
-            Amount = DecimalValue(item, "MontoItem")
+            Amount = DecimalValue(item, "MontoItem"),
+            UnidadMedida = (int)DecimalValue(item, "UnidadMedida"),
+            IndicadorFacturacion = (int)DecimalValue(item, "IndicadorFacturacion"),
+            Discount = DecimalValue(item, "DescuentoMonto")
         }).ToList();
     }
 

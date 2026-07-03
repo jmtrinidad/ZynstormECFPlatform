@@ -54,4 +54,43 @@ public class EcfRiDataMapperTests
         Assert.Equal("102620717", data.Buyer.Document);
         Assert.Equal("MORTEROS DE EUROPA", data.Buyer.Name);
     }
+
+    [Fact]
+    public void E31_Exento_SubTotalIncludesMontoExento_AndExtractsIdDocFields()
+    {
+        var data = EcfRiDataMapper.Map(Load("Paso_1_E310000000402.xml"), DgiiEnvironment.CerteCF);
+
+        Assert.Equal(6001.00m, data.Totals.SubTotal); // MontoGravadoTotal(0) + MontoExento(6001)
+        Assert.Equal("31-12-2028", data.FechaVencimientoSecuencia);
+        Assert.Equal(2, data.TipoPago);
+        Assert.Equal("02-05-2026", data.FechaLimitePago);
+        Assert.Equal("15 DIAS", data.TerminoPago);
+        Assert.Equal(string.Empty, data.NumeroFacturaInterna);
+        Assert.Equal(43, data.Items[0].UnidadMedida);
+    }
+
+    [Fact]
+    public void E41_ExtractsRetentions_AndItbisRates()
+    {
+        var data = EcfRiDataMapper.Map(Load("Paso_E410000000007.xml"), DgiiEnvironment.CerteCF);
+
+        Assert.Equal(16064.05m, data.Totals.SubTotal);
+        Assert.Equal(2846.53m, data.Totals.ItbisRetenido);
+        Assert.Equal(1606.41m, data.Totals.IsrRetencion);
+        Assert.Equal(18m, data.Totals.Itbis1Rate);
+        Assert.Equal(5, data.Items.Count);
+        Assert.Equal(1, data.Items[0].IndicadorFacturacion);
+    }
+
+    [Fact]
+    public void E34_ExtractsInformacionReferencia()
+    {
+        var data = EcfRiDataMapper.Map(Load("Paso_E340000000002.xml"), DgiiEnvironment.CerteCF);
+
+        Assert.Equal("E310000000034", data.NcfModificado);
+        Assert.Equal("3", data.CodigoModificacion);
+        Assert.Equal("Error en monto", data.RazonModificacion);
+        Assert.Equal("123456789016", data.NumeroFacturaInterna);
+        Assert.Equal(string.Empty, data.FechaVencimientoSecuencia);
+    }
 }
