@@ -89,7 +89,7 @@ public class XmlSignController(
                 return UnprocessableEntity("No se pudo desencriptar la SecretKey del cliente.");
 
             // 6. Obtenemos el certificado del cliente
-            var certificate = await clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId, cancellationToken);
+            var certificate = await clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId, cancellationToken);
 
             if (certificate == null)
                 return NotFound($"El cliente con RNC '{rnc}' no tiene un certificado digital registrado.");

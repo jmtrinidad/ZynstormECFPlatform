@@ -193,7 +193,7 @@ public class FeController : ControllerBase
         {
             try
             {
-                var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+                var certificate = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId);
                 if (certificate != null)
                 {
                     var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == certificate.ClientId);
@@ -322,7 +322,7 @@ public class FeController : ControllerBase
                     _logger.LogError(ex, "Error al guardar el XML de Aprobación Comercial recibido en la base de datos.");
                 }
 
-                var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+                var certificate = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId);
                 if (certificate != null)
                 {
                     var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == certificate.ClientId);

@@ -202,7 +202,7 @@ public class CertificationExcelService : ICertificationExcelService
         var client = await _clientService.GetByAsync(x => x.Rnc == requestDto.ECF.Encabezado.Emisor.RNCEmisor);
         var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId);
         var secretKey = _encryptedService.DecryptString(apiKey.SecretKey);
-        var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+        var cert = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId);
         var certBase64 = Convert.ToBase64String(_encryptedService.DecryptWithSecret(cert.Certificate, secretKey));
         var certPass = Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(cert.Password, secretKey));
         string unsignedXml = _generatorService.GenerateUnsignedXml(requestDto, false);
@@ -291,7 +291,7 @@ public class CertificationExcelService : ICertificationExcelService
                          ?? throw new Exception("API Key no encontrada.");
             var secretKey = _encryptedService.DecryptString(apiKey.SecretKey);
 
-            var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId)
+            var cert = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId)
                          ?? throw new Exception("Certificado no encontrado.");
             var certBase64 = Convert.ToBase64String(_encryptedService.DecryptWithSecret(cert.Certificate, secretKey));
             var certPass = Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(cert.Password, secretKey));
@@ -646,7 +646,7 @@ public class CertificationExcelService : ICertificationExcelService
                          ?? throw new Exception("API Key no encontrada.");
             var secretKey = _encryptedService.DecryptString(apiKey.SecretKey);
 
-            var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId)
+            var cert = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId)
                          ?? throw new Exception("Certificado no encontrado.");
             var certBase64 = Convert.ToBase64String(_encryptedService.DecryptWithSecret(cert.Certificate, secretKey));
             var certPass = Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(cert.Password, secretKey));
@@ -753,7 +753,7 @@ public class CertificationExcelService : ICertificationExcelService
             throw new Exception("No se pudo desencriptar la SecretKey del cliente.");
 
         // 5. Obtener el certificado digital del cliente
-        var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId)
+        var certificate = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId)
                           ?? throw new Exception($"El cliente con RNC '{rnc}' no tiene un certificado digital registrado.");
 
         // 6. Desencriptar certificado y password
@@ -792,7 +792,7 @@ public class CertificationExcelService : ICertificationExcelService
     private async Task<DgiiStatusResponse> PollDgiiStatusAsync(string trackId, string rnc)
     {
         var client = await _clientService.GetByAsync(c => c.Rnc == rnc);
-        var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+        var cert = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId);
         var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId);
         var secret = _encryptedService.DecryptString(apiKey.SecretKey);
 

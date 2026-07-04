@@ -181,7 +181,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
             var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId) ?? throw new Exception("ApiKey no encontrada.");
             var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
-            var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId) ?? throw new Exception("Certificado no encontrado.");
+            var certificate = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId) ?? throw new Exception("Certificado no encontrado.");
             var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
             var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
             var certBase64 = Convert.ToBase64String(certificateBytes);
@@ -1093,7 +1093,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
     {
         var apiKey = await _apiKeyService.GetByAsync(x => x.Client.Rnc == rncEmisor) ?? throw new Exception("ApiKey no encontrada para poll.");
         var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey);
-        var certificate = await _clientCertificateService.GetByAsync(x => x.Client.Rnc == rncEmisor) ?? throw new Exception("Certificado no encontrado para poll.");
+        var certificate = await _clientCertificateService.GetActiveCertificateAsync(x => x.Client.Rnc == rncEmisor) ?? throw new Exception("Certificado no encontrado para poll.");
         var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
         var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
         var certBase64 = Convert.ToBase64String(certificateBytes);

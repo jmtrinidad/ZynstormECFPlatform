@@ -142,7 +142,7 @@ public class CertificationSimulationService : ICertificationSimulationService
             var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)
                          ?? throw new Exception("API Key no encontrada.");
             var secretKey = _encryptedService.DecryptString(apiKey.SecretKey);
-            var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId)
+            var cert = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId)
                          ?? throw new Exception("Certificado no encontrado.");
             var certBase64 = Convert.ToBase64String(_encryptedService.DecryptWithSecret(cert.Certificate, secretKey));
             var certPass = Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(cert.Password, secretKey));
@@ -282,7 +282,7 @@ public class CertificationSimulationService : ICertificationSimulationService
         var client = await _clientService.GetByAsync(c => c.Rnc == dto.ECF.Encabezado.Emisor.RNCEmisor);
         var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId);
         var secretKey = _encryptedService.DecryptString(apiKey.SecretKey);
-        var cert = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId);
+        var cert = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId);
         var certBase64 = Convert.ToBase64String(_encryptedService.DecryptWithSecret(cert.Certificate, secretKey));
         var certPass = Encoding.UTF8.GetString(_encryptedService.DecryptWithSecret(cert.Password, secretKey));
         string token = await _authService.GetTokenAsync(client.Rnc, DgiiEnvironment.CerteCF, certBase64, certPass);

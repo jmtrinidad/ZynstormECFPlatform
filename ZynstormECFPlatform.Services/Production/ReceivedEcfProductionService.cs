@@ -167,7 +167,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         //}
 
         var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey ?? string.Empty);
-        var certificate = await _clientCertificateService.GetByAsync(x => x.ClientId == client.ClientId)
+        var certificate = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId)
             ?? throw new Exception("Certificado no encontrado.");
         var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
         var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
