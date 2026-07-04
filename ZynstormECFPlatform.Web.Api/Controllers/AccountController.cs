@@ -64,7 +64,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
             if (!user.IsActive)
             {
-                return BadRequest("Usuario no se encuentra activo.");
+                return BadRequest("Usuario no se encuentra activo!.");
             }
 
             var token = await _accountService.GeneratePasswordResetTokenAsync(user).ConfigureAwait(false);
