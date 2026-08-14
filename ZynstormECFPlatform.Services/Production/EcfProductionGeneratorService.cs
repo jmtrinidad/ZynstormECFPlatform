@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text;
 using System.Xml;
@@ -25,10 +26,11 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
 
     // ── Cached serializer (thread-safe after first use) ────────────────────────
 
-    private readonly XmlSerializer _serializer = new(typeof(EcfXmlRoot));
-    private readonly XmlSerializer _rfceSerializer = new(typeof(RfceXmlRoot));
-    private readonly XmlSerializer _acecfSerializer = new(typeof(AcecfXmlRoot));
+    private static readonly XmlSerializer _serializer = new(typeof(EcfXmlRoot));
+    private static readonly XmlSerializer _rfceSerializer = new(typeof(RfceXmlRoot));
+    private static readonly XmlSerializer _acecfSerializer = new(typeof(AcecfXmlRoot));
     private static readonly XmlSerializerNamespaces _noNamespaces;
+    private static readonly ConcurrentDictionary<(int EcfType, bool IsRfce), Lazy<XmlSchemaSet?>> _schemaSets = new();
 
     // ── Schema assembly (Schemas project) ─────────────────────────────────────
 
@@ -56,7 +58,7 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
     {
         // ── Step 1: Determine the ECF Type (Priority: explicit dto.ECF.Encabezado.IdDoc.TipoeCF > NCF extraction) ─────────────────────────
         var ecfType = int.Parse(dto.ECF.Encabezado.IdDoc.TipoeCF ?? NcfHelper.ExtractEcfType(dto.ECF.Encabezado.IdDoc.eNCF).ToString());
-        
+
         // Calculate actual total from items (do not rely on ManualMontoTotal which may be null)
         decimal actualTotal = dto.ECF.Encabezado.Totales.MontoTotal ?? dto.ECF.DetallesItems.Item.Sum(i => i.MontoItem);
 
@@ -64,7 +66,7 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
         bool isRfceSummary = isSummary || (ecfType == 32 && actualTotal < 250000m);
 
         // CLEANUP: Buyer cleanup removed to ensure Excel data is included.
-        
+
         var settings = new XmlWriterSettings
         {
             Encoding = Encoding.UTF8,
@@ -361,7 +363,7 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
     {
         var e = dto.ECF.Encabezado;
         var ecfType = int.Parse(e.IdDoc.TipoeCF ?? NcfHelper.ExtractEcfType(e.IdDoc.eNCF).ToString());
-        
+
         var signatureDate = dto.SignatureDateOverride ?? DateTime.UtcNow.ToDrTime();
         var signatureDateTime = dto.ECF.FechaHoraFirma ?? signatureDate.ToString(DateTimeFormat);
 
@@ -596,7 +598,7 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
             },
             Items = xmlItems,
             Adjustments = adjustments,
-            
+
             InformacionReferencia = dto.ECF.InformacionReferencia != null ? new EcfXmlInformacionReferencia
             {
                 NCFModificado = dto.ECF.InformacionReferencia.NCFModificado!,
@@ -655,7 +657,7 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
     private static RfceXmlRoot MapToRfceXmlRoot(EcfInvoiceRequestDto dto)
     {
         var e = dto.ECF.Encabezado;
-        
+
         var root = new RfceXmlRoot
         {
             Encabezado = new RfceXmlEncabezado
@@ -733,13 +735,22 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
     /// </summary>
     private static XmlSchemaSet? LoadSchemaSetForType(int ecfType, bool isRfce = false)
     {
+        return _schemaSets.GetOrAdd(
+            (ecfType, isRfce),
+            static key => new Lazy<XmlSchemaSet?>(
+                () => LoadAndCompileSchemaSet(key.EcfType, key.IsRfce),
+                LazyThreadSafetyMode.ExecutionAndPublication)).Value;
+    }
+
+    private static XmlSchemaSet? LoadAndCompileSchemaSet(int ecfType, bool isRfce)
+    {
         // Special case for ACECF (Commercial Approval)
         if (ecfType == 0 && !isRfce)
         {
             var arecfResource = _schemasAssembly
                 .GetManifestResourceNames()
                 .FirstOrDefault(r => r.Contains("ACECF", StringComparison.OrdinalIgnoreCase));
-            
+
             if (arecfResource != null)
             {
                 using var aecStream = _schemasAssembly.GetManifestResourceStream(arecfResource);
@@ -756,7 +767,7 @@ public class EcfProductionGeneratorService : IEcfProductionGeneratorService
         string prefix = isRfce ? "RFCE" : "e-CF";
         var resourceName = _schemasAssembly
             .GetManifestResourceNames()
-            .FirstOrDefault(r => r.Contains(prefix, StringComparison.OrdinalIgnoreCase) && 
+            .FirstOrDefault(r => r.Contains(prefix, StringComparison.OrdinalIgnoreCase) &&
                                  r.Contains($" {ecfType} ", StringComparison.OrdinalIgnoreCase));
 
         if (resourceName is null) return null;

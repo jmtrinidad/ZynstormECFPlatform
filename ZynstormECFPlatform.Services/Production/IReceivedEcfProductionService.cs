@@ -10,7 +10,8 @@ public interface IReceivedEcfProductionService
     Task<ReceivedEcfEmissionResultDto> ProcessAsync(
         EcfInvoiceRequestDto dto,
         DgiiEnvironment environment = DgiiEnvironment.Production,
-        int statusDelayMilliseconds = 750);
+        int statusDelayMilliseconds = 750,
+        CancellationToken cancellationToken = default);
 }
 
 public class ReceivedEcfEmissionResultDto

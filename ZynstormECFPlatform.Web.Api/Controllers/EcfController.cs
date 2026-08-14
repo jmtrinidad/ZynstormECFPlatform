@@ -98,10 +98,16 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
             try
             {
-                var result = await _receivedEcfProductionService.ProcessAsync(dto, environment);
+                var result = await _receivedEcfProductionService.ProcessAsync(
+                    dto,
+                    environment,
+                    cancellationToken: HttpContext.RequestAborted);
 
                 if (result.DtoErrors.Count > 0 || result.XsdErrors.Count > 0 || result.XmlProdErrors.Count > 0 || result.XmlValidation?.IsValid == false)
                     return BadRequest(result);
+
+                if (result.IsPending)
+                    return StatusCode(StatusCodes.Status504GatewayTimeout, result);
 
                 return Ok(result);
             }

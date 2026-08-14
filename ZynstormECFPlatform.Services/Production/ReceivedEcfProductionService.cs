@@ -6,6 +6,7 @@ using System.Xml.Linq;
 using Hangfire;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using ZynstormECFPlatform.Abstractions.Data;
 using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Common;
@@ -40,6 +41,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     private readonly IEcfTransmissionService _ecfTransmissionService;
     private readonly IEcfStatusHistoryService _ecfStatusHistoryService;
     private readonly ISystemLogService _systemLogService;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ICacheService _cacheService;
     private readonly IConfiguration _configuration;
@@ -62,6 +64,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         IEcfTransmissionService ecfTransmissionService,
         IEcfStatusHistoryService ecfStatusHistoryService,
         ISystemLogService systemLogService,
+        IUnitOfWork unitOfWork,
         IHttpClientFactory httpClientFactory,
         ICacheService cacheService,
         IConfiguration configuration,
@@ -83,6 +86,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         _ecfTransmissionService = ecfTransmissionService;
         _ecfStatusHistoryService = ecfStatusHistoryService;
         _systemLogService = systemLogService;
+        _unitOfWork = unitOfWork;
         _httpClientFactory = httpClientFactory;
         _cacheService = cacheService;
         _configuration = configuration;
@@ -92,7 +96,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     public async Task<ReceivedEcfEmissionResultDto> ProcessAsync(
         EcfInvoiceRequestDto dto,
         DgiiEnvironment environment = DgiiEnvironment.Production,
-        int statusDelayMilliseconds = 750)
+        int statusDelayMilliseconds = 750,
+        CancellationToken cancellationToken = default)
     {
         var resultDto = new ReceivedEcfEmissionResultDto();
 
@@ -136,8 +141,28 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
         var ecfDocument = await CreateEcfDocumentAsync(dto, client, clientBranch, apiKey, currency, ecfTypeEntity);
         resultDto.EcfDocumentId = ecfDocument.EcfDocumentId;
-        await AddHistoryAsync(ecfDocument, 2, "Iniciando validacion y generacion del XML.");
-        await AddLogAsync(ecfDocument, client.ClientId, "Information", "Proceso de emision e-CF iniciado.");
+
+        _ecfStatusHistoryService.Add(new EcfStatusHistory
+        {
+            EcfDocumentId = ecfDocument.EcfDocumentId,
+            EcfStatusId = 1,
+            Message = "Documento e-CF registrado."
+        });
+        _ecfStatusHistoryService.Add(new EcfStatusHistory
+        {
+            EcfDocumentId = ecfDocument.EcfDocumentId,
+            EcfStatusId = 2,
+            Message = "Iniciando validacion y generacion del XML."
+        });
+        _systemLogService.Add(new SystemLog
+        {
+            ClientId = client.ClientId,
+            EcfDocumentId = ecfDocument.EcfDocumentId,
+            LogLevel = "Information",
+            Message = "Proceso de emision e-CF iniciado.",
+            CreateAtUtc = DateTime.UtcNow
+        });
+        await _unitOfWork.SaveChangesAsync();
 
         var total = CalculateTransmissionTotal(dto);
         var isSummary = ShouldSendAsB2cSummary(ecfType, total);
@@ -179,15 +204,44 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         ApplyQrMetadata(resultDto, dto, signedXml, ecfType, targetEnvironment);
         resultDto.XmlValidation = BuildAcceptedValidationResult(dto, signedXml, ecfType, resultDto.QrUrl, resultDto.SecurityCode, resultDto.SignatureDate);
 
-        await _ecfXmlDocumentService.InsertAsync(new EcfXmlDocument
+        var useStagingValidation = ShouldUseStagingXmlValidation();
+        var tokenTask = useStagingValidation
+            ? null
+            : _authService.GetTokenAsync(issuerRnc, targetEnvironment, certBase64, certPass);
+
+        _ecfXmlDocumentService.Add(new EcfXmlDocument
         {
             EcfDocumentId = ecfDocument.EcfDocumentId,
             XmlUnsigned = unsignedXml,
             XmlSigned = signedXml
         });
-        await MarkDocumentAsync(ecfDocument, 6, "XML firmado y guardado.");
+        _ecfStatusHistoryService.Add(new EcfStatusHistory
+        {
+            EcfDocumentId = ecfDocument.EcfDocumentId,
+            EcfStatusId = 6,
+            Message = "XML firmado y guardado."
+        });
 
-        if (ShouldUseStagingXmlValidation())
+        var sendingMessage = isSummary ? "Enviando resumen B2C a DGII." : "Enviando e-CF a DGII.";
+        ecfDocument.EcfStatusId = 8;
+        _ecfDocumentService.Modify(ecfDocument);
+        _ecfStatusHistoryService.Add(new EcfStatusHistory
+        {
+            EcfDocumentId = ecfDocument.EcfDocumentId,
+            EcfStatusId = 8,
+            Message = sendingMessage
+        });
+        _systemLogService.Add(new SystemLog
+        {
+            ClientId = client.ClientId,
+            EcfDocumentId = ecfDocument.EcfDocumentId,
+            LogLevel = "Information",
+            Message = $"Ambiente DGII seleccionado para envio: {targetEnvironment}. Canal: {(isSummary ? "Resumen B2C" : "e-CF")}.",
+            CreateAtUtc = DateTime.UtcNow
+        });
+        await _unitOfWork.SaveChangesAsync();
+
+        if (useStagingValidation)
         {
             return await ProcessWithStagingValidationAsync(
                 resultDto,
@@ -201,10 +255,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
                 certPass);
         }
 
-        var token = await _authService.GetTokenAsync(issuerRnc, targetEnvironment, certBase64, certPass);
-
-        await MarkDocumentAsync(ecfDocument, 8, isSummary ? "Enviando resumen B2C a DGII." : "Enviando e-CF a DGII.");
-        await AddLogAsync(ecfDocument, client.ClientId, "Information", $"Ambiente DGII seleccionado para envio: {targetEnvironment}. Canal: {(isSummary ? "Resumen B2C" : "e-CF")}.");
+        var token = await tokenTask!;
 
         var transmission = await _transmissionService.SendEcfAsync(targetEnvironment, token, signedXml, ecfType, total, issuerRnc, eNcf, isSummary);
         await AddDgiiResponseLogAsync(ecfDocument, client.ClientId, "recepcion", targetEnvironment, transmission);
@@ -223,9 +274,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
         if (!string.IsNullOrWhiteSpace(transmission.TrackId))
         {
-            await SaveTransmissionAsync(ecfDocument, transmission, statusId: 9, signedXml);
-            await MarkDocumentAsync(ecfDocument, 9, $"DGII recibio el e-CF. TrackId: {transmission.TrackId}");
-            var status = await PollInitialDgiiStatusAsync(targetEnvironment, token, transmission.TrackId);
+            var status = await WaitForFinalDgiiStatusAsync(
+                targetEnvironment, token, transmission.TrackId, cancellationToken);
             _cacheService.Set($"EcfStatus_{transmission.TrackId}", status, TimeSpan.FromHours(1));
             await AddDgiiStatusLogAsync(ecfDocument, client.ClientId, targetEnvironment, transmission.TrackId, status);
             resultDto.Status = status;
@@ -246,11 +296,16 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             {
                 resultDto.IsPending = true;
                 resultDto.Success = false;
-                resultDto.Message = $"DGII aun procesa el e-CF. TrackId: {transmission.TrackId}";
+                resultDto.Message = string.IsNullOrWhiteSpace(status.Error)
+                    ? $"DGII aun procesa el e-CF. TrackId: {transmission.TrackId}"
+                    : status.Error;
 
+                var trackingDelaySeconds = Math.Max(
+                    1,
+                    _configuration.GetValue<int?>("EcfPerformance:TrackingInitialDelaySeconds") ?? 1);
                 var jobId = BackgroundJob.Schedule<EcfTrackingJob>(
                     j => j.Execute(transmission.TrackId, targetEnvironment, issuerRnc, certBase64, certPass, ecfDocument.EcfDocumentId, 1),
-                    TimeSpan.FromSeconds(3));
+                    TimeSpan.FromSeconds(trackingDelaySeconds));
 
                 ecfDocument.HangfireJobId = jobId;
                 await _ecfDocumentService.UpdateAsync(ecfDocument);
@@ -567,7 +622,6 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         };
 
         await _ecfDocumentService.InsertAsync(ecfDocument);
-        await AddHistoryAsync(ecfDocument, 1, "Documento e-CF registrado.");
         return ecfDocument;
     }
 
@@ -707,39 +761,58 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         || string.Equals(status.Estado, "Rechazado", StringComparison.OrdinalIgnoreCase)
         || string.Equals(status.Estado, "Error", StringComparison.OrdinalIgnoreCase);
 
-    private async Task<DgiiStatusResponse> PollInitialDgiiStatusAsync(
+    private async Task<DgiiStatusResponse> WaitForFinalDgiiStatusAsync(
         DgiiEnvironment environment,
         string token,
-        string trackId)
+        string trackId,
+        CancellationToken cancellationToken)
     {
-        const int firstDelayMilliseconds = 300;
-        const int totalWindowMilliseconds = 2000;
-        const int retryDelayMilliseconds = 300;
+        var timeoutSeconds = Math.Clamp(
+            _configuration.GetValue<int?>("EcfPerformance:FinalStatusTimeoutSeconds") ?? 60,
+            1,
+            300);
+        var pollingIntervalMilliseconds = Math.Clamp(
+            _configuration.GetValue<int?>("EcfPerformance:StatusPollingIntervalMilliseconds") ?? 500,
+            100,
+            5000);
 
-        var startedAt = DateTime.UtcNow;
-        await Task.Delay(firstDelayMilliseconds);
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+        var pollingToken = timeoutSource.Token;
 
         DgiiStatusResponse? lastStatus = null;
-        while ((DateTime.UtcNow - startedAt).TotalMilliseconds <= totalWindowMilliseconds)
+        try
         {
-            lastStatus = await _transmissionService.GetStatusAsync(environment, token, trackId);
-            if (!IsPendingDgiiStatus(lastStatus))
-                return lastStatus;
+            await Task.Delay(Math.Min(250, pollingIntervalMilliseconds), pollingToken);
+            while (true)
+            {
+                lastStatus = await _transmissionService.GetStatusAsync(
+                    environment,
+                    token,
+                    trackId,
+                    pollingToken);
 
-            var elapsed = (DateTime.UtcNow - startedAt).TotalMilliseconds;
-            var remaining = totalWindowMilliseconds - elapsed;
-            if (remaining <= 0)
-                break;
+                if (!IsPendingDgiiStatus(lastStatus))
+                    return lastStatus;
 
-            await Task.Delay((int)Math.Min(retryDelayMilliseconds, remaining));
+                await Task.Delay(pollingIntervalMilliseconds, pollingToken);
+            }
         }
-
-        return lastStatus ?? new DgiiStatusResponse
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            TrackId = trackId,
-            Estado = "Pendiente",
-            Mensaje = "DGII aun procesa el e-CF."
-        };
+            return new DgiiStatusResponse
+            {
+                TrackId = trackId,
+                Codigo = lastStatus?.Codigo ?? string.Empty,
+                Estado = "Pendiente",
+                ENcf = lastStatus?.ENcf ?? string.Empty,
+                SecuenciaUtilizada = lastStatus?.SecuenciaUtilizada ?? false,
+                FechaRecepcion = lastStatus?.FechaRecepcion ?? string.Empty,
+                Error = $"DGII no emitio un estado final dentro de {timeoutSeconds} segundos.",
+                Mensaje = lastStatus?.Mensaje ?? "La recepcion fue confirmada, pero el resultado final no estuvo disponible a tiempo.",
+                Mensajes = lastStatus?.Mensajes ?? []
+            };
+        }
     }
 
     internal static QrMetadata BuildQrMetadata(EcfDocument ecfDocument, string signedXml, string rncEmisor, DgiiEnvironment environment = DgiiEnvironment.Production)

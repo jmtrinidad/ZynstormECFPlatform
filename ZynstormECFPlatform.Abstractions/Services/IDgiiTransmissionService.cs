@@ -39,7 +39,11 @@ public interface IDgiiTransmissionService
     /// <summary>
     /// Queries the status of a document by its trackId from the DGII Consulta result endpoint.
     /// </summary>
-    Task<DgiiStatusResponse> GetStatusAsync(DgiiEnvironment environment, string token, string trackId);
+    Task<DgiiStatusResponse> GetStatusAsync(
+        DgiiEnvironment environment,
+        string token,
+        string trackId,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Sends an Aprobación Comercial (ARECF) document to the specific DGII endpoint.

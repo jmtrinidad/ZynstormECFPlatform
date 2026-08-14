@@ -171,7 +171,11 @@ public class DgiiTransmissionService : IDgiiTransmissionService
         };
     }
 
-    public async Task<DgiiStatusResponse> GetStatusAsync(DgiiEnvironment environment, string token, string trackId)
+    public async Task<DgiiStatusResponse> GetStatusAsync(
+        DgiiEnvironment environment,
+        string token,
+        string trackId,
+        CancellationToken cancellationToken = default)
     {
         string url;
         string envKey = environment.ToString();
@@ -194,8 +198,8 @@ public class DgiiTransmissionService : IDgiiTransmissionService
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var response = await _httpClient.SendAsync(request);
-        var responseString = await response.Content.ReadAsStringAsync();
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        var responseString = await response.Content.ReadAsStringAsync(cancellationToken);
         LogDgiiRawResponse("GetStatus", environment, url, ecfType: null, eNcf: trackId, isRfce: false, response, responseString);
 
         if (response.IsSuccessStatusCode)
