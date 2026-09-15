@@ -4,10 +4,14 @@ namespace ZynstormECFPlatform.Dtos
     {
         public string Id { get; set; } = null!; // GuidId
         public string Ncf { get; set; } = null!;
-        public string ClientName { get; set; } = null!; // CustomerName
-        public string ClientRnc { get; set; } = null!; // CustomerRnc
+        public int ClientId { get; set; } // Cliente emisor (nuestro cliente)
+        public string ClientName { get; set; } = null!; // Client.Name
+        public string ClientRnc { get; set; } = null!; // Client.Rnc
+        public string BuyerName { get; set; } = null!; // CustomerName (comprador)
+        public string BuyerRnc { get; set; } = null!; // CustomerRnc (comprador)
         public string Type { get; set; } = null!; // FE, FC, NC, ND
         public decimal Amount { get; set; } // Total
+        public decimal Itbis { get; set; } // Itbistotal
         public string Status { get; set; } = null!; // accepted, pending, rejected, processing
         public string? DgiiTrackId { get; set; } // TrackId de la última transmisión
         public string SentDate { get; set; } = null!; // Fecha de emisión formateada

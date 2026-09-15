@@ -24,11 +24,51 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         private string? CurrentUserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         private bool IsSA => User.IsInRole("SA");
 
+        /// <summary>
+        /// Aplica filtros comunes: propiedad del usuario, cliente emisor y rango de fechas
+        /// (fechas en hora local dominicana, ambos extremos inclusivos por día).
+        /// </summary>
+        private IQueryable<EcfDocument> ApplyCommonFilters(
+            IQueryable<EcfDocument> query,
+            int? clientId,
+            DateTime? fromDate,
+            DateTime? toDate)
+        {
+            // Filtrado por usuario / propiedad
+            if (!IsSA)
+            {
+                var userId = CurrentUserId;
+                query = query.Where(e => e.Client.UserClients.Any(uc => uc.UserId == userId));
+            }
+
+            if (clientId.HasValue && clientId.Value > 0)
+            {
+                query = query.Where(e => e.ClientId == clientId.Value);
+            }
+
+            if (fromDate.HasValue)
+            {
+                var fromUtc = fromDate.Value.Date.ConvertDominicanLocalToUtc();
+                query = query.Where(e => e.RegisteredAt >= fromUtc);
+            }
+
+            if (toDate.HasValue)
+            {
+                var toUtcExclusive = toDate.Value.Date.AddDays(1).ConvertDominicanLocalToUtc();
+                query = query.Where(e => e.RegisteredAt < toUtcExclusive);
+            }
+
+            return query;
+        }
+
         [HttpGet]
         public async Task<IActionResult> Get(
             [FromQuery] string? search,
             [FromQuery] string? status,
             [FromQuery] string? type,
+            [FromQuery] int? clientId,
+            [FromQuery] DateTime? fromDate,
+            [FromQuery] DateTime? toDate,
             [FromQuery] int? pageNumber,
             [FromQuery] int? pageSize,
             CancellationToken cancellationToken = default)
@@ -37,26 +77,20 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 var query = _ecfDocumentService.Table
                     .AsNoTracking()
-                    .Include(e => e.EcfStatus)
-                    .Include(e => e.EcfType)
-                    .Include(e => e.EcfTransmissions)
                     .AsQueryable();
 
-                // Filtrado por usuario / propiedad
-                if (!IsSA)
-                {
-                    var userId = CurrentUserId;
-                    query = query.Where(e => e.Client.UserClients.Any(uc => uc.UserId == userId));
-                }
+                query = ApplyCommonFilters(query, clientId, fromDate, toDate);
 
-                // Búsqueda por NCF, Nombre o RNC del cliente (comprador)
+                // Búsqueda por NCF, cliente emisor o comprador (nombre / RNC)
                 if (!string.IsNullOrWhiteSpace(search))
                 {
                     var searchLower = search.ToLower().Trim();
                     query = query.Where(e =>
                         e.Ncf.ToLower().Contains(searchLower) ||
                         e.CustomerName.ToLower().Contains(searchLower) ||
-                        e.CustomerRnc.Contains(searchLower)
+                        e.CustomerRnc.Contains(searchLower) ||
+                        e.Client.Name.ToLower().Contains(searchLower) ||
+                        e.Client.Rnc.Contains(searchLower)
                     );
                 }
 
@@ -118,13 +152,17 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 {
                     Id = e.GuidId,
                     Ncf = e.Ncf,
-                    ClientName = e.CustomerName,
-                    ClientRnc = e.CustomerRnc,
+                    ClientId = e.ClientId,
+                    ClientName = e.Client.Name,
+                    ClientRnc = e.Client.Rnc,
+                    BuyerName = e.CustomerName,
+                    BuyerRnc = e.CustomerRnc,
                     Type = e.EcfType.Code == "31" ? "FE" :
                            e.EcfType.Code == "32" ? "FC" :
                            e.EcfType.Code == "33" ? "ND" :
                            e.EcfType.Code == "34" ? "NC" : "FE",
                     Amount = e.Total,
+                    Itbis = e.Itbistotal,
                     Status = e.EcfStatus.Name == "Accepted" ? "accepted" :
                              (e.EcfStatus.Name == "Rejected" || e.EcfStatus.Name == "ValidationFailed" || e.EcfStatus.Name == "Error") ? "rejected" :
                              (e.EcfStatus.Name == "SendPending" || e.EcfStatus.Name == "Sending" || e.EcfStatus.Name == "Sent") ? "pending" : "processing",
@@ -149,10 +187,14 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 {
                     Id = x.Id,
                     Ncf = x.Ncf,
+                    ClientId = x.ClientId,
                     ClientName = x.ClientName,
                     ClientRnc = x.ClientRnc,
+                    BuyerName = x.BuyerName,
+                    BuyerRnc = x.BuyerRnc,
                     Type = x.Type,
                     Amount = x.Amount,
+                    Itbis = x.Itbis,
                     Status = x.Status,
                     DgiiTrackId = x.DgiiTrackId,
                     SentDate = (x.SentAtUtc ?? x.RegisteredAt).ToDrTime().ToString("yyyy-MM-dd HH:mm:ss"),
@@ -184,6 +226,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             try
             {
                 var query = _ecfDocumentService.Table
+                    .Include(e => e.Client)
                     .Include(e => e.EcfStatus)
                     .Include(e => e.EcfType)
                     .Include(e => e.EcfTransmissions)
@@ -206,13 +249,17 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 {
                     Id = document.GuidId,
                     Ncf = document.Ncf,
-                    ClientName = document.CustomerName,
-                    ClientRnc = document.CustomerRnc,
+                    ClientId = document.ClientId,
+                    ClientName = document.Client.Name,
+                    ClientRnc = document.Client.Rnc,
+                    BuyerName = document.CustomerName,
+                    BuyerRnc = document.CustomerRnc,
                     Type = document.EcfType.Code == "31" ? "FE" :
                            document.EcfType.Code == "32" ? "FC" :
                            document.EcfType.Code == "33" ? "ND" :
                            document.EcfType.Code == "34" ? "NC" : "FE",
                     Amount = document.Total,
+                    Itbis = document.Itbistotal,
                     Status = document.EcfStatus.Name == "Accepted" ? "accepted" :
                              (document.EcfStatus.Name == "Rejected" || document.EcfStatus.Name == "ValidationFailed" || document.EcfStatus.Name == "Error") ? "rejected" :
                              (document.EcfStatus.Name == "SendPending" || document.EcfStatus.Name == "Sending" || document.EcfStatus.Name == "Sent") ? "pending" : "processing",
@@ -233,21 +280,19 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         }
 
         [HttpGet("stats")]
-        public async Task<IActionResult> GetStats(CancellationToken cancellationToken = default)
+        public async Task<IActionResult> GetStats(
+            [FromQuery] int? clientId,
+            [FromQuery] DateTime? fromDate,
+            [FromQuery] DateTime? toDate,
+            CancellationToken cancellationToken = default)
         {
             try
             {
                 var query = _ecfDocumentService.Table
                     .AsNoTracking()
-                    .Include(e => e.EcfStatus)
                     .AsQueryable();
 
-                // Filtrado por usuario / propiedad
-                if (!IsSA)
-                {
-                    var userId = CurrentUserId;
-                    query = query.Where(e => e.Client.UserClients.Any(uc => uc.UserId == userId));
-                }
+                query = ApplyCommonFilters(query, clientId, fromDate, toDate);
 
                 var statsList = await query
                     .Select(e => e.EcfStatus.Name)
