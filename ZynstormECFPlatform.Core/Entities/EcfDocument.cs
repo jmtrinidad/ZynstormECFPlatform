@@ -67,6 +67,9 @@ public partial class EcfDocument : BaseEntity
     [XmlIgnore]
     public string? HangfireJobId { get; set; }
 
+    /// <summary>Fecha en que el documento se sumó al consumo mensual del cliente. Lo escribe solo ClientUsageService.</summary>
+    public DateTime? BillingCountedAtUtc { get; set; }
+
     [XmlIgnore]
     public virtual ApiKey ApiKey { get; set; } = null!;
 

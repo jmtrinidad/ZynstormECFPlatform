@@ -13,4 +13,6 @@ public partial class Status : BaseEntity
     public virtual ICollection<ClientCallBack> ClientCallBacks { get; set; } = [];
 
     public virtual ICollection<Client> Clients { get; set; } = [];
+
+    public virtual ICollection<Plan> Plans { get; set; } = [];
 }

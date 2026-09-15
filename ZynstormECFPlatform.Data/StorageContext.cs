@@ -438,6 +438,143 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasForeignKey(d => d.StatusId)
                   .OnDelete(DeleteBehavior.ClientSetNull)
                   .HasConstraintName("FK_Client_Status");
+
+            entity.Property(e => e.ClientInactive)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.HasOne(d => d.Plan)
+                  .WithMany(p => p.Clients)
+                  .HasForeignKey(d => d.PlanId)
+                  .OnDelete(DeleteBehavior.SetNull)
+                  .HasConstraintName("FK_Client_Plan");
+        });
+
+        modelBuilder.Entity<Plan>(entity =>
+        {
+            entity.HasKey(e => e.PlanId);
+
+            entity.Property(e => e.Name)
+                  .HasMaxLength(100)
+                  .IsUnicode(false)
+                  .IsRequired();
+
+            entity.Property(e => e.Description)
+                  .HasMaxLength(300)
+                  .IsUnicode(false);
+
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.Status)
+                  .WithMany(p => p.Plans)
+                  .HasForeignKey(d => d.StatusId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_Plan_Status");
+        });
+
+        modelBuilder.Entity<PlanOverageTier>(entity =>
+        {
+            entity.HasKey(e => e.PlanOverageTierId);
+
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.Plan)
+                  .WithMany(p => p.OverageTiers)
+                  .HasForeignKey(d => d.PlanId)
+                  .OnDelete(DeleteBehavior.Cascade)
+                  .HasConstraintName("FK_PlanOverageTier_Plan");
+        });
+
+        modelBuilder.Entity<ClientMonthlyUsage>(entity =>
+        {
+            entity.HasKey(e => e.ClientMonthlyUsageId);
+
+            // Requerido por el INSERT ... ON CONFLICT de ClientUsageService (no filtrar este índice)
+            entity.HasIndex(e => new { e.ClientId, e.Year, e.Month })
+                  .IsUnique()
+                  .HasDatabaseName("IX_ClientMonthlyUsage_ClientId_Year_Month");
+
+            entity.Property(e => e.AcceptedDocuments)
+                  .HasDefaultValue(0);
+
+            entity.Property(e => e.PlanName)
+                  .HasMaxLength(100)
+                  .IsUnicode(false)
+                  .IsRequired();
+
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.Client)
+                  .WithMany(p => p.MonthlyUsages)
+                  .HasForeignKey(d => d.ClientId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_ClientMonthlyUsage_Client");
+
+            entity.HasOne(d => d.Plan)
+                  .WithMany()
+                  .HasForeignKey(d => d.PlanId)
+                  .OnDelete(DeleteBehavior.SetNull)
+                  .HasConstraintName("FK_ClientMonthlyUsage_Plan");
         });
 
         modelBuilder.Entity<ClientBranche>(entity =>
@@ -701,6 +838,12 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.HangfireJobId)
                 .HasMaxLength(100)
                 .IsUnicode(false);
+
+            entity.Property(e => e.BillingCountedAtUtc)
+                  .HasColumnType(DateTimeColumnType);
+            // Solo lo escribe ClientUsageService por SQL; los updates de EF no deben pisarlo
+            entity.Property(e => e.BillingCountedAtUtc)
+                  .Metadata.SetAfterSaveBehavior(Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Ignore);
 
             entity.Property(e => e.IssueDateUtc).HasColumnType(DateTimeColumnType)
                   .HasDefaultValueSql(DefaultDateTimeSqlValue);
