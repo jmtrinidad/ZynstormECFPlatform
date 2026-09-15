@@ -32,6 +32,18 @@ public partial class Client : BaseEntity
 
     public bool ClientInactive { get; set; }
 
+    /// <summary>Fecha calendario del último pago de renta.</summary>
+    public DateTime? LastRentPaymentDate { get; set; }
+
+    /// <summary>Fecha calendario del próximo pago de renta.</summary>
+    public DateTime? NextRentPaymentDate { get; set; }
+
+    /// <summary>El cliente pagó el año completo de renta.</summary>
+    public bool RentPaidFullYear { get; set; }
+
+    /// <summary>Descuento por pago adelantado, en porcentaje (0–100). Por defecto 0.</summary>
+    public decimal RentDiscountPercent { get; set; }
+
     public virtual Plan? Plan { get; set; }
 
     public virtual ICollection<ClientMonthlyUsage> MonthlyUsages { get; set; } = [];

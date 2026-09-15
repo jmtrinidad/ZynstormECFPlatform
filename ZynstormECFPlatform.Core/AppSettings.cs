@@ -21,4 +21,7 @@ public class AppSettings
 
     /// <summary>Días de anticipación para considerar un certificado próximo a vencer.</summary>
     public int CertificateExpirationWarningDays { get; set; } = 20;
+
+    /// <summary>Días de anticipación para considerar una renta próxima a vencer.</summary>
+    public int RentPaymentWarningDays { get; set; } = 15;
 }

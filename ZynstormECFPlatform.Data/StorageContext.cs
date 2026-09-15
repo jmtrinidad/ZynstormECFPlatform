@@ -443,6 +443,21 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasDefaultValue(false)
                   .IsRequired();
 
+            entity.Property(e => e.LastRentPaymentDate)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.NextRentPaymentDate)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.RentPaidFullYear)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.RentDiscountPercent)
+                  .HasPrecision(5, 2)
+                  .HasDefaultValue(0m)
+                  .IsRequired();
+
             entity.HasOne(d => d.Plan)
                   .WithMany(p => p.Clients)
                   .HasForeignKey(d => d.PlanId)
@@ -462,6 +477,12 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.Description)
                   .HasMaxLength(300)
                   .IsUnicode(false);
+
+            entity.Property(e => e.PlanTypeId)
+                  .HasDefaultValue((int)ZynstormECFPlatform.Core.Enums.PlanTypeEnum.Documents)
+                  .IsRequired();
+
+            entity.Property(e => e.MaxUsers);
 
             entity.Property(e => e.RegisteredAt)
                   .HasColumnType(DateTimeColumnType)
