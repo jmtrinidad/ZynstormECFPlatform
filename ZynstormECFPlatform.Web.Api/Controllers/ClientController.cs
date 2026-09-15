@@ -10,6 +10,7 @@ using ZynstormECFPlatform.Common.Utilities;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
+using ZynstormECFPlatform.Services.Billing;
 using ZynstormECFPlatform.Services.Reports;
 using System.Security.Claims;
 
@@ -23,7 +24,10 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         IUnitOfWork unitOfWork,
         IMapper mapper,
         ILoggerFactory loggerFactory,
-        IRepository<EcfDocument> ecfDocumentRepository) : BaseController<ClientController, Client, ClientCreateDto, ClientUpdateDto, ClientViewDto>(clientService, mapper, loggerFactory)
+        IRepository<EcfDocument> ecfDocumentRepository,
+        IPlanService planService,
+        IRepository<ClientMonthlyUsage> clientMonthlyUsageRepository,
+        IRepository<PlanOverageTier> planOverageTierRepository) : BaseController<ClientController, Client, ClientCreateDto, ClientUpdateDto, ClientViewDto>(clientService, mapper, loggerFactory)
     {
         private string? CurrentUserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         private bool IsSA => User.IsInRole("SA");
@@ -44,7 +48,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 // Si se proporciona 'id', buscamos un único cliente por su GUID
                 if (!string.IsNullOrEmpty(id))
                 {
-                    var query = Repository.Table.AsNoTracking().Include(c => c.ApiKeys).Where(c => c.GuidId == id).AsQueryable();
+                    var query = Repository.Table.AsNoTracking().Include(c => c.ApiKeys).Include(c => c.Plan).Where(c => c.GuidId == id).AsQueryable();
                     if (!IsSA)
                     {
                         var userId = CurrentUserId;
@@ -57,7 +61,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 }
 
                 // Si no hay 'id', devolvemos una lista (opcionalmente filtrada por guidId)
-                var listQuery = Repository.Table.AsNoTracking().Include(c => c.ApiKeys).AsQueryable();
+                var listQuery = Repository.Table.AsNoTracking().Include(c => c.ApiKeys).Include(c => c.Plan).AsQueryable();
                 if (!string.IsNullOrEmpty(guidId))
                 {
                     listQuery = listQuery.Where(x => x.GuidId == guidId);
@@ -131,6 +135,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         {
             try
             {
+                if (!await PlanExistsAsync(dto.PlanId))
+                    return BadRequest("El plan seleccionado no existe.");
+
                 Client? model = null;
 
                 string? apiKey = null;
@@ -179,6 +186,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     await emailService.SendApiKeyEmailAsync(model.Email, apiKey, secretKey);
                 }
 
+                if (model?.PlanId != null)
+                    model.Plan = await planService.GetNoTrackingByAsync(p => p.PlanId == model.PlanId);
+
                 return Ok(Mapper.Map<Client, ClientViewDto>(model!));
             }
             catch (AutoMapperMappingException exception)
@@ -221,7 +231,10 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 if (string.IsNullOrEmpty(guid))
                     return BadRequest("El GuidId es obligatorio para la actualización.");
 
-                var query = Repository.Table.Include(c => c.ApiKeys).Where(c => c.GuidId == guid).AsQueryable();
+                if (!await PlanExistsAsync(dto.PlanId))
+                    return BadRequest("El plan seleccionado no existe.");
+
+                var query = Repository.Table.Include(c => c.ApiKeys).Include(c => c.Plan).Where(c => c.GuidId == guid).AsQueryable();
 
                 if (!IsSA)
                 {
@@ -238,6 +251,10 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                 await Repository.UpdateAsync(model);
 
+                model.Plan = model.PlanId.HasValue
+                    ? await planService.GetNoTrackingByAsync(p => p.PlanId == model.PlanId)
+                    : null;
+
                 return Ok(Mapper.Map<Client, ClientViewDto>(model));
             }
             catch (Exception exception)
@@ -253,7 +270,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         {
             try
             {
-                var query = Repository.Table.AsNoTracking().Include(c => c.ApiKeys).Where(c => c.GuidId == guid).AsQueryable();
+                var query = Repository.Table.AsNoTracking().Include(c => c.ApiKeys).Include(c => c.Plan).Where(c => c.GuidId == guid).AsQueryable();
                 if (!IsSA)
                 {
                     var userId = CurrentUserId;
@@ -394,5 +411,100 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 return StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
         }
+
+        [HttpGet]
+        [Route("usage", Order = 1)]
+        public async Task<IActionResult> GetMonthlyUsage([FromQuery] int year, [FromQuery] int month, CancellationToken cancellationToken = default)
+        {
+            if (!IsSA) return Forbid();
+            if (year < 2000 || month is < 1 or > 12)
+                return BadRequest("Año o mes inválido.");
+
+            try
+            {
+                var query = clientMonthlyUsageRepository.Table.AsNoTracking()
+                    .Where(u => u.Year == year && u.Month == month);
+
+                return Ok(await BuildUsageDtosAsync(query, cancellationToken));
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [HttpGet]
+        [Route("guid/{guid}/usage", Order = 1)]
+        public async Task<IActionResult> GetClientMonthlyUsage(string guid, [FromQuery] int year, [FromQuery] int month, CancellationToken cancellationToken = default)
+        {
+            if (!IsSA) return Forbid();
+            if (year < 2000 || month is < 1 or > 12)
+                return BadRequest("Año o mes inválido.");
+
+            try
+            {
+                var query = clientMonthlyUsageRepository.Table.AsNoTracking()
+                    .Where(u => u.Client.GuidId == guid && u.Year == year && u.Month == month);
+
+                var result = (await BuildUsageDtosAsync(query, cancellationToken)).FirstOrDefault();
+                return result == null ? NotFound("El cliente no tiene consumo registrado en ese mes.") : Ok(result);
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        private async Task<List<ClientMonthlyUsageDto>> BuildUsageDtosAsync(IQueryable<ClientMonthlyUsage> query, CancellationToken cancellationToken)
+        {
+            var usages = await query.Include(u => u.Client).ToListAsync(cancellationToken);
+
+            var planIds = usages.Where(u => u.PlanId.HasValue).Select(u => u.PlanId!.Value).Distinct().ToList();
+            var tiers = await planOverageTierRepository.Table.AsNoTracking()
+                .Where(t => planIds.Contains(t.PlanId))
+                .ToListAsync(cancellationToken);
+
+            return usages
+                .Select(u =>
+                {
+                    var calculation = BillingCalculator.Calculate(
+                        u.MonthlyFee,
+                        u.MonthlyDocumentLimit,
+                        tiers.Where(t => t.PlanId == u.PlanId).Select(t => new OverageTier(t.FromUnit, t.ToUnit, t.UnitPrice)),
+                        u.AcceptedDocuments);
+
+                    return new ClientMonthlyUsageDto
+                    {
+                        ClientGuidId = u.Client.GuidId,
+                        ClientName = u.Client.Name,
+                        ClientRnc = u.Client.Rnc,
+                        ClientInactive = u.Client.ClientInactive,
+                        Year = u.Year,
+                        Month = u.Month,
+                        PlanName = u.PlanName,
+                        MonthlyFee = calculation.MonthlyFee,
+                        MonthlyDocumentLimit = calculation.MonthlyDocumentLimit,
+                        AcceptedDocuments = calculation.AcceptedDocuments,
+                        OverageDocuments = calculation.OverageDocuments,
+                        OverageAmount = calculation.OverageAmount,
+                        Total = calculation.Total,
+                        Tiers = calculation.Tiers.Select(t => new OverageTierChargeDto
+                        {
+                            FromUnit = t.FromUnit,
+                            ToUnit = t.ToUnit,
+                            UnitPrice = t.UnitPrice,
+                            Units = t.Units,
+                            Amount = t.Amount
+                        }).ToList()
+                    };
+                })
+                .OrderBy(d => d.ClientName)
+                .ToList();
+        }
+
+        private async Task<bool> PlanExistsAsync(int? planId) =>
+            !planId.HasValue || await planService.GetNoTrackingByAsync(p => p.PlanId == planId.Value) != null;
     }
 }
