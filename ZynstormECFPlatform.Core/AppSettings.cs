@@ -15,4 +15,10 @@ public class AppSettings
     public string SmtpFromName { get; set; } = null!;
 
     public string PasswordChangeSuccessUrl { get; set; } = string.Empty;
+
+    /// <summary>Correo que recibe el resumen diario de certificados por vencer.</summary>
+    public string CertificateAlertEmail { get; set; } = string.Empty;
+
+    /// <summary>Días de anticipación para considerar un certificado próximo a vencer.</summary>
+    public int CertificateExpirationWarningDays { get; set; } = 20;
 }

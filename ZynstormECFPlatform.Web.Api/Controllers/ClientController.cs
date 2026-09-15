@@ -27,8 +27,41 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         IRepository<EcfDocument> ecfDocumentRepository,
         IPlanService planService,
         IRepository<ClientMonthlyUsage> clientMonthlyUsageRepository,
-        IRepository<PlanOverageTier> planOverageTierRepository) : BaseController<ClientController, Client, ClientCreateDto, ClientUpdateDto, ClientViewDto>(clientService, mapper, loggerFactory)
+        IRepository<PlanOverageTier> planOverageTierRepository,
+        IClientCertificateService clientCertificateService,
+        Microsoft.Extensions.Options.IOptions<ZynstormECFPlatform.Core.AppSettings> appSettings) : BaseController<ClientController, Client, ClientCreateDto, ClientUpdateDto, ClientViewDto>(clientService, mapper, loggerFactory)
     {
+        private int CertificateWarningDays => appSettings.Value.CertificateExpirationWarningDays > 0
+            ? appSettings.Value.CertificateExpirationWarningDays
+            : ZynstormECFPlatform.Services.Certificates.CertificateExpirationHelper.DefaultWarningDays;
+
+        /// <summary>Completa los datos del certificado vigente (vencimiento y aviso) en los clientes mapeados.</summary>
+        private async Task FillCertificateExpirationAsync(IEnumerable<ClientViewDto> clients, CancellationToken cancellationToken)
+        {
+            var list = clients.ToList();
+            if (list.Count == 0) return;
+
+            var clientIds = list.Select(c => c.ClientId).ToList();
+            var certificates = await clientCertificateService.Table
+                .AsNoTracking()
+                .Where(c => clientIds.Contains(c.ClientId))
+                .ToListAsync(cancellationToken);
+
+            var activeByClient = certificates
+                .GroupBy(c => c.ClientId)
+                .ToDictionary(g => g.Key, g => ZynstormECFPlatform.Services.Certificates.CertificateExpirationHelper.SelectActive(g));
+
+            foreach (var dto in list)
+            {
+                if (!activeByClient.TryGetValue(dto.ClientId, out var active) || active?.ExpirationDateUtc == null) continue;
+
+                var days = ZynstormECFPlatform.Services.Certificates.CertificateExpirationHelper.GetDaysToExpire(active.ExpirationDateUtc);
+                dto.CertificateExpirationDateUtc = active.ExpirationDateUtc;
+                dto.CertificateDaysToExpire = days;
+                dto.CertificateExpiringSoon = ZynstormECFPlatform.Services.Certificates.CertificateExpirationHelper.IsExpiringSoon(days, CertificateWarningDays);
+            }
+        }
+
         private string? CurrentUserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         private bool IsSA => User.IsInRole("SA");
 
@@ -45,6 +78,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 string? search = Request.Query.TryGetValue("search", out var searchVal) ? searchVal.ToString() : null;
                 int? pageNumber = int.TryParse(Request.Query["pageNumber"], out var pn) ? pn : null;
                 int? pageSize = int.TryParse(Request.Query["pageSize"], out var ps) ? ps : null;
+                // Por defecto se incluyen los inactivos; includeInactive=false devuelve solo activos
+                bool includeInactive = !bool.TryParse(Request.Query["includeInactive"], out var ii) || ii;
                 // Si se proporciona 'id', buscamos un único cliente por su GUID
                 if (!string.IsNullOrEmpty(id))
                 {
@@ -73,6 +108,11 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     listQuery = listQuery.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
                 }
 
+                if (!includeInactive)
+                {
+                    listQuery = listQuery.Where(c => !c.ClientInactive);
+                }
+
                 // Aplicar búsqueda si se proporciona
                 if (!string.IsNullOrEmpty(search))
                 {
@@ -98,7 +138,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                         .Take(size)
                         .ToListAsync(cancellationToken);
 
-                    var mappedItems = Mapper.Map<IEnumerable<Client>, IEnumerable<ClientViewDto>>(results);
+                    var mappedItems = Mapper.Map<IEnumerable<Client>, IEnumerable<ClientViewDto>>(results).ToList();
+                    await FillCertificateExpirationAsync(mappedItems, cancellationToken);
 
                     var paginatedResponse = new PaginatedResponseDto<ClientViewDto>
                     {
@@ -114,7 +155,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 else
                 {
                     var results = await listQuery.OrderBy(c => c.Name).ToListAsync(cancellationToken);
-                    return Ok(Mapper.Map<IEnumerable<Client>, IEnumerable<ClientViewDto>>(results));
+                    var mappedList = Mapper.Map<IEnumerable<Client>, IEnumerable<ClientViewDto>>(results).ToList();
+                    await FillCertificateExpirationAsync(mappedList, cancellationToken);
+                    return Ok(mappedList);
                 }
             }
             catch (Exception exception)
@@ -409,6 +452,50 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 Logger.LogError(exception, "Error generating weekly report PDF via API: {Message}", exception.Message);
                 return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [HttpPost]
+        [Route("guid/{guid}/certificate-expiration/notify", Order = 1)]
+        public async Task<IActionResult> NotifyCertificateExpiration(string guid, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var query = Repository.Table.AsNoTracking().Where(c => c.GuidId == guid);
+                if (!IsSA)
+                {
+                    var userId = CurrentUserId;
+                    query = query.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
+                }
+
+                var client = await query.FirstOrDefaultAsync(cancellationToken);
+                if (client == null)
+                    return NotFound(new { message = "No se encontró el cliente." });
+
+                if (string.IsNullOrWhiteSpace(client.Email))
+                    return BadRequest(new { message = "El cliente no tiene un correo electrónico registrado." });
+
+                var certificates = await clientCertificateService.Table
+                    .AsNoTracking()
+                    .Where(c => c.ClientId == client.ClientId)
+                    .ToListAsync(cancellationToken);
+
+                var active = ZynstormECFPlatform.Services.Certificates.CertificateExpirationHelper.SelectActive(certificates);
+                if (active?.ExpirationDateUtc == null)
+                    return BadRequest(new { message = "El cliente no tiene un certificado con fecha de vencimiento." });
+
+                var days = ZynstormECFPlatform.Services.Certificates.CertificateExpirationHelper.GetDaysToExpire(active.ExpirationDateUtc)!.Value;
+                var (subject, htmlBody) = ZynstormECFPlatform.Services.Certificates.CertificateExpirationHelper
+                    .BuildClientEmail(client.Name, active.ExpirationDateUtc.Value, days);
+
+                await emailService.SendEmailAsync(client.Email, subject, htmlBody, cancellationToken: cancellationToken);
+
+                return Ok(new { message = $"Aviso de vencimiento enviado a {client.Email}." });
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, "Error enviando aviso de vencimiento de certificado al cliente {Guid}", guid);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "No se pudo enviar el aviso de vencimiento." });
             }
         }
 

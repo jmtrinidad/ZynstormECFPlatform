@@ -62,6 +62,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Jobs.EcfTrackingJob>();
         services.AddTransient<Jobs.AutomaticReportsJob>();
         services.AddTransient<Jobs.ReceivedB2BMessagesCleanupJob>();
+        services.AddTransient<Jobs.CertificateExpirationJob>();
 
         return services;
     }

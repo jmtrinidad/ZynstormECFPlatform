@@ -287,6 +287,13 @@ RecurringJob.AddOrUpdate<ZynstormECFPlatform.Services.Jobs.ReceivedB2BMessagesCl
     new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Santo_Domingo") }
 );
 
+RecurringJob.AddOrUpdate<ZynstormECFPlatform.Services.Jobs.CertificateExpirationJob>(
+    "CertificateExpirationJob",
+    job => job.CheckExpiringCertificatesAsync(default),
+    Cron.Daily(2, 0), // 2:00 AM everyday in DR
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Santo_Domingo") }
+);
+
 app.MapControllers();
 app.MapHub<CertificationHub>("/hubs/certification");
 

@@ -51,4 +51,14 @@ public class ClientViewDto : ClientUpdateDto
     public string? ApiKey { get; set; }
 
     public string? PlanName { get; set; }
+
+    public decimal? PlanMonthlyFee { get; set; }
+
+    /// <summary>Vencimiento del certificado vigente (UTC).</summary>
+    public DateTime? CertificateExpirationDateUtc { get; set; }
+
+    /// <summary>Días calendario para el vencimiento; negativo si ya venció.</summary>
+    public int? CertificateDaysToExpire { get; set; }
+
+    public bool CertificateExpiringSoon { get; set; }
 }
