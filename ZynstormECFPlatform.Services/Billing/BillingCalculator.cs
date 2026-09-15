@@ -1,3 +1,5 @@
+using ZynstormECFPlatform.Core.Enums;
+
 namespace ZynstormECFPlatform.Services.Billing;
 
 public sealed record OverageTier(int FromUnit, int? ToUnit, decimal UnitPrice);
@@ -49,6 +51,34 @@ public static class BillingCalculator
             charges,
             overageAmount,
             monthlyFee + overageAmount);
+    }
+
+    /// <summary>Solo los planes por comprobantes acumulan consumo mensual.</summary>
+    public static bool AccruesDocumentUsage(int planTypeId) =>
+        planTypeId == (int)PlanTypeEnum.Documents;
+
+    /// <summary>
+    /// Validación según el tipo de plan. En los de renta se ignora el límite de documentos
+    /// (el controller lo fuerza a -1) y se exige el tope de usuarios sin tramos.
+    /// </summary>
+    public static List<string> ValidatePlan(
+        PlanTypeEnum planType,
+        int monthlyDocumentLimit,
+        decimal monthlyFee,
+        int? maxUsers,
+        IEnumerable<OverageTier> tiers)
+    {
+        var tierList = tiers.ToList();
+
+        if (planType == PlanTypeEnum.Rent)
+            return RentCalculator.ValidateRentPlan(monthlyFee, maxUsers, tierList.Count > 0);
+
+        var errors = ValidatePlan(monthlyDocumentLimit, monthlyFee, tierList);
+
+        if (maxUsers.HasValue)
+            errors.Add("Los usuarios permitidos solo aplican a los planes de renta.");
+
+        return errors;
     }
 
     public static List<string> ValidatePlan(int monthlyDocumentLimit, decimal monthlyFee, IEnumerable<OverageTier> tiers)
