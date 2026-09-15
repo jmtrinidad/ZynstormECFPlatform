@@ -91,6 +91,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         [HttpPost("emit")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> EmitEcf([FromBody] EcfInvoiceRequestDto dto, [FromQuery] DgiiEnvironment environment = DgiiEnvironment.Test)
         {
             if (dto == null)
@@ -103,7 +104,14 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     environment,
                     cancellationToken: HttpContext.RequestAborted);
 
-                if (result.DtoErrors.Count > 0 || result.XsdErrors.Count > 0 || result.XmlProdErrors.Count > 0 || result.XmlValidation?.IsValid == false)
+                if (result.ClientInactive)
+                    return StatusCode(StatusCodes.Status403Forbidden, result);
+
+                if (result.HasUnexpectedError)
+                    return StatusCode(StatusCodes.Status500InternalServerError, result);
+
+                if (result.DtoErrors.Count > 0 || result.XsdErrors.Count > 0 || result.XmlProdErrors.Count > 0
+                    || result.ConfigurationErrors.Count > 0 || result.XmlValidation?.IsValid == false)
                     return BadRequest(result);
 
                 if (result.IsPending)

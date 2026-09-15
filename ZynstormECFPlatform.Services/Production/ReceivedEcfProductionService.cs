@@ -123,17 +123,27 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         var issuerRnc = dto.ECF.Encabezado.Emisor.RNCEmisor;
         var eNcf = dto.ECF.Encabezado.IdDoc.eNCF;
 
-        var client = await _clientService.GetByAsync(c => c.Rnc == issuerRnc)
-            ?? throw new Exception($"Cliente con RNC {issuerRnc} no encontrado.");
-        var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId)
-            ?? throw new Exception("ApiKey no encontrada.");
+        var client = await _clientService.GetByAsync(c => c.Rnc == issuerRnc);
+        if (client == null)
+            return FailConfiguration(resultDto, $"Cliente con RNC {issuerRnc} no encontrado.");
+
+        if (client.ClientInactive)
+            return BuildClientInactiveResult(resultDto);
+
+        var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId);
+        if (apiKey == null)
+            return FailConfiguration(resultDto, "ApiKey no encontrada.");
+
         var clientBranch = await _clientBrancheService.GetByAsync(x => x.ClientId == client.ClientId && x.IsMain)
             ?? await _clientBrancheService.GetByAsync(x => x.ClientId == client.ClientId);
         var currency = await _currencyService.GetByAsync(x => x.Code == "DOP")
-            ?? await _currencyService.GetByAsync(x => x.CurrencyId > 0)
-            ?? throw new Exception("No hay moneda configurada para registrar el e-CF.");
-        var ecfTypeEntity = await _ecfTypeService.GetByAsync(x => x.Code == ecfType.ToString())
-            ?? throw new Exception($"TipoeCF {ecfType} no esta configurado.");
+            ?? await _currencyService.GetByAsync(x => x.CurrencyId > 0);
+        if (currency == null)
+            return FailConfiguration(resultDto, "No hay moneda configurada para registrar el e-CF.");
+
+        var ecfTypeEntity = await _ecfTypeService.GetByAsync(x => x.Code == ecfType.ToString());
+        if (ecfTypeEntity == null)
+            return FailConfiguration(resultDto, $"TipoeCF {ecfType} no esta configurado.");
 
         dto.SignatureDateOverride ??= DateTime.Now.ToDrTime();
         dto.SequenceExpirationDate ??= new DateTime(DateTime.Now.Year + 2, 12, 31);
@@ -146,6 +156,54 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         var ecfDocument = await CreateEcfDocumentAsync(dto, client, clientBranch, apiKey, currency, ecfTypeEntity);
         resultDto.EcfDocumentId = ecfDocument.EcfDocumentId;
 
+        try
+        {
+            return await ContinueProcessingAsync(
+                resultDto, dto, client, apiKey, ecfDocument, ecfType, targetEnvironment,
+                issuerRnc, eNcf, statusDelayMilliseconds, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            resultDto.Success = false;
+            resultDto.HasUnexpectedError = true;
+            resultDto.Message = $"Error inesperado durante la emision del e-CF: {ex.Message}";
+            await MarkDocumentAsync(ecfDocument, 12, resultDto.Message);
+            await AddLogAsync(ecfDocument, client.ClientId, "Error", resultDto.Message, ex.ToString());
+            return resultDto;
+        }
+    }
+
+    public const string ClientInactiveMessage = "El cliente se encuentra desactivado. Por favor, comuníquese con soporte.";
+
+    public static ReceivedEcfEmissionResultDto BuildClientInactiveResult(ReceivedEcfEmissionResultDto resultDto)
+    {
+        resultDto.Success = false;
+        resultDto.ClientInactive = true;
+        resultDto.Message = ClientInactiveMessage;
+        return resultDto;
+    }
+
+    private static ReceivedEcfEmissionResultDto FailConfiguration(ReceivedEcfEmissionResultDto resultDto, string message)
+    {
+        resultDto.Success = false;
+        resultDto.Message = message;
+        resultDto.ConfigurationErrors.Add(message);
+        return resultDto;
+    }
+
+    private async Task<ReceivedEcfEmissionResultDto> ContinueProcessingAsync(
+        ReceivedEcfEmissionResultDto resultDto,
+        EcfInvoiceRequestDto dto,
+        Client client,
+        ApiKey apiKey,
+        EcfDocument ecfDocument,
+        int ecfType,
+        DgiiEnvironment targetEnvironment,
+        string issuerRnc,
+        string eNcf,
+        int statusDelayMilliseconds,
+        CancellationToken cancellationToken)
+    {
         _ecfStatusHistoryService.Add(new EcfStatusHistory
         {
             EcfDocumentId = ecfDocument.EcfDocumentId,
@@ -196,8 +254,14 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         //}
 
         var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey ?? string.Empty);
-        var certificate = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId)
-            ?? throw new Exception("Certificado no encontrado.");
+        var certificate = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId);
+        if (certificate == null)
+        {
+            FailConfiguration(resultDto, "Certificado no encontrado.");
+            await MarkDocumentAsync(ecfDocument, 3, resultDto.Message);
+            await AddLogAsync(ecfDocument, client.ClientId, "Warning", resultDto.Message);
+            return resultDto;
+        }
         var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
         var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
         var certBase64 = Convert.ToBase64String(certificateBytes);

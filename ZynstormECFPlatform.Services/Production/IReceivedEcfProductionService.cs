@@ -20,6 +20,12 @@ public class ReceivedEcfEmissionResultDto
     public bool IsPending { get; set; }
     public bool IsAcceptedConditional { get; set; }
     public bool RequiresCorrection { get; set; }
+    public bool ClientInactive { get; set; }
+
+    [JsonIgnore]
+    public bool HasUnexpectedError { get; set; }
+
+    public List<string> ConfigurationErrors { get; set; } = [];
     public string Message { get; set; } = string.Empty;
     public int EcfDocumentId { get; set; }
     public int EcfType { get; set; }
