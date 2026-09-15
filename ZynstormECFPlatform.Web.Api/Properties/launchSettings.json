@@ -1,26 +1,33 @@
-﻿{
-  "$schema": "https://json.schemastore.org/launchsettings.json",
+{
   "profiles": {
     "http": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
       "launchBrowser": true,
       "launchUrl": "swagger",
-      "applicationUrl": "http://localhost:5220",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
-      }
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:5220"
     },
     "WSL": {
       "commandName": "WSL2",
+      "workingDirectory": "/home/dev/projects/ZynstormECF-WorkSpace/ZynstormECFPlatform/ZynstormECFPlatform.Web.Api",
       "launchBrowser": true,
       "launchUrl": "https://localhost:7148/swagger",
-      "workingDirectory": "/home/dev/projects/ZynstormECF-WorkSpace/ZynstormECFPlatform/ZynstormECFPlatform.Web.Api",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "ASPNETCORE_URLS": "https://localhost:7148;http://localhost:7027"
       },
       "distributionName": "Ubuntu"
+    },
+    "IIS Express": {
+      "commandName": "IISExpress",
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
     }
   },
   "https": {
@@ -32,5 +39,14 @@
     "environmentVariables": {
       "ASPNETCORE_ENVIRONMENT": "Development"
     }
+  },
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:65184/",
+      "sslPort": 44394
+    }
   }
-} }
+}
