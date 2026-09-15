@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Core.Entities;
+using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Services.Billing;
 
@@ -56,6 +57,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         [Route("", Order = 1)]
         public override async Task<ActionResult<PlanViewDto>> Post([FromBody] PlanCreateDto dto)
         {
+            Normalize(dto);
             var errors = Validate(dto);
             if (errors.Count > 0)
                 return BadRequest(new { success = false, message = string.Join(" ", errors), errors });
@@ -77,6 +79,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         [Route("", Order = 1)]
         public override async Task<ActionResult<PlanViewDto>> Put([FromBody] PlanUpdateDto dto)
         {
+            Normalize(dto);
             var errors = Validate(dto);
             if (errors.Count > 0)
                 return BadRequest(new { success = false, message = string.Join(" ", errors), errors });
@@ -114,8 +117,27 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
         private static List<string> Validate(PlanCreateDto dto) =>
             BillingCalculator.ValidatePlan(
+                (PlanTypeEnum)dto.PlanTypeId,
                 dto.MonthlyDocumentLimit,
                 dto.MonthlyFee,
+                dto.MaxUsers,
                 dto.OverageTiers.Select(t => new OverageTier(t.FromUnit, t.ToUnit, t.UnitPrice)));
+
+        /// <summary>
+        /// Un plan de renta no tiene límite de comprobantes ni tramos: se fuerzan, no se validan.
+        /// Un plan de comprobantes no lleva tope de usuarios.
+        /// </summary>
+        private static void Normalize(PlanCreateDto dto)
+        {
+            if ((PlanTypeEnum)dto.PlanTypeId == PlanTypeEnum.Rent)
+            {
+                dto.MonthlyDocumentLimit = BillingCalculator.UnlimitedDocuments;
+                dto.OverageTiers = [];
+            }
+            else
+            {
+                dto.MaxUsers = null;
+            }
+        }
     }
 }

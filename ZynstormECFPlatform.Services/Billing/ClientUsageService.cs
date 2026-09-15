@@ -45,6 +45,10 @@ public class ClientUsageService(
             if (plan == null)
                 return false;
 
+            // Los planes de renta no acumulan consumo mensual ni excedente.
+            if (!BillingCalculator.AccruesDocumentUsage(plan.PlanTypeId))
+                return false;
+
             var drNow = DateTimeExtensions.DrNow;
             var affected = await clientMonthlyUsageService.ExecuteAsync(ClientUsageSql.RegisterAccepted, new
             {
