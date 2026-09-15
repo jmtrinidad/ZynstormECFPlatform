@@ -53,6 +53,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IEcfProductionGeneratorService, Production.EcfProductionGeneratorService>();
         services.AddTransient<IEcfProductionService, Production.EcfProductionService>();
         services.AddTransient<Production.IReceivedEcfProductionService, Production.ReceivedEcfProductionService>();
+        services.AddTransient<Billing.IClientUsageService, Billing.ClientUsageService>();
 
         // --- XML Validation (Standalone) ---
         // Singleton because it maintains an internal ConcurrentDictionary cache for Verificaciones

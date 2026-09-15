@@ -14,6 +14,7 @@ using ZynstormECFPlatform.Common.Utilities;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
+using ZynstormECFPlatform.Services.Billing;
 using ZynstormECFPlatform.Services.Jobs;
 
 namespace ZynstormECFPlatform.Services.Production;
@@ -46,6 +47,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     private readonly ICacheService _cacheService;
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _hostEnvironment;
+    private readonly IClientUsageService _clientUsageService;
 
     public ReceivedEcfProductionService(
         IClientService clientService,
@@ -68,7 +70,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         IHttpClientFactory httpClientFactory,
         ICacheService cacheService,
         IConfiguration configuration,
-        IHostEnvironment hostEnvironment)
+        IHostEnvironment hostEnvironment,
+        IClientUsageService clientUsageService)
     {
         _clientService = clientService;
         _apiKeyService = apiKeyService;
@@ -91,6 +94,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         _cacheService = cacheService;
         _configuration = configuration;
         _hostEnvironment = hostEnvironment;
+        _clientUsageService = clientUsageService;
     }
 
     public async Task<ReceivedEcfEmissionResultDto> ProcessAsync(
@@ -292,6 +296,9 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             await MarkDocumentAsync(ecfDocument, statusId, resultDto.Message);
             await SaveTransmissionAsync(ecfDocument, transmission, statusId, signedXml, status);
 
+            if (resultDto.Success || resultDto.IsAcceptedConditional)
+                await _clientUsageService.RegisterAcceptedAsync(ecfDocument.EcfDocumentId, client.ClientId, cancellationToken);
+
             if (IsPendingDgiiStatus(status))
             {
                 resultDto.IsPending = true;
@@ -325,7 +332,10 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         await AddLogAsync(ecfDocument, client.ClientId, resultDto.Success ? "Information" : "Error", resultDto.Message, JsonSerializer.Serialize(transmission));
 
         if (resultDto.Success)
+        {
             await AddLogAsync(ecfDocument, client.ClientId, "Information", $"e-CF aprobado. CodigoSeguridad: {resultDto.SecurityCode}. FechaFirma: {resultDto.SignatureDate}. QR: {resultDto.QrUrl}.");
+            await _clientUsageService.RegisterAcceptedAsync(ecfDocument.EcfDocumentId, client.ClientId, cancellationToken);
+        }
 
         return resultDto;
     }
@@ -459,6 +469,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
                 await SaveValidationTransmissionAsync(ecfDocument, transmission, statusId: 10, signedXml, statusBody);
                 await MarkDocumentAsync(ecfDocument, 10, resultDto.Message);
                 await AddLogAsync(ecfDocument, clientId, "Information", $"XML validado y aceptado por endpoint interno. QR: {resultDto.QrUrl}", statusBody);
+                await _clientUsageService.RegisterAcceptedAsync(ecfDocument.EcfDocumentId, clientId);
                 return resultDto;
             }
 

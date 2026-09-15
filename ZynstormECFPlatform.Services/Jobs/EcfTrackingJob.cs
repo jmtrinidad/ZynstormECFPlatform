@@ -12,6 +12,7 @@ using ZynstormECFPlatform.Common;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
+using ZynstormECFPlatform.Services.Billing;
 using ZynstormECFPlatform.Services.Production;
 
 namespace ZynstormECFPlatform.Services.Jobs;
@@ -31,6 +32,7 @@ public class EcfTrackingJob
     private readonly IEmailService _emailService;
     private readonly IRepository<UserClient> _userClientRepository;
     private readonly IClientService _clientService;
+    private readonly IClientUsageService _clientUsageService;
     private readonly ILogger<EcfTrackingJob> _logger;
 
     public EcfTrackingJob(
@@ -45,6 +47,7 @@ public class EcfTrackingJob
         IEmailService emailService,
         IRepository<UserClient> userClientRepository,
         IClientService clientService,
+        IClientUsageService clientUsageService,
         ILogger<EcfTrackingJob> logger)
     {
         _transmissionService = transmissionService;
@@ -58,6 +61,7 @@ public class EcfTrackingJob
         _emailService = emailService;
         _userClientRepository = userClientRepository;
         _clientService = clientService;
+        _clientUsageService = clientUsageService;
         _logger = logger;
     }
 
@@ -151,6 +155,11 @@ public class EcfTrackingJob
             Exception = JsonSerializer.Serialize(new { statusResponse, qrMetadata }),
             CreateAtUtc = DateTime.UtcNow
         });
+
+        if (statusId == 10 || ReceivedEcfProductionService.IsAcceptedConditionalDgiiStatus(statusResponse))
+        {
+            await _clientUsageService.RegisterAcceptedAsync(ecfDocumentId, ecfDocument.ClientId);
+        }
 
         // Dispatch notifications if status is final (Aceptado = 10, Rechazado = 11, Error = 12)
         if (statusId == 10 || statusId == 11 || statusId == 12)
