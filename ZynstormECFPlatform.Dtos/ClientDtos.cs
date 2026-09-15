@@ -27,6 +27,10 @@ public class ClientCreateDto
     [StringLength(500)]
     public string? WeeklyReportEmails { get; set; }
 
+    public int? PlanId { get; set; }
+
+    public bool ClientInactive { get; set; }
+
     //public int StatusId { get; set; }
 }
 
@@ -45,4 +49,6 @@ public class ClientViewDto : ClientUpdateDto
     public DateTime RegisteredAt { get; set; }
 
     public string? ApiKey { get; set; }
+
+    public string? PlanName { get; set; }
 }

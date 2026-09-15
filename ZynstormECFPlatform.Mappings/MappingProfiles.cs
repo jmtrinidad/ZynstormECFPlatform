@@ -18,7 +18,25 @@ public class MappingProfiles : Profile
 
         CreateMap<ClientUpdateDto, Client>()
             .ForMember(dest => dest.ClientId, opt => opt.Ignore());
+        // Plan
+        CreateMap<PlanOverageTierDto, PlanOverageTier>();
+        CreateMap<PlanOverageTier, PlanOverageTierDto>();
+
+        CreateMap<PlanCreateDto, Plan>()
+            .ForMember(dest => dest.StatusId, opt => opt.MapFrom(src => src.IsActive ? (int)Enums.StatusEnum.Active : (int)Enums.StatusEnum.Inactive));
+
+        CreateMap<PlanUpdateDto, Plan>()
+            .ForMember(dest => dest.PlanId, opt => opt.Ignore())
+            .ForMember(dest => dest.OverageTiers, opt => opt.Ignore())
+            .ForMember(dest => dest.StatusId, opt => opt.MapFrom(src => src.IsActive ? (int)Enums.StatusEnum.Active : (int)Enums.StatusEnum.Inactive));
+
+        CreateMap<Plan, PlanViewDto>()
+            .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.StatusId == (int)Enums.StatusEnum.Active))
+            .ForMember(dest => dest.ClientsCount, opt => opt.MapFrom(src => src.Clients.Count))
+            .ForMember(dest => dest.OverageTiers, opt => opt.MapFrom(src => src.OverageTiers.OrderBy(t => t.FromUnit)));
+
         CreateMap<Client, ClientViewDto>()
+            .ForMember(dest => dest.PlanName, opt => opt.MapFrom(src => src.Plan != null ? src.Plan.Name : null))
             .ForMember(dest => dest.ApiKey, opt => opt.MapFrom(src => 
                 src.ApiKeys.Where(k => k.StatusId == (int)Enums.StatusEnum.Active)
                            .Select(k => k.Apikey)
