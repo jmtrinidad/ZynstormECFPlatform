@@ -18,6 +18,8 @@ public class ClientMonthlyUsageDto
     public int Year { get; set; }
     public int Month { get; set; }
     public string PlanName { get; set; } = string.Empty;
+    /// <summary>1 = Comprobantes, 2 = Renta. En las filas de renta los campos de documentos van en cero.</summary>
+    public int PlanTypeId { get; set; } = 1;
     public decimal MonthlyFee { get; set; }
     public int MonthlyDocumentLimit { get; set; }
     public int AcceptedDocuments { get; set; }

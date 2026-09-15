@@ -28,6 +28,13 @@ public class PlanCreateDto
     /// <summary>-1 = ilimitado.</summary>
     public int MonthlyDocumentLimit { get; set; }
 
+    /// <summary>1 = Comprobantes, 2 = Renta.</summary>
+    [Range(1, 2)]
+    public int PlanTypeId { get; set; } = 1;
+
+    /// <summary>Usuarios permitidos al mismo tiempo. Solo planes de renta. -1 = ilimitado.</summary>
+    public int? MaxUsers { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     public List<PlanOverageTierDto> OverageTiers { get; set; } = [];

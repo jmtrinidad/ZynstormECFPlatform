@@ -38,6 +38,8 @@ public class MappingProfiles : Profile
         CreateMap<Client, ClientViewDto>()
             .ForMember(dest => dest.PlanName, opt => opt.MapFrom(src => src.Plan != null ? src.Plan.Name : null))
             .ForMember(dest => dest.PlanMonthlyFee, opt => opt.MapFrom(src => src.Plan != null ? (decimal?)src.Plan.MonthlyFee : null))
+            .ForMember(dest => dest.PlanTypeId, opt => opt.MapFrom(src => src.Plan != null ? (int?)src.Plan.PlanTypeId : null))
+            .ForMember(dest => dest.MaxUsers, opt => opt.MapFrom(src => src.Plan != null ? src.Plan.MaxUsers : null))
             .ForMember(dest => dest.ApiKey, opt => opt.MapFrom(src => 
                 src.ApiKeys.Where(k => k.StatusId == (int)Enums.StatusEnum.Active)
                            .Select(k => k.Apikey)
