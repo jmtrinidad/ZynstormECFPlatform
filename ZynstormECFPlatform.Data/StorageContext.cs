@@ -458,6 +458,19 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasDefaultValue(0m)
                   .IsRequired();
 
+            entity.Property(e => e.RentPaymentGraceDays)
+                  .HasDefaultValue(3)
+                  .IsRequired();
+
+            entity.Property(e => e.RentFirstReminderSentFor)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.RentFinalReminderSentFor)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.RentSuspendedAtUtc)
+                  .HasColumnType(DateTimeColumnType);
+
             entity.HasOne(d => d.Plan)
                   .WithMany(p => p.Clients)
                   .HasForeignKey(d => d.PlanId)

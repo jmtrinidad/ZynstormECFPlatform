@@ -44,6 +44,18 @@ public partial class Client : BaseEntity
     /// <summary>Descuento por pago adelantado, en porcentaje (0–100). Por defecto 0.</summary>
     public decimal RentDiscountPercent { get; set; }
 
+    /// <summary>Días después de la fecha de pago para pagar antes de la suspensión. Por defecto 3.</summary>
+    public int RentPaymentGraceDays { get; set; } = 3;
+
+    /// <summary>Fecha de pago para la que ya se envió el primer aviso.</summary>
+    public DateTime? RentFirstReminderSentFor { get; set; }
+
+    /// <summary>Fecha de pago para la que ya se envió el último aviso.</summary>
+    public DateTime? RentFinalReminderSentFor { get; set; }
+
+    /// <summary>Momento en que el cliente fue suspendido por falta de pago de la renta. Null = no suspendido por renta.</summary>
+    public DateTime? RentSuspendedAtUtc { get; set; }
+
     public virtual Plan? Plan { get; set; }
 
     public virtual ICollection<ClientMonthlyUsage> MonthlyUsages { get; set; } = [];
