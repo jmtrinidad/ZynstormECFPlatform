@@ -72,4 +72,42 @@ public class PaymentReminderEmailsTests
         Assert.Contains("Comprobantes", html);
         Assert.Contains("RD$10,300.00", html);
     }
+
+    [Fact]
+    public void Reminders_ContainCorporateBrandingAndHelpNotice()
+    {
+        var (_, firstHtml) = PaymentReminderEmails.BuildFirstReminder(Data());
+        var (_, finalHtml) = PaymentReminderEmails.BuildFinalReminder(Data());
+        var (_, suspHtml) = PaymentReminderEmails.BuildSuspension(Data());
+
+        // Header Brand, Logo, Slogan & Badges
+        Assert.Contains("Zyn", firstHtml);
+        Assert.Contains("storm", firstHtml);
+        Assert.Contains("Desata tu evolución digital.", firstHtml);
+        Assert.Contains("data:image/png;base64,", firstHtml);
+        Assert.Contains("Recordatorio", firstHtml);
+        Assert.Contains("Último aviso", finalHtml);
+        Assert.Contains("Suspendido", suspHtml);
+
+        // Help Notice
+        Assert.Contains("¿Necesita asistencia o realizar su reporte de pago?", firstHtml);
+        Assert.Contains("¿Necesita asistencia o realizar su reporte de pago?", finalHtml);
+        Assert.Contains("¿Necesita asistencia o realizar su reporte de pago?", suspHtml);
+    }
+
+    [Fact]
+    public void SingleMonth_ShowsSpecificMonthToPay()
+    {
+        var (_, html) = PaymentReminderEmails.BuildFirstReminder(Data() with { PaidMonths = 1 });
+
+        Assert.Contains("Mes a pagar: Septiembre 2026", html);
+    }
+
+    [Fact]
+    public void MultipleMonths_ShowsMonthRangeAndCount()
+    {
+        var (_, html) = PaymentReminderEmails.BuildFirstReminder(Data() with { PaidMonths = 3 });
+
+        Assert.Contains("Meses a pagar: Septiembre – Noviembre 2026 (3 meses)", html);
+    }
 }
