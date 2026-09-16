@@ -102,3 +102,28 @@ public class ClientViewDto : ClientUpdateDto
 
     public bool CertificateExpiringSoon { get; set; }
 }
+
+public class ClientActiveStatusDto
+{
+    public bool IsActive { get; set; }
+
+    public string Message { get; set; } = string.Empty;
+
+    public string? ClientGuid { get; set; }
+
+    public string? ClientName { get; set; }
+
+    public string? Rnc { get; set; }
+
+    public bool ClientInactive { get; set; }
+
+    public bool PaymentSuspended { get; set; }
+
+    public DateTime? NextPaymentDate { get; set; }
+
+    public string? PlanName { get; set; }
+
+    public bool IsDgiiProduction { get; set; }
+
+    public bool IsCertified { get; set; }
+}

@@ -1,4 +1,5 @@
 using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -751,6 +752,54 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 Logger.LogError(exception, "Error enviando el resumen de pagos pendientes");
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = "No se pudo enviar el resumen de pagos." });
+            }
+        }
+
+        /// <summary>
+        /// Consulta y valida si un cliente se encuentra activo a partir de su ApiKey.
+        /// Acepta el ApiKey en la ruta, en query string (?apiKey=...) o en el header 'X-Api-Key'.
+        /// </summary>
+        [HttpGet]
+        [AllowAnonymous]
+        [Route("status-by-key/{apiKey?}", Order = 1)]
+        public async Task<ActionResult<ClientActiveStatusDto>> GetStatusByKey(
+            [FromRoute] string? apiKey,
+            [FromQuery(Name = "apiKey")] string? queryApiKey,
+            [FromHeader(Name = "X-Api-Key")] string? headerApiKey,
+            CancellationToken cancellationToken = default)
+        {
+            var effectiveKey = (string.IsNullOrWhiteSpace(apiKey)
+                ? (!string.IsNullOrWhiteSpace(queryApiKey) ? queryApiKey : headerApiKey)
+                : apiKey)?.Trim();
+
+            if (string.IsNullOrWhiteSpace(effectiveKey))
+            {
+                return BadRequest(new ClientActiveStatusDto
+                {
+                    IsActive = false,
+                    Message = "Debe proporcionar una ApiKey válida en la ruta, query string o header 'X-Api-Key'."
+                });
+            }
+
+            try
+            {
+                var apiKeyEntity = await apiKeyService.Table
+                    .AsNoTracking()
+                    .Include(k => k.Client)
+                        .ThenInclude(c => c.Plan)
+                    .FirstOrDefaultAsync(k => k.Apikey == effectiveKey, cancellationToken);
+
+                var statusDto = ClientStatusEvaluator.Evaluate(apiKeyEntity);
+                return Ok(statusDto);
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, "Error al consultar estado del cliente por ApiKey");
+                return StatusCode(StatusCodes.Status500InternalServerError, new ClientActiveStatusDto
+                {
+                    IsActive = false,
+                    Message = "Ocurrió un error interno al consultar el estado del cliente."
+                });
             }
         }
 
