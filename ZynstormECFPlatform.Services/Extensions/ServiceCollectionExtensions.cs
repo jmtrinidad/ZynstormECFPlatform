@@ -54,6 +54,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IEcfProductionService, Production.EcfProductionService>();
         services.AddTransient<Production.IReceivedEcfProductionService, Production.ReceivedEcfProductionService>();
         services.AddTransient<Billing.IClientUsageService, Billing.ClientUsageService>();
+        services.AddTransient<Billing.IPaymentReminderService, Billing.PaymentReminderService>();
 
         // --- XML Validation (Standalone) ---
         // Singleton because it maintains an internal ConcurrentDictionary cache for Verificaciones
@@ -63,6 +64,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Jobs.AutomaticReportsJob>();
         services.AddTransient<Jobs.ReceivedB2BMessagesCleanupJob>();
         services.AddTransient<Jobs.CertificateExpirationJob>();
+        services.AddTransient<Jobs.PaymentReminderJob>();
 
         return services;
     }
