@@ -47,6 +47,10 @@ public class ClientCreateDto
     [Range(0, 100)]
     public decimal PrepaymentDiscountPercent { get; set; }
 
+    /// <summary>Días después de la fecha de pago antes de suspender al cliente. Por defecto 3.</summary>
+    [Range(1, 30)]
+    public int PaymentGraceDays { get; set; } = 3;
+
     //public int StatusId { get; set; }
 }
 
@@ -86,6 +90,9 @@ public class ClientViewDto : ClientUpdateDto
 
     /// <summary>Ciclo pagado por adelantado con descuento aplicado. Null si el cliente no tiene plan.</summary>
     public decimal? PaymentCycleAmount { get; set; }
+
+    /// <summary>El cliente fue desactivado automáticamente por falta de pago.</summary>
+    public bool PaymentSuspended { get; set; }
 
     /// <summary>Vencimiento del certificado vigente (UTC).</summary>
     public DateTime? CertificateExpirationDateUtc { get; set; }

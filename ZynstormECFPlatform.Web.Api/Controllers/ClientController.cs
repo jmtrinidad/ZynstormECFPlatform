@@ -30,6 +30,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         IRepository<PlanOverageTier> planOverageTierRepository,
         IRepository<UserClient> userClientRepository,
         IClientCertificateService clientCertificateService,
+        IPaymentReminderService paymentReminderService,
         Microsoft.Extensions.Options.IOptions<ZynstormECFPlatform.Core.AppSettings> appSettings) : BaseController<ClientController, Client, ClientCreateDto, ClientUpdateDto, ClientViewDto>(clientService, mapper, loggerFactory)
     {
         private int CertificateWarningDays => appSettings.Value.CertificateExpirationWarningDays > 0
@@ -388,7 +389,21 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 if (model == null)
                     return NotFound("No se encontró el cliente o no tiene permisos para actualizarlo.");
 
+                var wasPaymentSuspended = model.PaymentSuspendedAtUtc != null;
+
                 Mapper.Map(dto, model);
+
+                if (!model.ClientInactive)
+                {
+                    // Reactivado a mano: deja de figurar como suspendido por pago.
+                    model.PaymentSuspendedAtUtc = null;
+                }
+                else if (wasPaymentSuspended && model.NextPaymentDate?.Date > DateTimeExtensions.DrNow.Date)
+                {
+                    // Se registró el pago: reactivación automática.
+                    model.ClientInactive = false;
+                    model.PaymentSuspendedAtUtc = null;
+                }
 
                 await Repository.UpdateAsync(model);
 
@@ -662,6 +677,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 {
                     var calculation = PaymentCalculator.Calculate(c.Plan!.MonthlyFee, c.PaidMonths, c.PrepaymentDiscountPercent);
                     var (status, days) = PaymentCalculator.GetPaymentStatus(c.NextPaymentDate, PaymentWarningDays);
+                    var due = c.NextPaymentDate?.Date;
 
                     return new ClientPaymentDto
                     {
@@ -683,7 +699,13 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                         LastPaymentDate = c.LastPaymentDate,
                         NextPaymentDate = c.NextPaymentDate,
                         PaymentStatus = (int)status,
-                        PaymentDaysToDue = days
+                        PaymentDaysToDue = days,
+                        PaymentGraceDays = PaymentReminderPolicy.NormalizeGraceDays(c.PaymentGraceDays),
+                        PaymentDeadline = due is DateTime d ? PaymentReminderPolicy.GetDeadline(d, c.PaymentGraceDays) : null,
+                        FirstReminderSent = due != null && c.FirstPaymentReminderSentFor?.Date == due,
+                        FinalReminderSent = due != null && c.FinalPaymentReminderSentFor?.Date == due,
+                        PaymentSuspended = c.PaymentSuspendedAtUtc != null,
+                        HasEmail = !string.IsNullOrWhiteSpace(c.Email)
                     };
                 }).ToList();
 
@@ -693,6 +715,42 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 Logger.LogError(exception, exception.Message);
                 return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [HttpPost]
+        [Route("guid/{guid}/payment-reminder/notify", Order = 1)]
+        public async Task<IActionResult> NotifyPaymentReminder(string guid, CancellationToken cancellationToken = default)
+        {
+            if (!IsSA) return Forbid();
+
+            try
+            {
+                var result = await paymentReminderService.SendClientReminderAsync(guid, cancellationToken);
+                return result.Success ? Ok(new { message = result.Message }) : BadRequest(new { message = result.Message });
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, "Error enviando recordatorio de pago al cliente {Guid}", guid);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "No se pudo enviar el recordatorio de pago." });
+            }
+        }
+
+        [HttpPost]
+        [Route("payments/reminders/summary", Order = 1)]
+        public async Task<IActionResult> SendPaymentSummary(CancellationToken cancellationToken = default)
+        {
+            if (!IsSA) return Forbid();
+
+            try
+            {
+                var result = await paymentReminderService.SendAdminSummaryAsync(cancellationToken);
+                return result.Success ? Ok(new { message = result.Message }) : BadRequest(new { message = result.Message });
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, "Error enviando el resumen de pagos pendientes");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "No se pudo enviar el resumen de pagos." });
             }
         }
 

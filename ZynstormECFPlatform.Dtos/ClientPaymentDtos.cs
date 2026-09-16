@@ -41,4 +41,21 @@ public class ClientPaymentDto
 
     /// <summary>Días calendario para el próximo pago; negativo si ya venció.</summary>
     public int? PaymentDaysToDue { get; set; }
+
+    public int PaymentGraceDays { get; set; }
+
+    /// <summary>Último día para pagar antes de la suspensión: próximo pago + días de gracia.</summary>
+    [JsonConverter(typeof(CalendarDateJsonConverter))]
+    public DateTime? PaymentDeadline { get; set; }
+
+    /// <summary>Ya se envió el primer aviso para la fecha de pago actual.</summary>
+    public bool FirstReminderSent { get; set; }
+
+    /// <summary>Ya se envió el último aviso para la fecha de pago actual.</summary>
+    public bool FinalReminderSent { get; set; }
+
+    /// <summary>Desactivado automáticamente por falta de pago.</summary>
+    public bool PaymentSuspended { get; set; }
+
+    public bool HasEmail { get; set; }
 }
