@@ -8,11 +8,13 @@
 
   <ItemGroup>
     <PackageReference Include="Hangfire.Core" Version="1.8.23" />
+    <!-- Hangfire.Core arrastra Newtonsoft.Json 11.0.1 (GHSA-5crp-9r3c-p9vr); se fija una versión corregida. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
     <PackageReference Include="MiniExcel" Version="1.43.0" />
     <PackageReference Include="QuestPDF" Version="2026.5.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.5" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.5" />
     <PackageReference Include="PdfPig" Version="0.1.11" />
     <PackageReference Include="QRCoder" Version="1.6.0" />
