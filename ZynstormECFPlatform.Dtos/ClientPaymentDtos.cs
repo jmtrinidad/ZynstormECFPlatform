@@ -58,4 +58,9 @@ public class ClientPaymentDto
     public bool PaymentSuspended { get; set; }
 
     public bool HasEmail { get; set; }
+
+    /// <summary>Suma del excedente de meses cerrados sin pagar (solo planes de comprobantes).</summary>
+    public decimal PendingOverageAmount { get; set; }
+
+    public int PendingOverageMonths { get; set; }
 }
