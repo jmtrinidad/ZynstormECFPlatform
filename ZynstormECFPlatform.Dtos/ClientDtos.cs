@@ -34,16 +34,18 @@ public class ClientCreateDto
     public bool ClientInactive { get; set; }
 
     [JsonConverter(typeof(CalendarDateJsonConverter))]
-    public DateTime? LastRentPaymentDate { get; set; }
+    public DateTime? LastPaymentDate { get; set; }
 
     [JsonConverter(typeof(CalendarDateJsonConverter))]
-    public DateTime? NextRentPaymentDate { get; set; }
+    public DateTime? NextPaymentDate { get; set; }
 
-    public bool RentPaidFullYear { get; set; }
+    /// <summary>Meses que cubre el pago. Mínimo 1, sin tope.</summary>
+    [Range(1, int.MaxValue)]
+    public int PaidMonths { get; set; } = 1;
 
     /// <summary>Descuento por pago adelantado, en porcentaje. Por defecto 0.</summary>
     [Range(0, 100)]
-    public decimal RentDiscountPercent { get; set; }
+    public decimal PrepaymentDiscountPercent { get; set; }
 
     //public int StatusId { get; set; }
 }
@@ -77,13 +79,13 @@ public class ClientViewDto : ClientUpdateDto
     /// <summary>Usuarios activos y no eliminados asignados al cliente.</summary>
     public int ActiveUsersCount { get; set; }
 
-    /// <summary>0 = sin fecha, 1 = al día, 2 = por vencer, 3 = vencido. Solo planes de renta.</summary>
-    public int? RentStatus { get; set; }
+    /// <summary>0 = sin fecha, 1 = al día, 2 = por vencer, 3 = vencido. Null si el cliente no tiene plan.</summary>
+    public int? PaymentStatus { get; set; }
 
-    public int? RentDaysToDue { get; set; }
+    public int? PaymentDaysToDue { get; set; }
 
-    /// <summary>Ciclo completo de renta con descuento aplicado. Solo planes de renta.</summary>
-    public decimal? RentCycleAmount { get; set; }
+    /// <summary>Ciclo pagado por adelantado con descuento aplicado. Null si el cliente no tiene plan.</summary>
+    public decimal? PaymentCycleAmount { get; set; }
 
     /// <summary>Vencimiento del certificado vigente (UTC).</summary>
     public DateTime? CertificateExpirationDateUtc { get; set; }

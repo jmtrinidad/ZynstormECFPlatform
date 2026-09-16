@@ -63,9 +63,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             }
         }
 
-        private int RentWarningDays => appSettings.Value.RentPaymentWarningDays > 0
-            ? appSettings.Value.RentPaymentWarningDays
-            : RentCalculator.DefaultWarningDays;
+        private int PaymentWarningDays => appSettings.Value.PaymentWarningDays > 0
+            ? appSettings.Value.PaymentWarningDays
+            : PaymentCalculator.DefaultWarningDays;
 
         /// <summary>Usuarios activos y no eliminados por cliente.</summary>
         private async Task<Dictionary<int, int>> ActiveUserCountsAsync(List<int> clientIds, CancellationToken cancellationToken)
@@ -83,7 +83,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         }
 
         /// <summary>Completa usuarios activos y, en los clientes de plan de renta, estado y monto del ciclo.</summary>
-        private async Task FillRentStatusAsync(IEnumerable<ClientViewDto> clients, CancellationToken cancellationToken)
+        private async Task FillPaymentStatusAsync(IEnumerable<ClientViewDto> clients, CancellationToken cancellationToken)
         {
             var list = clients.ToList();
             if (list.Count == 0) return;
@@ -96,11 +96,11 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                 if (dto.PlanTypeId != (int)PlanTypeEnum.Rent) continue;
 
-                var (status, days) = RentCalculator.GetRentStatus(dto.NextRentPaymentDate, RentWarningDays);
-                dto.RentStatus = (int)status;
-                dto.RentDaysToDue = days;
-                dto.RentCycleAmount = RentCalculator
-                    .Calculate(dto.PlanMonthlyFee ?? 0m, dto.RentPaidFullYear, dto.RentDiscountPercent)
+                var (status, days) = PaymentCalculator.GetPaymentStatus(dto.NextPaymentDate, PaymentWarningDays);
+                dto.PaymentStatus = (int)status;
+                dto.PaymentDaysToDue = days;
+                dto.PaymentCycleAmount = PaymentCalculator
+                    .Calculate(dto.PlanMonthlyFee ?? 0m, dto.PaidMonths, dto.PrepaymentDiscountPercent)
                     .Total;
             }
         }
@@ -117,7 +117,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
             return clients.Select(c =>
             {
-                var calculation = RentCalculator.Calculate(c.Plan!.MonthlyFee, c.RentPaidFullYear, c.RentDiscountPercent);
+                var calculation = PaymentCalculator.Calculate(c.Plan!.MonthlyFee, c.PaidMonths, c.PrepaymentDiscountPercent);
 
                 return new ClientMonthlyUsageDto
                 {
@@ -134,7 +134,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     AcceptedDocuments = 0,
                     OverageDocuments = 0,
                     OverageAmount = 0m,
-                    Total = RentCalculator.GetAmountForMonth(calculation, c.NextRentPaymentDate, year, month),
+                    Total = PaymentCalculator.GetAmountForMonth(calculation, c.NextPaymentDate, year, month),
                     Tiers = []
                 };
             }).ToList();
@@ -179,7 +179,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     if (result == null) return NotFound();
 
                     var single = Mapper.Map<Client, ClientViewDto>(result);
-                    await FillRentStatusAsync([single], cancellationToken);
+                    await FillPaymentStatusAsync([single], cancellationToken);
                     return Ok(single);
                 }
 
@@ -228,7 +228,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                     var mappedItems = Mapper.Map<IEnumerable<Client>, IEnumerable<ClientViewDto>>(results).ToList();
                     await FillCertificateExpirationAsync(mappedItems, cancellationToken);
-                    await FillRentStatusAsync(mappedItems, cancellationToken);
+                    await FillPaymentStatusAsync(mappedItems, cancellationToken);
 
                     var paginatedResponse = new PaginatedResponseDto<ClientViewDto>
                     {
@@ -246,7 +246,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     var results = await listQuery.OrderBy(c => c.Name).ToListAsync(cancellationToken);
                     var mappedList = Mapper.Map<IEnumerable<Client>, IEnumerable<ClientViewDto>>(results).ToList();
                     await FillCertificateExpirationAsync(mappedList, cancellationToken);
-                    await FillRentStatusAsync(mappedList, cancellationToken);
+                    await FillPaymentStatusAsync(mappedList, cancellationToken);
                     return Ok(mappedList);
                 }
             }
@@ -271,8 +271,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 if (!await PlanExistsAsync(dto.PlanId))
                     return BadRequest("El plan seleccionado no existe.");
 
-                if (ValidateRentDates(dto) is string rentDateError)
-                    return BadRequest(rentDateError);
+                if (ValidatePaymentDates(dto) is string paymentDateError)
+                    return BadRequest(paymentDateError);
 
                 Client? model = null;
 
@@ -370,8 +370,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 if (!await PlanExistsAsync(dto.PlanId))
                     return BadRequest("El plan seleccionado no existe.");
 
-                if (ValidateRentDates(dto) is string rentDateError)
-                    return BadRequest(rentDateError);
+                if (ValidatePaymentDates(dto) is string paymentDateError)
+                    return BadRequest(paymentDateError);
 
                 var query = Repository.Table.Include(c => c.ApiKeys).Include(c => c.Plan).Where(c => c.GuidId == guid).AsQueryable();
 
@@ -647,7 +647,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
         [HttpGet]
         [Route("rent", Order = 1)]
-        public async Task<IActionResult> GetRentClients(CancellationToken cancellationToken = default)
+        public async Task<IActionResult> GetPaymentClients(CancellationToken cancellationToken = default)
         {
             if (!IsSA) return Forbid();
 
@@ -658,10 +658,10 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                 var rows = clients.Select(c =>
                 {
-                    var calculation = RentCalculator.Calculate(c.Plan!.MonthlyFee, c.RentPaidFullYear, c.RentDiscountPercent);
-                    var (status, days) = RentCalculator.GetRentStatus(c.NextRentPaymentDate, RentWarningDays);
+                    var calculation = PaymentCalculator.Calculate(c.Plan!.MonthlyFee, c.PaidMonths, c.PrepaymentDiscountPercent);
+                    var (status, days) = PaymentCalculator.GetPaymentStatus(c.NextPaymentDate, PaymentWarningDays);
 
-                    return new ClientRentDto
+                    return new ClientPaymentDto
                     {
                         ClientGuidId = c.GuidId,
                         ClientName = c.Name,
@@ -671,16 +671,16 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                         MonthlyFee = c.Plan.MonthlyFee,
                         MaxUsers = c.Plan.MaxUsers,
                         ActiveUsersCount = countByClient.TryGetValue(c.ClientId, out var count) ? count : 0,
-                        RentPaidFullYear = c.RentPaidFullYear,
-                        RentDiscountPercent = c.RentDiscountPercent,
+                        PaidMonths = c.PaidMonths,
+                        PrepaymentDiscountPercent = c.PrepaymentDiscountPercent,
                         MonthsCovered = calculation.MonthsCovered,
                         GrossAmount = calculation.GrossAmount,
                         DiscountAmount = calculation.DiscountAmount,
                         Total = calculation.Total,
-                        LastRentPaymentDate = c.LastRentPaymentDate,
-                        NextRentPaymentDate = c.NextRentPaymentDate,
-                        RentStatus = (int)status,
-                        RentDaysToDue = days
+                        LastPaymentDate = c.LastPaymentDate,
+                        NextPaymentDate = c.NextPaymentDate,
+                        PaymentStatus = (int)status,
+                        PaymentDaysToDue = days
                     };
                 }).ToList();
 
@@ -744,9 +744,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         private async Task<bool> PlanExistsAsync(int? planId) =>
             !planId.HasValue || await planService.GetNoTrackingByAsync(p => p.PlanId == planId.Value) != null;
 
-        private static string? ValidateRentDates(ClientCreateDto dto) =>
-            dto.LastRentPaymentDate is DateTime last
-            && dto.NextRentPaymentDate is DateTime next
+        private static string? ValidatePaymentDates(ClientCreateDto dto) =>
+            dto.LastPaymentDate is DateTime last
+            && dto.NextPaymentDate is DateTime next
             && next.Date < last.Date
                 ? "La fecha de próximo pago no puede ser anterior a la del último pago."
                 : null;

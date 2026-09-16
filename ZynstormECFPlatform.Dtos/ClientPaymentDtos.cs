@@ -3,8 +3,8 @@ using ZynstormECFPlatform.Dtos.Converters;
 
 namespace ZynstormECFPlatform.Dtos;
 
-/// <summary>Fila del reporte de renta. <see cref="Total"/> es el ciclo completo con descuento.</summary>
-public class ClientRentDto
+/// <summary>Fila del seguimiento de pagos. <see cref="Total"/> es el ciclo completo con descuento.</summary>
+public class ClientPaymentDto
 {
     public string ClientGuidId { get; set; } = string.Empty;
     public string ClientName { get; set; } = string.Empty;
@@ -19,8 +19,8 @@ public class ClientRentDto
 
     public int ActiveUsersCount { get; set; }
 
-    public bool RentPaidFullYear { get; set; }
-    public decimal RentDiscountPercent { get; set; }
+    public int PaidMonths { get; set; }
+    public decimal PrepaymentDiscountPercent { get; set; }
 
     public int MonthsCovered { get; set; }
     public decimal GrossAmount { get; set; }
@@ -28,14 +28,14 @@ public class ClientRentDto
     public decimal Total { get; set; }
 
     [JsonConverter(typeof(CalendarDateJsonConverter))]
-    public DateTime? LastRentPaymentDate { get; set; }
+    public DateTime? LastPaymentDate { get; set; }
 
     [JsonConverter(typeof(CalendarDateJsonConverter))]
-    public DateTime? NextRentPaymentDate { get; set; }
+    public DateTime? NextPaymentDate { get; set; }
 
     /// <summary>0 = sin fecha, 1 = al día, 2 = por vencer, 3 = vencido.</summary>
-    public int RentStatus { get; set; }
+    public int PaymentStatus { get; set; }
 
     /// <summary>Días calendario para el próximo pago; negativo si ya venció.</summary>
-    public int? RentDaysToDue { get; set; }
+    public int? PaymentDaysToDue { get; set; }
 }

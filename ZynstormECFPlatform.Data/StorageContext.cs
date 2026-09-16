@@ -443,32 +443,32 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasDefaultValue(false)
                   .IsRequired();
 
-            entity.Property(e => e.LastRentPaymentDate)
+            entity.Property(e => e.LastPaymentDate)
                   .HasColumnType(DateTimeColumnType);
 
-            entity.Property(e => e.NextRentPaymentDate)
+            entity.Property(e => e.NextPaymentDate)
                   .HasColumnType(DateTimeColumnType);
 
-            entity.Property(e => e.RentPaidFullYear)
-                  .HasDefaultValue(false)
+            entity.Property(e => e.PaidMonths)
+                  .HasDefaultValue(1)
                   .IsRequired();
 
-            entity.Property(e => e.RentDiscountPercent)
+            entity.Property(e => e.PrepaymentDiscountPercent)
                   .HasPrecision(5, 2)
                   .HasDefaultValue(0m)
                   .IsRequired();
 
-            entity.Property(e => e.RentPaymentGraceDays)
+            entity.Property(e => e.PaymentGraceDays)
                   .HasDefaultValue(3)
                   .IsRequired();
 
-            entity.Property(e => e.RentFirstReminderSentFor)
+            entity.Property(e => e.FirstPaymentReminderSentFor)
                   .HasColumnType(DateTimeColumnType);
 
-            entity.Property(e => e.RentFinalReminderSentFor)
+            entity.Property(e => e.FinalPaymentReminderSentFor)
                   .HasColumnType(DateTimeColumnType);
 
-            entity.Property(e => e.RentSuspendedAtUtc)
+            entity.Property(e => e.PaymentSuspendedAtUtc)
                   .HasColumnType(DateTimeColumnType);
 
             entity.HasOne(d => d.Plan)

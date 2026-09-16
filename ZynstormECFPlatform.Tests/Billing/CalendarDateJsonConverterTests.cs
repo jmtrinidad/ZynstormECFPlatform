@@ -7,7 +7,7 @@ namespace ZynstormECFPlatform.Tests.Billing;
 
 /// <summary>
 /// Program.cs registra convertidores globales que aplican ToDrTime() (UTC-4) a todo DateTime.
-/// Estas pruebas fijan que las fechas de renta salgan como fecha calendario sin corrimiento,
+/// Estas pruebas fijan que las fechas de pago salgan como fecha calendario sin corrimiento,
 /// incluso con un convertidor global que sí desplazaría el día.
 /// </summary>
 public class CalendarDateJsonConverterTests
@@ -35,60 +35,60 @@ public class CalendarDateJsonConverterTests
     }
 
     [Fact]
-    public void ClientRentDto_RentDates_AreNotShiftedByTheGlobalConverter()
+    public void ClientPaymentDto_PaymentDates_AreNotShiftedByTheGlobalConverter()
     {
-        var dto = new ClientRentDto
+        var dto = new ClientPaymentDto
         {
-            LastRentPaymentDate = new DateTime(2026, 9, 1),
-            NextRentPaymentDate = new DateTime(2027, 9, 1)
+            LastPaymentDate = new DateTime(2026, 9, 1),
+            NextPaymentDate = new DateTime(2027, 9, 1)
         };
 
         var json = JsonSerializer.Serialize(dto, OptionsWithGlobalShiftingConverter());
 
-        Assert.Contains("\"lastRentPaymentDate\":\"2026-09-01\"", json);
-        Assert.Contains("\"nextRentPaymentDate\":\"2027-09-01\"", json);
+        Assert.Contains("\"lastPaymentDate\":\"2026-09-01\"", json);
+        Assert.Contains("\"nextPaymentDate\":\"2027-09-01\"", json);
         // El día anterior es exactamente el síntoma que produciría el convertidor global.
         Assert.DoesNotContain("2026-08-31", json);
     }
 
     [Fact]
-    public void ClientCreateDto_RentDates_AreNotShiftedByTheGlobalConverter()
+    public void ClientCreateDto_PaymentDates_AreNotShiftedByTheGlobalConverter()
     {
         var dto = new ClientCreateDto
         {
             Name = "Cliente",
             Rnc = "101010101",
-            LastRentPaymentDate = new DateTime(2026, 1, 1),
-            NextRentPaymentDate = new DateTime(2026, 2, 1)
+            LastPaymentDate = new DateTime(2026, 1, 1),
+            NextPaymentDate = new DateTime(2026, 2, 1)
         };
 
         var json = JsonSerializer.Serialize(dto, OptionsWithGlobalShiftingConverter());
 
-        Assert.Contains("\"lastRentPaymentDate\":\"2026-01-01\"", json);
-        Assert.Contains("\"nextRentPaymentDate\":\"2026-02-01\"", json);
+        Assert.Contains("\"lastPaymentDate\":\"2026-01-01\"", json);
+        Assert.Contains("\"nextPaymentDate\":\"2026-02-01\"", json);
         Assert.DoesNotContain("2025-12-31", json);
     }
 
     [Fact]
-    public void ClientCreateDto_RentDates_RoundTrip()
+    public void ClientCreateDto_PaymentDates_RoundTrip()
     {
         var json = """
-            {"name":"Cliente","rnc":"101010101","lastRentPaymentDate":"2026-09-01","nextRentPaymentDate":"2027-09-01"}
+            {"name":"Cliente","rnc":"101010101","lastPaymentDate":"2026-09-01","nextPaymentDate":"2027-09-01"}
             """;
 
         var dto = JsonSerializer.Deserialize<ClientCreateDto>(json, OptionsWithGlobalShiftingConverter())!;
 
-        Assert.Equal(new DateTime(2026, 9, 1), dto.LastRentPaymentDate);
-        Assert.Equal(new DateTime(2027, 9, 1), dto.NextRentPaymentDate);
+        Assert.Equal(new DateTime(2026, 9, 1), dto.LastPaymentDate);
+        Assert.Equal(new DateTime(2027, 9, 1), dto.NextPaymentDate);
     }
 
     [Fact]
     public void NullDates_SerializeAsNull()
     {
-        var json = JsonSerializer.Serialize(new ClientRentDto(), OptionsWithGlobalShiftingConverter());
+        var json = JsonSerializer.Serialize(new ClientPaymentDto(), OptionsWithGlobalShiftingConverter());
 
-        Assert.Contains("\"lastRentPaymentDate\":null", json);
-        Assert.Contains("\"nextRentPaymentDate\":null", json);
+        Assert.Contains("\"lastPaymentDate\":null", json);
+        Assert.Contains("\"nextPaymentDate\":null", json);
     }
 
     [Fact]

@@ -32,29 +32,29 @@ public partial class Client : BaseEntity
 
     public bool ClientInactive { get; set; }
 
-    /// <summary>Fecha calendario del último pago de renta.</summary>
-    public DateTime? LastRentPaymentDate { get; set; }
+    /// <summary>Fecha calendario del último pago del plan.</summary>
+    public DateTime? LastPaymentDate { get; set; }
 
-    /// <summary>Fecha calendario del próximo pago de renta.</summary>
-    public DateTime? NextRentPaymentDate { get; set; }
+    /// <summary>Fecha calendario del próximo pago del plan.</summary>
+    public DateTime? NextPaymentDate { get; set; }
 
-    /// <summary>El cliente pagó el año completo de renta.</summary>
-    public bool RentPaidFullYear { get; set; }
+    /// <summary>Meses que cubre el pago registrado. Por defecto 1.</summary>
+    public int PaidMonths { get; set; } = 1;
 
     /// <summary>Descuento por pago adelantado, en porcentaje (0–100). Por defecto 0.</summary>
-    public decimal RentDiscountPercent { get; set; }
+    public decimal PrepaymentDiscountPercent { get; set; }
 
     /// <summary>Días después de la fecha de pago para pagar antes de la suspensión. Por defecto 3.</summary>
-    public int RentPaymentGraceDays { get; set; } = 3;
+    public int PaymentGraceDays { get; set; } = 3;
 
     /// <summary>Fecha de pago para la que ya se envió el primer aviso.</summary>
-    public DateTime? RentFirstReminderSentFor { get; set; }
+    public DateTime? FirstPaymentReminderSentFor { get; set; }
 
     /// <summary>Fecha de pago para la que ya se envió el último aviso.</summary>
-    public DateTime? RentFinalReminderSentFor { get; set; }
+    public DateTime? FinalPaymentReminderSentFor { get; set; }
 
-    /// <summary>Momento en que el cliente fue suspendido por falta de pago de la renta. Null = no suspendido por renta.</summary>
-    public DateTime? RentSuspendedAtUtc { get; set; }
+    /// <summary>Momento en que el cliente fue suspendido por falta de pago del plan. Null = no suspendido por pago.</summary>
+    public DateTime? PaymentSuspendedAtUtc { get; set; }
 
     public virtual Plan? Plan { get; set; }
 

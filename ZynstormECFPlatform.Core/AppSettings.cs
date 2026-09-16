@@ -23,8 +23,8 @@ public class AppSettings
     public int CertificateExpirationWarningDays { get; set; } = 20;
 
     /// <summary>Días de anticipación para considerar una renta próxima a vencer.</summary>
-    public int RentPaymentWarningDays { get; set; } = 15;
+    public int PaymentWarningDays { get; set; } = 15;
 
     /// <summary>Correo que recibe el resumen diario de rentas pendientes. Si está vacío se usa CertificateAlertEmail.</summary>
-    public string RentAlertEmail { get; set; } = string.Empty;
+    public string PaymentAlertEmail { get; set; } = string.Empty;
 }

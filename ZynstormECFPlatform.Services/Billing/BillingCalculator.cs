@@ -19,6 +19,9 @@ public static class BillingCalculator
 {
     public const int UnlimitedDocuments = -1;
 
+    /// <summary>-1 en <c>Plan.MaxUsers</c> significa usuarios ilimitados.</summary>
+    public const int UnlimitedUsers = -1;
+
     /// <summary>
     /// Calcula mensualidad + excedente escalonado. Cada tramo cubre las unidades de excedente
     /// dentro de [FromUnit, ToUnit] (ToUnit null = sin tope).
@@ -71,12 +74,28 @@ public static class BillingCalculator
         var tierList = tiers.ToList();
 
         if (planType == PlanTypeEnum.Rent)
-            return RentCalculator.ValidateRentPlan(monthlyFee, maxUsers, tierList.Count > 0);
+            return ValidateRentPlan(monthlyFee, maxUsers, tierList.Count > 0);
 
         var errors = ValidatePlan(monthlyDocumentLimit, monthlyFee, tierList);
 
         if (maxUsers.HasValue)
             errors.Add("Los usuarios permitidos solo aplican a los planes de renta.");
+
+        return errors;
+    }
+
+    public static List<string> ValidateRentPlan(decimal monthlyFee, int? maxUsers, bool hasOverageTiers)
+    {
+        var errors = new List<string>();
+
+        if (monthlyFee < 0)
+            errors.Add("La renta mensual no puede ser negativa.");
+
+        if (maxUsers is not int users || (users != UnlimitedUsers && users <= 0))
+            errors.Add("Los usuarios permitidos deben ser mayor que 0, o -1 para ilimitado.");
+
+        if (hasOverageTiers)
+            errors.Add("Un plan de renta no lleva tramos de excedente.");
 
         return errors;
     }
