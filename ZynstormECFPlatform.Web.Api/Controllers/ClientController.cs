@@ -32,6 +32,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         IRepository<UserClient> userClientRepository,
         IClientCertificateService clientCertificateService,
         IPaymentReminderService paymentReminderService,
+        IClientPaymentRegistrationService paymentRegistrationService,
         Microsoft.Extensions.Options.IOptions<ZynstormECFPlatform.Core.AppSettings> appSettings) : BaseController<ClientController, Client, ClientCreateDto, ClientUpdateDto, ClientViewDto>(clientService, mapper, loggerFactory)
     {
         private int CertificateWarningDays => appSettings.Value.CertificateExpirationWarningDays > 0
@@ -673,6 +674,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 var clients = await ActivePlanClientsQuery().OrderBy(c => c.Name).ToListAsync(cancellationToken);
                 var countByClient = await ActiveUserCountsAsync(clients.Select(c => c.ClientId).ToList(), cancellationToken);
+                var pendingByClient = await paymentRegistrationService.GetPendingOveragesAsync(
+                    clients.Select(c => c.ClientId).ToList(), cancellationToken);
 
                 var rows = clients.Select(c =>
                 {
@@ -706,7 +709,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                         FirstReminderSent = due != null && c.FirstPaymentReminderSentFor?.Date == due,
                         FinalReminderSent = due != null && c.FinalPaymentReminderSentFor?.Date == due,
                         PaymentSuspended = c.PaymentSuspendedAtUtc != null,
-                        HasEmail = !string.IsNullOrWhiteSpace(c.Email)
+                        HasEmail = !string.IsNullOrWhiteSpace(c.Email),
+                        PendingOverageAmount = pendingByClient.TryGetValue(c.ClientId, out var pending) ? pending.Sum(p => p.Amount) : 0m,
+                        PendingOverageMonths = pending?.Count ?? 0
                     };
                 }).ToList();
 
@@ -754,6 +759,66 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = "No se pudo enviar el resumen de pagos." });
             }
         }
+
+        [HttpGet]
+        [Route("guid/{guid}/payments/preview", Order = 1)]
+        public async Task<IActionResult> GetPaymentPreview(string guid, CancellationToken cancellationToken = default)
+        {
+            if (!IsSA) return Forbid();
+
+            try
+            {
+                return ToPaymentActionResult(await paymentRegistrationService.GetPreviewAsync(guid, cancellationToken));
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, "Error consultando el pago a registrar del cliente {Guid}", guid);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "No se pudo consultar el pago a registrar." });
+            }
+        }
+
+        [HttpPost]
+        [Route("guid/{guid}/payments", Order = 1)]
+        public async Task<IActionResult> RegisterPayment(string guid, [FromBody] RegisterPaymentRequestDto dto, CancellationToken cancellationToken = default)
+        {
+            if (!IsSA) return Forbid();
+
+            try
+            {
+                var result = await paymentRegistrationService.RegisterAsync(guid, dto, CurrentUserId, cancellationToken);
+                return ToPaymentActionResult(result);
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, "Error registrando el pago del cliente {Guid}", guid);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "No se pudo registrar el pago." });
+            }
+        }
+
+        [HttpGet]
+        [Route("guid/{guid}/payments", Order = 1)]
+        public async Task<IActionResult> GetPaymentHistory(string guid, CancellationToken cancellationToken = default)
+        {
+            if (!IsSA) return Forbid();
+
+            try
+            {
+                return ToPaymentActionResult(await paymentRegistrationService.GetHistoryAsync(guid, cancellationToken));
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, "Error consultando el historial de pagos del cliente {Guid}", guid);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "No se pudo consultar el historial de pagos." });
+            }
+        }
+
+        private IActionResult ToPaymentActionResult<T>(PaymentRegistrationResult<T> result) => result.Outcome switch
+        {
+            PaymentRegistrationOutcome.Ok => Ok(result.Value),
+            PaymentRegistrationOutcome.NotFound => NotFound(new { message = result.Errors.FirstOrDefault() }),
+            PaymentRegistrationOutcome.Conflict => Conflict(new { message = string.Join(" ", result.Errors), errors = result.Errors }),
+            _ => BadRequest(new { message = string.Join(" ", result.Errors), errors = result.Errors })
+        };
 
         /// <summary>
         /// Consulta y valida si un cliente se encuentra activo a partir de su ApiKey.
