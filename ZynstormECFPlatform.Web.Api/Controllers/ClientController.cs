@@ -28,6 +28,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         IPlanService planService,
         IRepository<ClientMonthlyUsage> clientMonthlyUsageRepository,
         IRepository<PlanOverageTier> planOverageTierRepository,
+        IRepository<UserClient> userClientRepository,
         IClientCertificateService clientCertificateService,
         Microsoft.Extensions.Options.IOptions<ZynstormECFPlatform.Core.AppSettings> appSettings) : BaseController<ClientController, Client, ClientCreateDto, ClientUpdateDto, ClientViewDto>(clientService, mapper, loggerFactory)
     {
@@ -62,6 +63,90 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             }
         }
 
+        private int RentWarningDays => appSettings.Value.RentPaymentWarningDays > 0
+            ? appSettings.Value.RentPaymentWarningDays
+            : RentCalculator.DefaultWarningDays;
+
+        /// <summary>Usuarios activos y no eliminados por cliente.</summary>
+        private async Task<Dictionary<int, int>> ActiveUserCountsAsync(List<int> clientIds, CancellationToken cancellationToken)
+        {
+            if (clientIds.Count == 0) return [];
+
+            var counts = await userClientRepository.Table
+                .AsNoTracking()
+                .Where(uc => clientIds.Contains(uc.ClientId) && uc.User.IsActive && !uc.User.IsDeleted)
+                .GroupBy(uc => uc.ClientId)
+                .Select(g => new { ClientId = g.Key, Count = g.Count() })
+                .ToListAsync(cancellationToken);
+
+            return counts.ToDictionary(c => c.ClientId, c => c.Count);
+        }
+
+        /// <summary>Completa usuarios activos y, en los clientes de plan de renta, estado y monto del ciclo.</summary>
+        private async Task FillRentStatusAsync(IEnumerable<ClientViewDto> clients, CancellationToken cancellationToken)
+        {
+            var list = clients.ToList();
+            if (list.Count == 0) return;
+
+            var countByClient = await ActiveUserCountsAsync(list.Select(c => c.ClientId).ToList(), cancellationToken);
+
+            foreach (var dto in list)
+            {
+                dto.ActiveUsersCount = countByClient.TryGetValue(dto.ClientId, out var count) ? count : 0;
+
+                if (dto.PlanTypeId != (int)PlanTypeEnum.Rent) continue;
+
+                var (status, days) = RentCalculator.GetRentStatus(dto.NextRentPaymentDate, RentWarningDays);
+                dto.RentStatus = (int)status;
+                dto.RentDaysToDue = days;
+                dto.RentCycleAmount = RentCalculator
+                    .Calculate(dto.PlanMonthlyFee ?? 0m, dto.RentPaidFullYear, dto.RentDiscountPercent)
+                    .Total;
+            }
+        }
+
+        /// <summary>Filas del reporte mensual para los clientes con plan de renta activo.</summary>
+        private async Task<List<ClientMonthlyUsageDto>> BuildRentUsageRowsAsync(
+            int year, int month, string? clientGuid, CancellationToken cancellationToken)
+        {
+            var query = RentClientsQuery();
+            if (!string.IsNullOrEmpty(clientGuid))
+                query = query.Where(c => c.GuidId == clientGuid);
+
+            var clients = await query.ToListAsync(cancellationToken);
+
+            return clients.Select(c =>
+            {
+                var calculation = RentCalculator.Calculate(c.Plan!.MonthlyFee, c.RentPaidFullYear, c.RentDiscountPercent);
+
+                return new ClientMonthlyUsageDto
+                {
+                    ClientGuidId = c.GuidId,
+                    ClientName = c.Name,
+                    ClientRnc = c.Rnc,
+                    ClientInactive = c.ClientInactive,
+                    Year = year,
+                    Month = month,
+                    PlanName = c.Plan.Name,
+                    PlanTypeId = (int)PlanTypeEnum.Rent,
+                    MonthlyFee = c.Plan.MonthlyFee,
+                    MonthlyDocumentLimit = BillingCalculator.UnlimitedDocuments,
+                    AcceptedDocuments = 0,
+                    OverageDocuments = 0,
+                    OverageAmount = 0m,
+                    Total = RentCalculator.GetAmountForMonth(calculation, c.NextRentPaymentDate, year, month),
+                    Tiers = []
+                };
+            }).ToList();
+        }
+
+        private IQueryable<Client> RentClientsQuery() =>
+            Repository.Table.AsNoTracking()
+                .Include(c => c.Plan)
+                .Where(c => c.Plan != null
+                         && c.Plan.PlanTypeId == (int)PlanTypeEnum.Rent
+                         && c.Plan.StatusId == (int)StatusEnum.Active);
+
         private string? CurrentUserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         private bool IsSA => User.IsInRole("SA");
 
@@ -92,7 +177,10 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                     var result = await query.FirstOrDefaultAsync(cancellationToken);
                     if (result == null) return NotFound();
-                    return Ok(Mapper.Map<Client, ClientViewDto>(result));
+
+                    var single = Mapper.Map<Client, ClientViewDto>(result);
+                    await FillRentStatusAsync([single], cancellationToken);
+                    return Ok(single);
                 }
 
                 // Si no hay 'id', devolvemos una lista (opcionalmente filtrada por guidId)
@@ -140,6 +228,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                     var mappedItems = Mapper.Map<IEnumerable<Client>, IEnumerable<ClientViewDto>>(results).ToList();
                     await FillCertificateExpirationAsync(mappedItems, cancellationToken);
+                    await FillRentStatusAsync(mappedItems, cancellationToken);
 
                     var paginatedResponse = new PaginatedResponseDto<ClientViewDto>
                     {
@@ -157,6 +246,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     var results = await listQuery.OrderBy(c => c.Name).ToListAsync(cancellationToken);
                     var mappedList = Mapper.Map<IEnumerable<Client>, IEnumerable<ClientViewDto>>(results).ToList();
                     await FillCertificateExpirationAsync(mappedList, cancellationToken);
+                    await FillRentStatusAsync(mappedList, cancellationToken);
                     return Ok(mappedList);
                 }
             }
@@ -180,6 +270,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 if (!await PlanExistsAsync(dto.PlanId))
                     return BadRequest("El plan seleccionado no existe.");
+
+                if (ValidateRentDates(dto) is string rentDateError)
+                    return BadRequest(rentDateError);
 
                 Client? model = null;
 
@@ -276,6 +369,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                 if (!await PlanExistsAsync(dto.PlanId))
                     return BadRequest("El plan seleccionado no existe.");
+
+                if (ValidateRentDates(dto) is string rentDateError)
+                    return BadRequest(rentDateError);
 
                 var query = Repository.Table.Include(c => c.ApiKeys).Include(c => c.Plan).Where(c => c.GuidId == guid).AsQueryable();
 
@@ -512,7 +608,10 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 var query = clientMonthlyUsageRepository.Table.AsNoTracking()
                     .Where(u => u.Year == year && u.Month == month);
 
-                return Ok(await BuildUsageDtosAsync(query, cancellationToken));
+                var documentRows = await BuildUsageDtosAsync(query, cancellationToken);
+                var rentRows = await BuildRentUsageRowsAsync(year, month, clientGuid: null, cancellationToken);
+
+                return Ok(documentRows.Concat(rentRows).OrderBy(d => d.ClientName).ToList());
             }
             catch (Exception exception)
             {
@@ -534,8 +633,58 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 var query = clientMonthlyUsageRepository.Table.AsNoTracking()
                     .Where(u => u.Client.GuidId == guid && u.Year == year && u.Month == month);
 
-                var result = (await BuildUsageDtosAsync(query, cancellationToken)).FirstOrDefault();
+                var result = (await BuildUsageDtosAsync(query, cancellationToken)).FirstOrDefault()
+                    ?? (await BuildRentUsageRowsAsync(year, month, guid, cancellationToken)).FirstOrDefault();
+
                 return result == null ? NotFound("El cliente no tiene consumo registrado en ese mes.") : Ok(result);
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        [HttpGet]
+        [Route("rent", Order = 1)]
+        public async Task<IActionResult> GetRentClients(CancellationToken cancellationToken = default)
+        {
+            if (!IsSA) return Forbid();
+
+            try
+            {
+                var clients = await RentClientsQuery().OrderBy(c => c.Name).ToListAsync(cancellationToken);
+                var countByClient = await ActiveUserCountsAsync(clients.Select(c => c.ClientId).ToList(), cancellationToken);
+
+                var rows = clients.Select(c =>
+                {
+                    var calculation = RentCalculator.Calculate(c.Plan!.MonthlyFee, c.RentPaidFullYear, c.RentDiscountPercent);
+                    var (status, days) = RentCalculator.GetRentStatus(c.NextRentPaymentDate, RentWarningDays);
+
+                    return new ClientRentDto
+                    {
+                        ClientGuidId = c.GuidId,
+                        ClientName = c.Name,
+                        ClientRnc = c.Rnc,
+                        ClientInactive = c.ClientInactive,
+                        PlanName = c.Plan.Name,
+                        MonthlyFee = c.Plan.MonthlyFee,
+                        MaxUsers = c.Plan.MaxUsers,
+                        ActiveUsersCount = countByClient.TryGetValue(c.ClientId, out var count) ? count : 0,
+                        RentPaidFullYear = c.RentPaidFullYear,
+                        RentDiscountPercent = c.RentDiscountPercent,
+                        MonthsCovered = calculation.MonthsCovered,
+                        GrossAmount = calculation.GrossAmount,
+                        DiscountAmount = calculation.DiscountAmount,
+                        Total = calculation.Total,
+                        LastRentPaymentDate = c.LastRentPaymentDate,
+                        NextRentPaymentDate = c.NextRentPaymentDate,
+                        RentStatus = (int)status,
+                        RentDaysToDue = days
+                    };
+                }).ToList();
+
+                return Ok(rows);
             }
             catch (Exception exception)
             {
@@ -571,6 +720,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                         Year = u.Year,
                         Month = u.Month,
                         PlanName = u.PlanName,
+                        PlanTypeId = (int)PlanTypeEnum.Documents,
                         MonthlyFee = calculation.MonthlyFee,
                         MonthlyDocumentLimit = calculation.MonthlyDocumentLimit,
                         AcceptedDocuments = calculation.AcceptedDocuments,
@@ -593,5 +743,12 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
         private async Task<bool> PlanExistsAsync(int? planId) =>
             !planId.HasValue || await planService.GetNoTrackingByAsync(p => p.PlanId == planId.Value) != null;
+
+        private static string? ValidateRentDates(ClientCreateDto dto) =>
+            dto.LastRentPaymentDate is DateTime last
+            && dto.NextRentPaymentDate is DateTime next
+            && next.Date < last.Date
+                ? "La fecha de próximo pago no puede ser anterior a la del último pago."
+                : null;
     }
 }
