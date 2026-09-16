@@ -82,7 +82,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             return counts.ToDictionary(c => c.ClientId, c => c.Count);
         }
 
-        /// <summary>Completa usuarios activos y, en los clientes de plan de renta, estado y monto del ciclo.</summary>
+        /// <summary>Completa usuarios activos y, en los clientes con plan, estado del pago y monto del ciclo.</summary>
         private async Task FillPaymentStatusAsync(IEnumerable<ClientViewDto> clients, CancellationToken cancellationToken)
         {
             var list = clients.ToList();
@@ -94,7 +94,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 dto.ActiveUsersCount = countByClient.TryGetValue(dto.ClientId, out var count) ? count : 0;
 
-                if (dto.PlanTypeId != (int)PlanTypeEnum.Rent) continue;
+                if (dto.PlanTypeId is null) continue;
 
                 var (status, days) = PaymentCalculator.GetPaymentStatus(dto.NextPaymentDate, PaymentWarningDays);
                 dto.PaymentStatus = (int)status;
@@ -109,7 +109,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         private async Task<List<ClientMonthlyUsageDto>> BuildRentUsageRowsAsync(
             int year, int month, string? clientGuid, CancellationToken cancellationToken)
         {
-            var query = RentClientsQuery();
+            var query = ActivePlanClientsQuery().Where(c => c.Plan!.PlanTypeId == (int)PlanTypeEnum.Rent);
             if (!string.IsNullOrEmpty(clientGuid))
                 query = query.Where(c => c.GuidId == clientGuid);
 
@@ -118,6 +118,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             return clients.Select(c =>
             {
                 var calculation = PaymentCalculator.Calculate(c.Plan!.MonthlyFee, c.PaidMonths, c.PrepaymentDiscountPercent);
+                var feeCharged = PaymentCalculator.GetAmountForMonth(calculation, c.NextPaymentDate, year, month);
 
                 return new ClientMonthlyUsageDto
                 {
@@ -134,18 +135,19 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     AcceptedDocuments = 0,
                     OverageDocuments = 0,
                     OverageAmount = 0m,
-                    Total = PaymentCalculator.GetAmountForMonth(calculation, c.NextPaymentDate, year, month),
+                    MonthlyFeeCharged = feeCharged,
+                    MonthlyFeeCovered = PaymentCalculator.IsMonthCovered(c.NextPaymentDate, year, month),
+                    Total = feeCharged,
                     Tiers = []
                 };
             }).ToList();
         }
 
-        private IQueryable<Client> RentClientsQuery() =>
+        /// <summary>Clientes con un plan activo de cualquier tipo.</summary>
+        private IQueryable<Client> ActivePlanClientsQuery() =>
             Repository.Table.AsNoTracking()
                 .Include(c => c.Plan)
-                .Where(c => c.Plan != null
-                         && c.Plan.PlanTypeId == (int)PlanTypeEnum.Rent
-                         && c.Plan.StatusId == (int)StatusEnum.Active);
+                .Where(c => c.Plan != null && c.Plan.StatusId == (int)StatusEnum.Active);
 
         private string? CurrentUserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         private bool IsSA => User.IsInRole("SA");
@@ -646,14 +648,14 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         }
 
         [HttpGet]
-        [Route("rent", Order = 1)]
+        [Route("payments", Order = 1)]
         public async Task<IActionResult> GetPaymentClients(CancellationToken cancellationToken = default)
         {
             if (!IsSA) return Forbid();
 
             try
             {
-                var clients = await RentClientsQuery().OrderBy(c => c.Name).ToListAsync(cancellationToken);
+                var clients = await ActivePlanClientsQuery().OrderBy(c => c.Name).ToListAsync(cancellationToken);
                 var countByClient = await ActiveUserCountsAsync(clients.Select(c => c.ClientId).ToList(), cancellationToken);
 
                 var rows = clients.Select(c =>
@@ -668,6 +670,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                         ClientRnc = c.Rnc,
                         ClientInactive = c.ClientInactive,
                         PlanName = c.Plan.Name,
+                        PlanTypeId = c.Plan.PlanTypeId,
                         MonthlyFee = c.Plan.MonthlyFee,
                         MaxUsers = c.Plan.MaxUsers,
                         ActiveUsersCount = countByClient.TryGetValue(c.ClientId, out var count) ? count : 0,
@@ -711,6 +714,10 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                         tiers.Where(t => t.PlanId == u.PlanId).Select(t => new OverageTier(t.FromUnit, t.ToUnit, t.UnitPrice)),
                         u.AcceptedDocuments);
 
+                    // El pago adelantado cubre solo la mensualidad; el excedente se cobra siempre.
+                    var payment = PaymentCalculator.Calculate(u.MonthlyFee, u.Client.PaidMonths, u.Client.PrepaymentDiscountPercent);
+                    var feeCharged = PaymentCalculator.GetAmountForMonth(payment, u.Client.NextPaymentDate, u.Year, u.Month);
+
                     return new ClientMonthlyUsageDto
                     {
                         ClientGuidId = u.Client.GuidId,
@@ -726,7 +733,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                         AcceptedDocuments = calculation.AcceptedDocuments,
                         OverageDocuments = calculation.OverageDocuments,
                         OverageAmount = calculation.OverageAmount,
-                        Total = calculation.Total,
+                        MonthlyFeeCharged = feeCharged,
+                        MonthlyFeeCovered = PaymentCalculator.IsMonthCovered(u.Client.NextPaymentDate, u.Year, u.Month),
+                        Total = feeCharged + calculation.OverageAmount,
                         Tiers = calculation.Tiers.Select(t => new OverageTierChargeDto
                         {
                             FromUnit = t.FromUnit,

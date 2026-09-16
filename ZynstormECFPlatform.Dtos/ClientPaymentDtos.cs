@@ -12,9 +12,12 @@ public class ClientPaymentDto
     public bool ClientInactive { get; set; }
 
     public string PlanName { get; set; } = string.Empty;
+
+    /// <summary>1 = Comprobantes, 2 = Renta.</summary>
+    public int PlanTypeId { get; set; }
     public decimal MonthlyFee { get; set; }
 
-    /// <summary>-1 = ilimitado.</summary>
+    /// <summary>Solo planes de renta. -1 = ilimitado.</summary>
     public int? MaxUsers { get; set; }
 
     public int ActiveUsersCount { get; set; }

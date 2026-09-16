@@ -21,6 +21,9 @@ public class ClientMonthlyUsageDto
     /// <summary>1 = Comprobantes, 2 = Renta. En las filas de renta los campos de documentos van en cero.</summary>
     public int PlanTypeId { get; set; } = 1;
     public decimal MonthlyFee { get; set; }
+    /// <summary>Mensualidad (o renta) facturada en el mes: 0 si el mes está cubierto por un pago adelantado.</summary>
+    public decimal MonthlyFeeCharged { get; set; }
+    public bool MonthlyFeeCovered { get; set; }
     public int MonthlyDocumentLimit { get; set; }
     public int AcceptedDocuments { get; set; }
     public int OverageDocuments { get; set; }
