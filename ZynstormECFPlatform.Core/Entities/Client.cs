@@ -60,6 +60,8 @@ public partial class Client : BaseEntity
 
     public virtual ICollection<ClientMonthlyUsage> MonthlyUsages { get; set; } = [];
 
+    public virtual ICollection<ClientPayment> Payments { get; set; } = [];
+
     public virtual Status Status { get; set; } = null!;
 
     public virtual ICollection<ReceivedB2BMessage> ReceivedB2BMessages { get; set; } = [];

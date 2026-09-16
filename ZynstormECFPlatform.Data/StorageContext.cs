@@ -611,6 +611,113 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasConstraintName("FK_ClientMonthlyUsage_Plan");
         });
 
+        modelBuilder.Entity<ClientPayment>(entity =>
+        {
+            entity.HasKey(e => e.ClientPaymentId);
+
+            entity.Property(e => e.PaymentDate)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.Reference)
+                  .HasMaxLength(100)
+                  .IsUnicode(false);
+
+            entity.Property(e => e.Notes)
+                  .HasMaxLength(500)
+                  .IsUnicode(false);
+
+            entity.Property(e => e.RegisteredByUserId)
+                  .HasMaxLength(450)
+                  .IsUnicode(false);
+
+            entity.HasIndex(e => new { e.ClientId, e.PaymentDate })
+                  .HasDatabaseName("IX_ClientPayment_ClientId_PaymentDate");
+
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.Client)
+                  .WithMany(p => p.Payments)
+                  .HasForeignKey(d => d.ClientId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_ClientPayment_Client");
+        });
+
+        modelBuilder.Entity<ClientPaymentItem>(entity =>
+        {
+            entity.HasKey(e => e.ClientPaymentItemId);
+
+            entity.Property(e => e.PlanName)
+                  .HasMaxLength(100)
+                  .IsUnicode(false)
+                  .IsRequired();
+
+            entity.Property(e => e.PreviousNextPaymentDate)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.NewNextPaymentDate)
+                  .HasColumnType(DateTimeColumnType);
+
+            // Un mes de excedente se paga una sola vez.
+            entity.HasIndex(e => e.ClientMonthlyUsageId)
+                  .IsUnique()
+                  .HasFilter("\"ItemType\" = 2 AND \"ClientMonthlyUsageId\" IS NOT NULL AND NOT \"IsDeleted\"")
+                  .HasDatabaseName("IX_ClientPaymentItem_Overage_Usage");
+
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.ClientPayment)
+                  .WithMany(p => p.Items)
+                  .HasForeignKey(d => d.ClientPaymentId)
+                  .OnDelete(DeleteBehavior.Cascade)
+                  .HasConstraintName("FK_ClientPaymentItem_ClientPayment");
+
+            entity.HasOne(d => d.ClientMonthlyUsage)
+                  .WithMany()
+                  .HasForeignKey(d => d.ClientMonthlyUsageId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_ClientPaymentItem_ClientMonthlyUsage");
+        });
+
         modelBuilder.Entity<ClientBranche>(entity =>
         {
             entity.HasKey(c => c.ClientBrancheId);
