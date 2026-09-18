@@ -171,6 +171,7 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
     }
 
     public DbSet<CertificationInvoicePrintTemplateEcfType> CertificationInvoicePrintTemplateEcfTypes { get; set; }
+    public DbSet<GeneratedSerial> GeneratedSerials { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -376,6 +377,60 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasForeignKey(d => d.StatusId)
                   .OnDelete(DeleteBehavior.ClientSetNull)
                   .HasConstraintName("FK_ApiKey_Status");
+        });
+
+        modelBuilder.Entity<GeneratedSerial>(entity =>
+        {
+            entity.HasKey(e => e.GeneratedSerialId);
+
+            entity.Property(e => e.SerialHash)
+                  .IsRequired()
+                  .HasMaxLength(64)
+                  .IsUnicode(false);
+
+            entity.HasIndex(e => e.SerialHash)
+                  .IsUnique();
+
+            entity.Property(e => e.SerialSuffix)
+                  .IsRequired()
+                  .HasMaxLength(5)
+                  .IsUnicode(false);
+
+            entity.Property(e => e.Description)
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.IsActive)
+                  .HasDefaultValue(true)
+                  .IsRequired();
+
+            entity.Property(e => e.IsUsed)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.UsedAtUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(e => e.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(e => !e.IsDeleted);
         });
 
         modelBuilder.Entity<Client>(entity =>

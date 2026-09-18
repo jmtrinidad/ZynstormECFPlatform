@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ZynstormECFPlatform.Data;
@@ -11,9 +12,11 @@ using ZynstormECFPlatform.Data;
 namespace ZynstormECFPlatform.Data.Migrations
 {
     [DbContext(typeof(StorageContext))]
-    partial class StorageContextModelSnapshot : ModelSnapshot
+    [Migration("20260918124946_AddGeneratedSerials")]
+    partial class AddGeneratedSerials
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -5713,11 +5716,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
-                    b.Property<bool>("IsUsed")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
                     b.Property<DateTime?>("LastUpdateUtc")
                         .IsConcurrencyToken()
                         .HasColumnType("timestamp without time zone");
@@ -5738,9 +5736,6 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(5)
                         .IsUnicode(false)
                         .HasColumnType("character varying(5)");
-
-                    b.Property<DateTime?>("UsedAtUtc")
-                        .HasColumnType("timestamp without time zone");
 
                     b.HasKey("GeneratedSerialId");
 
