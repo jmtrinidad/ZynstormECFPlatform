@@ -73,6 +73,66 @@ public class PaymentReminderService(
     private async Task SendAsync(Client client, (string Subject, string HtmlBody) email, CancellationToken cancellationToken) =>
         await emailService.SendEmailAsync(client.Email!, email.Subject, email.HtmlBody, cancellationToken: cancellationToken);
 
+    /// <summary>
+    /// Persiste primero el bloqueo para que un fallo del correo no deje al cliente con acceso activo.
+    /// </summary>
+    private async Task<string> SuspendClientAsync(Client client, CancellationToken cancellationToken)
+    {
+        client.ClientInactive = true;
+        client.PaymentSuspendedAtUtc = DateTime.UtcNow;
+        await clientRepository.UpdateAsync(client);
+
+        if (!HasEmail(client))
+            return "Suspendido hoy";
+
+        try
+        {
+            await SendAsync(client, PaymentReminderEmails.BuildSuspension(EmailData(client)), cancellationToken);
+            return "Suspendido hoy";
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Pago: cliente {ClientId} suspendido, pero no se pudo enviar el correo de suspensión.", client.ClientId);
+            return "Suspendido hoy (correo no enviado)";
+        }
+    }
+
+    public async Task<int> SuspendExpiredClientsAsync(CancellationToken cancellationToken = default)
+    {
+        var today = DateTimeExtensions.DrNow.Date;
+        var clients = await Candidates().OrderBy(c => c.Name).ToListAsync(cancellationToken);
+        var suspended = 0;
+
+        foreach (var client in clients)
+        {
+            if (IsManuallyInactive(client)) continue;
+
+            var action = PaymentReminderPolicy.Decide(
+                client.NextPaymentDate!.Value.Date,
+                client.PaymentGraceDays,
+                client.FirstPaymentReminderSentFor,
+                client.FinalPaymentReminderSentFor,
+                HasEmail(client),
+                IsPaymentSuspended(client),
+                today);
+
+            if (action != PaymentReminderAction.Suspend) continue;
+
+            try
+            {
+                await SuspendClientAsync(client, cancellationToken);
+                suspended++;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Pago: error suspendiendo al cliente {ClientId} después del período de gracia.", client.ClientId);
+            }
+        }
+
+        logger.LogInformation("Pago: {Suspended} cliente(s) suspendido(s) por vencimiento.", suspended);
+        return suspended;
+    }
+
     public async Task<PaymentReminderRunResult> RunDailyAsync(CancellationToken cancellationToken = default)
     {
         var today = DateTimeExtensions.DrNow.Date;
@@ -121,24 +181,8 @@ public class PaymentReminderService(
                         break;
 
                     case PaymentReminderAction.Suspend:
-                        client.ClientInactive = true;
-                        client.PaymentSuspendedAtUtc = DateTime.UtcNow;
-                        await clientRepository.UpdateAsync(client);
+                        status = await SuspendClientAsync(client, cancellationToken);
                         suspended++;
-                        status = "Suspendido hoy";
-
-                        if (hasEmail)
-                        {
-                            try
-                            {
-                                await SendAsync(client, PaymentReminderEmails.BuildSuspension(EmailData(client)), cancellationToken);
-                            }
-                            catch (Exception ex)
-                            {
-                                logger.LogError(ex, "Pago: cliente {ClientId} suspendido, pero no se pudo enviar el correo de suspensión.", client.ClientId);
-                                status = "Suspendido hoy (correo no enviado)";
-                            }
-                        }
                         break;
 
                     default:

@@ -325,6 +325,14 @@ RecurringJob.AddOrUpdate<ZynstormECFPlatform.Services.Jobs.PaymentReminderJob>(
     new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Santo_Domingo") }
 );
 
+// El acceso se corta al comenzar el día posterior a la fecha límite; no se espera al envío de avisos de las 8:00 AM.
+RecurringJob.AddOrUpdate<ZynstormECFPlatform.Services.Jobs.PaymentSuspensionJob>(
+    "PaymentSuspensionJob",
+    job => job.RunAsync(default),
+    Cron.Daily(0, 5), // 12:05 AM every day in DR
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Santo_Domingo") }
+);
+
 app.MapControllers();
 app.MapHub<CertificationHub>("/hubs/certification");
 
