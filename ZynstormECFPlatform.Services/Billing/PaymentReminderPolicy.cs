@@ -48,8 +48,9 @@ public static class PaymentReminderPolicy
         var firstSent = firstSentFor?.Date == due.Date;
         var finalSent = finalSentFor?.Date == due.Date;
 
-        // Se suspende solo si el último aviso salió en una corrida anterior (o no hay a quién avisar).
-        if (overdue > grace && (finalSent || !hasEmail))
+        // Un fallo de SMTP no puede extender el acceso más allá del período de gracia.
+        // El correo de suspensión se seguirá intentando y el error quedará registrado.
+        if (overdue > grace)
             return PaymentReminderAction.Suspend;
 
         if (overdue >= grace)

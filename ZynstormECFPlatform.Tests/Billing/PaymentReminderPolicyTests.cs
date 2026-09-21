@@ -78,10 +78,10 @@ public class PaymentReminderPolicyTests
     }
 
     [Fact]
-    public void DayAfterGrace_FinalNeverSent_SendsFinalFirst()
+    public void DayAfterGrace_FinalNeverSent_Suspends()
     {
-        // El cliente siempre recibe el último aviso antes del corte.
-        Assert.Equal(PaymentReminderAction.FinalReminder, Decide(Due.AddDays(4), firstSentFor: Due));
+        // Un fallo de correo no debe prolongar el acceso después de la gracia.
+        Assert.Equal(PaymentReminderAction.Suspend, Decide(Due.AddDays(4), firstSentFor: Due));
     }
 
     [Fact]
