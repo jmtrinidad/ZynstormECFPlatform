@@ -24,8 +24,11 @@ public class EmailService : IEmailService
         if (string.IsNullOrWhiteSpace(recipientEmail))
             throw new InvalidOperationException("Email service called without a recipient email.");
 
+        var smtpUsername = _settings.SmtpUsername.Trim();
+        var smtpPassword = GetSmtpPassword();
+
         using var message = new MailMessage();
-        message.From = new MailAddress(_settings.SmtpUsername, _settings.SmtpFromName);
+        message.From = new MailAddress(smtpUsername, _settings.SmtpFromName);
         message.To.Add(new MailAddress(recipientEmail));
         message.Subject = subject;
         message.IsBodyHtml = true;
@@ -40,10 +43,20 @@ public class EmailService : IEmailService
         }
 
         using var client = new SmtpClient(_settings.SmtpHost, _settings.SmtpPort);
-        client.EnableSsl = true; 
-        client.Credentials = new NetworkCredential(_settings.SmtpUsername, _settings.SmtpAppPassword);
+        client.EnableSsl = true;
+        client.Credentials = new NetworkCredential(smtpUsername, smtpPassword);
 
         await client.SendMailAsync(message, cancellationToken);
+    }
+
+    private string GetSmtpPassword()
+    {
+        var password = _settings.SmtpAppPassword.Trim();
+
+        // Google muestra las contraseñas de aplicación agrupadas con espacios, pero SMTP espera los 16 caracteres continuos.
+        return string.Equals(_settings.SmtpHost, "smtp.gmail.com", StringComparison.OrdinalIgnoreCase)
+            ? string.Concat(password.Where(character => !char.IsWhiteSpace(character)))
+            : password;
     }
 
     public async Task SendApiKeyEmailAsync(string email, string apiKey, string secretKey)
