@@ -12,6 +12,7 @@ using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Services.Billing;
+using ZynstormECFPlatform.Services.Credentials;
 using ZynstormECFPlatform.Services.Reports;
 using System.Security.Claims;
 
@@ -33,6 +34,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         IClientCertificateService clientCertificateService,
         IPaymentReminderService paymentReminderService,
         IClientPaymentRegistrationService paymentRegistrationService,
+        IClientApiKeyService clientApiKeyService,
         Microsoft.Extensions.Options.IOptions<ZynstormECFPlatform.Core.AppSettings> appSettings) : BaseController<ClientController, Client, ClientCreateDto, ClientUpdateDto, ClientViewDto>(clientService, mapper, loggerFactory)
     {
         private int CertificateWarningDays => appSettings.Value.CertificateExpirationWarningDays > 0
@@ -611,6 +613,49 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 Logger.LogError(exception, "Error enviando aviso de vencimiento de certificado al cliente {Guid}", guid);
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = "No se pudo enviar el aviso de vencimiento." });
+            }
+        }
+
+        [HttpPost]
+        [Route("guid/{guid}/api-key/send", Order = 1)]
+        public async Task<IActionResult> SendApiKey(string guid, [FromBody] ClientSendApiKeyDto dto, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var query = Repository.Table.AsNoTracking().Where(c => c.GuidId == guid);
+                if (!IsSA)
+                {
+                    var userId = CurrentUserId;
+                    query = query.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
+                }
+
+                var client = await query.FirstOrDefaultAsync(cancellationToken);
+                if (client == null)
+                    return NotFound(new { message = "No se encontró el cliente." });
+
+                var result = await clientApiKeyService.SendAsync(client.ClientId, dto.Email, cancellationToken);
+
+                return result.Outcome switch
+                {
+                    ClientApiKeySendOutcome.Sent => Ok(new ClientSendApiKeyResultDto
+                    {
+                        Message = result.Generated
+                            ? $"Se generó la API Key y se envió a {dto.Email.Trim()}."
+                            : $"API Key enviada a {dto.Email.Trim()}.",
+                        ApiKey = result.ApiKey!,
+                        Generated = result.Generated
+                    }),
+                    ClientApiKeySendOutcome.InvalidEmail => BadRequest(new { message = result.Error }),
+                    _ => UnprocessableEntity(new { message = result.Error })
+                };
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, "Error enviando la API Key del cliente {Guid}", guid);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+                {
+                    message = "No se pudo enviar el correo. Si la API Key se acababa de generar, quedó guardada; intente nuevamente para reenviarla."
+                });
             }
         }
 

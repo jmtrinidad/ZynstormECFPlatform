@@ -127,3 +127,18 @@ public class ClientActiveStatusDto
 
     public bool IsCertified { get; set; }
 }
+
+public class ClientSendApiKeyDto
+{
+    [Required]
+    public string Email { get; set; } = null!;
+}
+
+public class ClientSendApiKeyResultDto
+{
+    public string Message { get; set; } = null!;
+
+    public string ApiKey { get; set; } = null!;
+
+    public bool Generated { get; set; }
+}
