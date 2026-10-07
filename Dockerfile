@@ -32,18 +32,18 @@ COPY ZynstormECFPlatform.Mappings/ZynstormECFPlatform.Mappings.csproj ZynstormEC
 COPY ZynstormECFPlatform.Reports/ZynstormECFPlatform.Reports.csproj ZynstormECFPlatform.Reports/
 COPY ZynstormECFPlatform.Web.Api/ZynstormECFPlatform.Web.Api.csproj ZynstormECFPlatform.Web.Api/
 
-# Restore para la arquitectura del VPS. La cache de NuGet sobrevive entre builds
-# sin pasar a formar parte de la imagen resultante.
-RUN --mount=type=cache,id=zynstormecf-nuget,target=/root/.nuget/packages \
-    dotnet restore "./ZynstormECFPlatform.Web.Api/ZynstormECFPlatform.Web.Api.csproj" \
+# Restore para la arquitectura del VPS.
+# Sin --mount=type=cache: el restore y el publish --no-restore corren en RUN distintos y,
+# con cache de capas (type=gha), el restore se salta y un cache mount llegaria vacio al
+# publish (NETSDK1064). Los paquetes deben quedar dentro de la capa del restore.
+RUN dotnet restore "./ZynstormECFPlatform.Web.Api/ZynstormECFPlatform.Web.Api.csproj" \
     -r linux-x64
 
 COPY . .
 
 # Publish once; dotnet publish already includes compilation.
 WORKDIR "/src/ZynstormECFPlatform.Web.Api"
-RUN --mount=type=cache,id=zynstormecf-nuget,target=/root/.nuget/packages \
-    dotnet publish "./ZynstormECFPlatform.Web.Api.csproj" \
+RUN dotnet publish "./ZynstormECFPlatform.Web.Api.csproj" \
     --no-restore \
     -r linux-x64 \
     --self-contained false \
