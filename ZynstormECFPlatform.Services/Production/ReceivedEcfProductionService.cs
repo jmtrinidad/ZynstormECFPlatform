@@ -1007,7 +1007,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         };
     }
 
-    private static string ExtractXmlValue(string xml, string localName)
+    internal static string ExtractXmlValue(string xml, string localName)
     {
         if (string.IsNullOrWhiteSpace(xml)) return string.Empty;
         try
@@ -1021,7 +1021,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         }
     }
 
-    private static string ExtractSecurityCode(string xml)
+    internal static string ExtractSecurityCode(string xml)
     {
         var rfceSecurityCode = ExtractXmlValue(xml, "CodigoSeguridadeCF");
         if (!string.IsNullOrWhiteSpace(rfceSecurityCode))

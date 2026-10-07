@@ -1,3 +1,5 @@
+using ZynstormECFPlatform.Core.Entities;
+using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Services.Production;
 
 namespace ZynstormECFPlatform.Tests.Production;
@@ -129,5 +131,139 @@ public class EcfLookupLogicTests
     public void PickBest_WithNoCandidates_ReturnsNull()
     {
         Assert.Null(EcfLookupLogic.PickBest([]));
+    }
+
+    // ─── ForClient ─────────────────────────────────────────────────
+
+    [Fact]
+    public void ForClient_ReturnsOnlyTheClientsOwnNonDeletedDocuments()
+    {
+        var documents = new[]
+        {
+            new EcfDocument { EcfDocumentId = 1, ClientId = 7, Ncf = "E320000000098" },
+            new EcfDocument { EcfDocumentId = 2, ClientId = 8, Ncf = "E320000000098" },   // otro cliente
+            new EcfDocument { EcfDocumentId = 3, ClientId = 7, Ncf = "E320000000099" },   // otro eNCF
+            new EcfDocument { EcfDocumentId = 4, ClientId = 7, Ncf = "E320000000098", IsDeleted = true },
+        }.AsQueryable();
+
+        var ids = documents
+            .Where(EcfLookupLogic.ForClient(7, "E320000000098"))
+            .Select(document => document.EcfDocumentId)
+            .ToList();
+
+        Assert.Equal([1], ids);
+    }
+
+    // ─── ResolveEnvironment ────────────────────────────────────────
+
+    [Theory]
+    [InlineData("Production", DgiiEnvironment.Production)]
+    [InlineData("test", DgiiEnvironment.Test)]
+    [InlineData("CerteCF", DgiiEnvironment.CerteCF)]
+    [InlineData(null, DgiiEnvironment.Production)]
+    [InlineData("", DgiiEnvironment.Production)]
+    [InlineData("algo raro", DgiiEnvironment.Production)]
+    public void ResolveEnvironment_ParsesOrDefaultsToProduction(string? configured, DgiiEnvironment expected)
+    {
+        Assert.Equal(expected, EcfLookupLogic.ResolveEnvironment(configured));
+    }
+
+    // ─── BuildResponse ─────────────────────────────────────────────
+
+    private const string SignedXml =
+        "<ECF><FechaHoraFirma>07-10-2026 09:01:23</FechaHoraFirma>" +
+        "<Signature><SignatureValue>ABCDEF123456</SignatureValue></Signature></ECF>";
+
+    private static EcfLookupSource Source(string? signedXml, DateTime? signatureDateTime = null) => new(
+        EcfDocumentId: 123,
+        ENcf: "E320000000098",
+        Total: 140m,
+        IssueDateUtc: new DateTime(2026, 10, 7),
+        SignatureDateTime: signatureDateTime,
+        IssuerRnc: "132293894",
+        CustomerRnc: "",
+        TrackId: "TRACK-1",
+        SignedXml: signedXml);
+
+    [Fact]
+    public void BuildResponse_Accepted_CarriesTheDataNeededToPrintTheInvoice()
+    {
+        var response = EcfLookupLogic.BuildResponse(
+            Source(SignedXml), EcfLookupState.Accepted, attempts: 2, DgiiEnvironment.Production);
+
+        Assert.True(response.Found);
+        Assert.Equal(EcfLookupState.Accepted, response.State);
+        Assert.True(response.IsUsable);
+        Assert.Equal("TRACK-1", response.TrackId);
+        Assert.Equal("ABCDEF", response.SecurityCode);
+        Assert.Equal("07-10-2026 09:01:23", response.SignatureDate);
+        Assert.Equal(
+            "https://fc.dgii.gov.do/ecf/ConsultaTimbreFC?RncEmisor=132293894&ENCF=E320000000098&MontoTotal=140&CodigoSeguridad=ABCDEF",
+            response.QrUrl);
+        Assert.Equal(123, response.EcfDocumentId);
+        Assert.Equal(2, response.Attempts);
+        Assert.Equal(string.Empty, response.Message);
+    }
+
+    [Fact]
+    public void BuildResponse_UsableWithoutSignedXml_ReturnsStateWithoutSecurityData()
+    {
+        var response = EcfLookupLogic.BuildResponse(
+            Source(signedXml: null), EcfLookupState.Accepted, attempts: 1, DgiiEnvironment.Production);
+
+        Assert.True(response.IsUsable);
+        Assert.Null(response.SecurityCode);
+        Assert.Null(response.SignatureDate);
+        Assert.Null(response.QrUrl);
+        Assert.Contains("XML firmado", response.Message);
+    }
+
+    [Fact]
+    public void BuildResponse_UnparseableSignedXml_IsTreatedAsMissing()
+    {
+        var response = EcfLookupLogic.BuildResponse(
+            Source("esto no es xml"), EcfLookupState.Accepted, attempts: 1, DgiiEnvironment.Production);
+
+        Assert.Null(response.SecurityCode);
+        Assert.Null(response.QrUrl);
+        Assert.Contains("XML firmado", response.Message);
+    }
+
+    [Fact]
+    public void BuildResponse_SignatureDateFallsBackToTheStoredOne()
+    {
+        const string xmlWithoutDate = "<ECF><Signature><SignatureValue>ABCDEF123456</SignatureValue></Signature></ECF>";
+
+        var response = EcfLookupLogic.BuildResponse(
+            Source(xmlWithoutDate, new DateTime(2026, 10, 7, 9, 1, 23)),
+            EcfLookupState.Accepted, attempts: 1, DgiiEnvironment.Production);
+
+        Assert.Equal("07-10-2026 09:01:23", response.SignatureDate);
+        Assert.NotNull(response.QrUrl);
+    }
+
+    [Theory]
+    [InlineData(EcfLookupState.Rejected)]
+    [InlineData(EcfLookupState.Error)]
+    [InlineData(EcfLookupState.NotSent)]
+    public void BuildResponse_NotUsable_DoesNotExposeSecurityData(EcfLookupState state)
+    {
+        var response = EcfLookupLogic.BuildResponse(
+            Source(SignedXml), state, attempts: 1, DgiiEnvironment.Production);
+
+        Assert.False(response.IsUsable);
+        Assert.Null(response.SecurityCode);
+        Assert.Null(response.QrUrl);
+        Assert.False(string.IsNullOrWhiteSpace(response.Message));
+    }
+
+    [Fact]
+    public void BuildResponse_Pending_IsUsableAndKeepsTheTrackId()
+    {
+        var response = EcfLookupLogic.BuildResponse(
+            Source(SignedXml), EcfLookupState.Pending, attempts: 1, DgiiEnvironment.Production);
+
+        Assert.True(response.IsUsable);
+        Assert.Equal("TRACK-1", response.TrackId);
     }
 }
