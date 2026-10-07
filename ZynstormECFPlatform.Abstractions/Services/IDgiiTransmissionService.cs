@@ -17,6 +17,12 @@ public class DgiiTransmissionResult
     public bool? SecuenciaUtilizada { get; set; }
     public string? SignedXml { get; set; }
 
+    /// <summary>
+    /// No hubo respuesta de la DGII: timeout o red caída. Es lo único que se reintenta de forma
+    /// automática, porque no se sabe si el documento llegó.
+    /// </summary>
+    public bool TransportFailure { get; set; }
+
     public bool Success => (!string.IsNullOrEmpty(TrackId) || string.Equals(Estado, "Aceptado", StringComparison.OrdinalIgnoreCase) || Codigo == 0) && string.IsNullOrEmpty(Error);
 }
 
