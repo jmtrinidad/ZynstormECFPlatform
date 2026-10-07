@@ -11,8 +11,22 @@ public interface IReceivedEcfProductionService
         EcfInvoiceRequestDto dto,
         DgiiEnvironment environment = DgiiEnvironment.Production,
         int statusDelayMilliseconds = 750,
+        CancellationToken cancellationToken = default,
+        bool deferred = false);
+
+    /// <summary>
+    /// Transmite a la DGII un documento que <c>emit</c> dejó firmado y en cola (estado 7), y sigue
+    /// su estado. Lo ejecuta <c>EcfTransmitJob</c>. Devuelve cuánto esperar para reintentar si
+    /// hubo un fallo de transporte; sin espera, no queda nada por hacer.
+    /// </summary>
+    Task<DeferredTransmitOutcome> TransmitDeferredAsync(
+        int ecfDocumentId,
+        int attemptNumber,
+        DgiiEnvironment environment,
         CancellationToken cancellationToken = default);
 }
+
+public sealed record DeferredTransmitOutcome(TimeSpan? RetryAfter);
 
 public class ReceivedEcfEmissionResultDto
 {

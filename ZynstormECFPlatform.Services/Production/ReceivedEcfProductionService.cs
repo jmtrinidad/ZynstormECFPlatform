@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Xml;
 using System.Xml.Linq;
 using Hangfire;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using ZynstormECFPlatform.Abstractions.Data;
@@ -108,7 +109,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         EcfInvoiceRequestDto dto,
         DgiiEnvironment environment = DgiiEnvironment.Production,
         int statusDelayMilliseconds = 750,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool deferred = false)
     {
         var resultDto = new ReceivedEcfEmissionResultDto();
         var timings = new EcfEmitTimings();
@@ -183,7 +185,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         {
             var processed = await ContinueProcessingAsync(
                 resultDto, dto, client, apiKey, ecfDocument, ecfType, targetEnvironment,
-                issuerRnc, eNcf, statusDelayMilliseconds, timings, cancellationToken);
+                issuerRnc, eNcf, statusDelayMilliseconds, timings, deferred, cancellationToken);
 
             await AddLogAsync(ecfDocument, client.ClientId, "Information", $"Tiempos de emit [{eNcf}]: {timings}");
 
@@ -301,6 +303,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         string eNcf,
         int statusDelayMilliseconds,
         EcfEmitTimings timings,
+        bool deferred,
         CancellationToken cancellationToken)
     {
         _ecfStatusHistoryService.Add(new EcfStatusHistory
@@ -371,7 +374,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         timings.Mark("firma");
 
         var useStagingValidation = ShouldUseStagingXmlValidation();
-        var tokenTask = useStagingValidation
+        // En modo diferido el token lo pide el job: no se gasta una llamada a la DGII en la respuesta.
+        var tokenTask = useStagingValidation || deferred
             ? null
             : _authService.GetTokenAsync(issuerRnc, targetEnvironment, certBase64, certPass);
 
@@ -387,6 +391,40 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             EcfStatusId = 6,
             Message = "XML firmado y guardado."
         });
+
+        if (deferred)
+        {
+            ecfDocument.EcfStatusId = 7;
+            _ecfDocumentService.Modify(ecfDocument);
+            _ecfStatusHistoryService.Add(new EcfStatusHistory
+            {
+                EcfDocumentId = ecfDocument.EcfDocumentId,
+                EcfStatusId = 7,
+                Message = "Firmado; la transmisión a la DGII quedó en cola."
+            });
+            _systemLogService.Add(new SystemLog
+            {
+                ClientId = client.ClientId,
+                EcfDocumentId = ecfDocument.EcfDocumentId,
+                LogLevel = "Information",
+                Message = $"Modo diferido: se respondió al firmar y la transmisión corre en segundo plano ({targetEnvironment}).",
+                CreateAtUtc = DateTime.UtcNow
+            });
+            await _unitOfWork.SaveChangesAsync();
+            timings.Mark("guardado_previo");
+
+            // No se guarda el id del job en el documento: UpdateAsync reescribe el documento
+            // completo y podría pisar el estado 8 que el job ya escribió.
+            var queuedJobId = BackgroundJob.Enqueue<EcfTransmitJob>(
+                job => job.Execute(ecfDocument.EcfDocumentId, 1, targetEnvironment));
+
+            resultDto.Success = false;
+            resultDto.IsPending = true;
+            resultDto.HangfireJobId = queuedJobId;
+            resultDto.Message = "Firmado; la transmisión a la DGII está en curso.";
+
+            return resultDto;
+        }
 
         var sendingMessage = isSummary ? "Enviando resumen B2C a DGII." : "Enviando e-CF a DGII.";
         ecfDocument.EcfStatusId = 8;
@@ -424,6 +462,9 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             tokenTask,
             statusDelayMilliseconds,
             timings,
+            attemptNumber: 1,
+            isDeferred: false,
+            earlierAttemptsWithoutTrackId: false,
             cancellationToken);
 
         return resultDto;
@@ -451,6 +492,9 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         Task<string>? tokenTask,
         int statusDelayMilliseconds,
         EcfEmitTimings? timings,
+        int attemptNumber,
+        bool isDeferred,
+        bool earlierAttemptsWithoutTrackId,
         CancellationToken cancellationToken)
     {
         if (ShouldUseStagingXmlValidation())
@@ -478,6 +522,21 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         resultDto.Transmission = transmission;
         resultDto.TrackId = transmission.TrackId;
 
+        // Diferido: un fallo de transporte (no se sabe si llegó) no es un error del documento. Se
+        // deja el rastro del intento y quien llama decide si reintenta.
+        if (isDeferred && transmission.TransportFailure)
+        {
+            await SaveTransmissionAsync(ecfDocument, transmission, statusId: 12, signedXml, attemptNumber: attemptNumber);
+            await AddLogAsync(
+                ecfDocument,
+                clientId,
+                "Warning",
+                $"Fallo de transporte hacia la DGII en el intento {attemptNumber}: {BuildDgiiTransmissionError(transmission)}",
+                JsonSerializer.Serialize(transmission));
+
+            return TransmitStep.TransportFailure;
+        }
+
         if (!transmission.Success)
         {
             resultDto.Message = BuildDgiiTransmissionError(transmission);
@@ -489,7 +548,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
         if (!string.IsNullOrWhiteSpace(transmission.TrackId))
         {
-            var transmissionRecord = await BeginTransmissionAsync(ecfDocument, transmission, signedXml);
+            var transmissionRecord = await BeginTransmissionAsync(ecfDocument, transmission, signedXml, attemptNumber);
 
             var status = await WaitForFinalDgiiStatusAsync(
                 targetEnvironment, token, transmission.TrackId, cancellationToken);
@@ -503,6 +562,29 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             resultDto.Success = string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase);
             var statusId = MapDgiiStatusToEcfStatus(status);
             resultDto.Message = resultDto.Success ? $"TrackId: {transmission.TrackId}" : BuildDgiiStatusError(status);
+
+            // 1209/75 en un reintento propio: el primer envío probablemente sí llegó y la
+            // respuesta se perdió. No es una secuencia quemada ni un rechazo: se deja Pendiente
+            // con un aviso, sin Status/DgiiResponse rechazados (la librería los clasificaría
+            // como secuencia quemada) y sin pedir un NCF nuevo.
+            if (EcfTransmitRetryPolicy.IsOwnDuplicate(status, earlierAttemptsWithoutTrackId))
+            {
+                statusId = 9;
+                resultDto.Success = false;
+                resultDto.IsAcceptedConditional = false;
+                resultDto.RequiresCorrection = false;
+                resultDto.IsPending = true;
+                resultDto.Status = null;
+                resultDto.DgiiResponse = null;
+                resultDto.Message = "La DGII ya recibió este comprobante en un envío anterior; falta confirmar su TrackId.";
+
+                await AddLogAsync(
+                    ecfDocument,
+                    clientId,
+                    "Warning",
+                    $"Reintento {attemptNumber}: la DGII ya tenía el eNCF {eNcf} de un envío anterior sin TrackId. No se trata como secuencia quemada; conciliar con la DGII.",
+                    JsonSerializer.Serialize(status));
+            }
 
             if (resultDto.Success)
                 await AddLogAsync(ecfDocument, clientId, "Information", $"e-CF aprobado. TrackId: {transmission.TrackId}. CodigoSeguridad: {resultDto.SecurityCode}. FechaFirma: {resultDto.SignatureDate}. QR: {resultDto.QrUrl}.");
@@ -571,6 +653,138 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
 
         return (Convert.ToBase64String(certificateBytes), Encoding.UTF8.GetString(passwordBytes));
+    }
+
+    public async Task<DeferredTransmitOutcome> TransmitDeferredAsync(
+        int ecfDocumentId,
+        int attemptNumber,
+        DgiiEnvironment environment,
+        CancellationToken cancellationToken = default)
+    {
+        var ecfDocument = await _ecfDocumentService.GetAsync(ecfDocumentId);
+
+        if (ecfDocument is null)
+            return new DeferredTransmitOutcome(null);
+
+        // Solo se transmite lo que quedó en cola (7). Si otra ejecución ya lo pasó a 8 o ya
+        // está aceptado, no se hace nada: así dos ejecuciones nunca transmiten el mismo documento.
+        if (ecfDocument.EcfStatusId != 7)
+        {
+            await AddLogAsync(
+                ecfDocument,
+                ecfDocument.ClientId,
+                "Information",
+                $"Transmisión diferida omitida (intento {attemptNumber}): el documento está en estado {ecfDocument.EcfStatusId}, no en cola.");
+
+            return new DeferredTransmitOutcome(null);
+        }
+
+        var clientId = ecfDocument.ClientId;
+        await MarkDocumentAsync(ecfDocument, 8, $"Enviando e-CF a DGII (intento {attemptNumber}).");
+
+        TransmitStep step;
+
+        try
+        {
+            var client = await _clientService.GetAsync(clientId)
+                ?? throw new InvalidOperationException($"No se encontró el cliente {clientId} del documento {ecfDocumentId}.");
+            var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == clientId)
+                ?? throw new InvalidOperationException($"No hay API key para el cliente {clientId}.");
+
+            var material = await LoadSigningMaterialAsync(clientId, apiKey);
+
+            if (material is null)
+            {
+                await MarkDocumentAsync(ecfDocument, 3, "Certificado no encontrado.");
+                await AddLogAsync(ecfDocument, clientId, "Warning", "Certificado no encontrado; no se pudo transmitir.");
+                return new DeferredTransmitOutcome(null);
+            }
+
+            var (certBase64, certPass) = material.Value;
+
+            var xml = await _ecfXmlDocumentService.GetByAsync(x => x.EcfDocumentId == ecfDocumentId)
+                ?? throw new InvalidOperationException($"El documento {ecfDocumentId} no tiene XML firmado.");
+
+            var ecfType = NcfHelper.ExtractEcfType(ecfDocument.Ncf);
+            var total = ecfDocument.Total;
+            var issuerRnc = client.Rnc;
+            var targetEnvironment = ResolveTargetEnvironment(environment);
+
+            var earlierAttemptsWithoutTrackId = attemptNumber > 1
+                && !await _ecfTransmissionService.Table.AnyAsync(
+                    t => t.EcfDocumentId == ecfDocumentId && t.TrackId != string.Empty,
+                    cancellationToken);
+
+            var tokenTask = ShouldUseStagingXmlValidation()
+                ? null
+                : _authService.GetTokenAsync(issuerRnc, targetEnvironment, certBase64, certPass);
+
+            var resultDto = new ReceivedEcfEmissionResultDto
+            {
+                EcfDocumentId = ecfDocumentId,
+                ENcf = ecfDocument.Ncf,
+                EcfType = ecfType
+            };
+
+            step = await TransmitAndTrackAsync(
+                resultDto,
+                ecfDocument,
+                clientId,
+                xml.XmlSigned,
+                ecfType,
+                total,
+                issuerRnc,
+                ecfDocument.Ncf,
+                ShouldSendAsB2cSummary(ecfType, total),
+                targetEnvironment,
+                certBase64,
+                certPass,
+                tokenTask,
+                statusDelayMilliseconds: 750,
+                timings: null,
+                attemptNumber,
+                isDeferred: true,
+                earlierAttemptsWithoutTrackId,
+                cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Un fallo inesperado (token, red, base de datos) se trata como transporte: se
+            // reintenta con las mismas esperas y, agotadas, el documento queda en Error.
+            await AddLogAsync(
+                ecfDocument,
+                clientId,
+                "Error",
+                $"Fallo inesperado al transmitir (intento {attemptNumber}): {ex.Message}",
+                ex.ToString());
+
+            step = TransmitStep.TransportFailure;
+        }
+
+        if (step == TransmitStep.Completed)
+            return new DeferredTransmitOutcome(null);
+
+        var delays = EcfTransmitRetryPolicy.Normalize(
+            _configuration.GetSection("EcfTransmit:RetryDelaysSeconds").Get<int[]>());
+        var delay = EcfTransmitRetryPolicy.NextDelay(attemptNumber, delays);
+
+        if (delay is { } wait)
+        {
+            await MarkDocumentAsync(
+                ecfDocument,
+                7,
+                $"La DGII no respondió en el intento {attemptNumber}; se reintentará en {wait.TotalSeconds:0} s.");
+
+            return new DeferredTransmitOutcome(wait);
+        }
+
+        await MarkDocumentAsync(
+            ecfDocument,
+            12,
+            $"Se agotaron los reintentos de transmisión a la DGII ({attemptNumber} intentos). El documento se puede reenviar con el mismo eNCF.");
+        await AddLogAsync(ecfDocument, clientId, "Error", $"Se agotaron los reintentos de transmisión tras {attemptNumber} intentos.");
+
+        return new DeferredTransmitOutcome(null);
     }
 
     private DgiiEnvironment ResolveTargetEnvironment(DgiiEnvironment requestedEnvironment)
@@ -874,13 +1088,14 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         DgiiTransmissionResult transmission,
         int statusId,
         string signedXml,
-        DgiiStatusResponse? status = null)
+        DgiiStatusResponse? status = null,
+        int attemptNumber = 1)
     {
         await _ecfTransmissionService.InsertAsync(new EcfTransmission
         {
             EcfDocumentId = ecfDocument.EcfDocumentId,
             TrackId = transmission.TrackId ?? string.Empty,
-            AttemptNumber = 1,
+            AttemptNumber = attemptNumber,
             RequestPayload = signedXml,
             ResponsePayload = JsonSerializer.Serialize(new { transmission, status }),
             EcfStatusId = statusId,
@@ -899,13 +1114,14 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     private async Task<EcfTransmission> BeginTransmissionAsync(
         EcfDocument ecfDocument,
         DgiiTransmissionResult transmission,
-        string signedXml)
+        string signedXml,
+        int attemptNumber = 1)
     {
         var record = new EcfTransmission
         {
             EcfDocumentId = ecfDocument.EcfDocumentId,
             TrackId = transmission.TrackId ?? string.Empty,
-            AttemptNumber = 1,
+            AttemptNumber = attemptNumber,
             RequestPayload = signedXml,
             ResponsePayload = JsonSerializer.Serialize(new { transmission, status = (DgiiStatusResponse?)null }),
             EcfStatusId = 9,

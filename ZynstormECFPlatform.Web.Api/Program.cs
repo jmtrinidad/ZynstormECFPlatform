@@ -90,7 +90,17 @@ builder.Services.AddHangfire(config => config
         options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("HangfireConnection"));
     }));
 
-builder.Services.AddHangfireServer();
+// Servidor por defecto: mantenimiento, reportes, recordatorios y seguimiento de estado.
+builder.Services.AddHangfireServer(options => options.Queues = ["default"]);
+
+// Servidor propio para transmitir e-CF a la DGII: el envío en segundo plano no compite con los
+// demás jobs ni espera detrás de ellos.
+builder.Services.AddHangfireServer(options =>
+{
+    options.ServerName = $"{Environment.MachineName}-ecf-transmit";
+    options.Queues = ["ecf-transmit"];
+    options.WorkerCount = Math.Clamp(builder.Configuration.GetValue<int?>("EcfTransmit:WorkerCount") ?? 10, 1, 50);
+});
 
 builder.Services.Configure<AppSettings>(options => builder.Configuration.GetSection("AppSettings").Bind(options));
 

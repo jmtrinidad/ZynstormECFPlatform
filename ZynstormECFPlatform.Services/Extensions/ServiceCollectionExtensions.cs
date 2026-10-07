@@ -66,6 +66,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IEcfXmlValidationService, Validation.EcfXmlValidationService>();
 
         services.AddTransient<Jobs.EcfTrackingJob>();
+        services.AddTransient<Jobs.EcfTransmitJob>();
         services.AddTransient<Jobs.AutomaticReportsJob>();
         services.AddTransient<Jobs.ReceivedB2BMessagesCleanupJob>();
         services.AddTransient<Jobs.CertificateExpirationJob>();

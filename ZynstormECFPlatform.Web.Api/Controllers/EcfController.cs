@@ -94,7 +94,10 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
-        public async Task<IActionResult> EmitEcf([FromBody] EcfInvoiceRequestDto dto, [FromQuery] DgiiEnvironment environment = DgiiEnvironment.Test)
+        public async Task<IActionResult> EmitEcf(
+            [FromBody] EcfInvoiceRequestDto dto,
+            [FromQuery] DgiiEnvironment environment = DgiiEnvironment.Test,
+            [FromQuery] bool deferred = false)
         {
             if (dto == null)
                 return BadRequest(new { success = false, message = "Debe proporcionar el objeto e-CF." });
@@ -104,7 +107,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 var result = await _receivedEcfProductionService.ProcessAsync(
                     dto,
                     environment,
-                    cancellationToken: HttpContext.RequestAborted);
+                    cancellationToken: HttpContext.RequestAborted,
+                    deferred: deferred);
 
                 if (result.ClientInactive)
                     return StatusCode(StatusCodes.Status403Forbidden, result);
@@ -116,8 +120,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     || result.ConfigurationErrors.Count > 0 || result.XmlValidation?.IsValid == false)
                     return BadRequest(result);
 
-                // Un replay pendiente no es un fallo de la plataforma: devolvió lo guardado.
-                if (result.IsPending && !result.Replayed)
+                // Un replay o una respuesta diferida pendiente no son un fallo de la plataforma:
+                // devolvieron lo guardado o firmaron y dejaron la transmisión en cola.
+                if (result.IsPending && !result.Replayed && !deferred)
                     return StatusCode(StatusCodes.Status504GatewayTimeout, result);
 
                 return Ok(result);
