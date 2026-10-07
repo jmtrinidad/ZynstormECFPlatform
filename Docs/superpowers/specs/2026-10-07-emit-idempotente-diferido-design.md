@@ -117,6 +117,41 @@ integrador corrige y reenvía el mismo eNCF: la sección 1 lo permite.
 - Petición: `POST v1/Ecf/emit?environment=…&deferred=true|false` (por defecto `false`).
 - Respuesta: los campos actuales más `replayed` (bool) y `attempt` (int).
 
+## Rendimiento
+
+Objetivo: que la respuesta de `emit?deferred=true` tarde una fracción de segundo (meta: p95
+menor a 1 s, medida en staging; se confirma o se ajusta con la medición de la fase 0) y que el
+envío a la DGII deje de ocupar peticiones HTTP.
+
+Diagnóstico del código actual: el token de la DGII ya se cachea 55 min con candado por RNC y
+los esquemas XSD ya se compilan una sola vez. Lo que domina el tiempo es la espera de la DGII
+(envío más sondeo cada 500 ms hasta 60 s), que el modo diferido saca de la respuesta. Lo que
+queda en la respuesta son unas diez consultas a la base de datos antes de firmar, la firma y
+el XSD.
+
+Medidas, en este orden:
+
+0. **Medir primero.** Un cronómetro por fase de `emit` (consultas previas, generación + XSD,
+   firma, guardado, transmisión, espera del estado final) que se escribe en el log estructurado
+   con el eNCF y el modo. Las fases siguientes se verifican contra estos números, no a ojo.
+1. **Modo diferido** (sección anterior): quita de la respuesta el envío y la espera de la DGII.
+2. **Menos viajes a la base de datos antes de firmar.** Moneda DOP, tipo de e-CF y los datos
+   del cliente (cliente, API key, sucursal principal) casi nunca cambian: se cachean en
+   memoria con `ICacheService` y TTL corto (5 min) y se invalidan al editar el cliente.
+   **No** se cachea el certificado ni su contraseña descifrada: esos se leen y descifran en
+   cada firma.
+3. **Menos `SaveChanges`.** Los historiales y logs que hoy se agregan por separado se
+   acumulan y se guardan junto con el cambio de estado, en un solo viaje por fase.
+4. **Cola propia para transmitir.** `EcfTransmitJob` va en una cola `ecf-transmit` con sus
+   propios workers, para que el envío a la DGII no compita con los jobs de mantenimiento,
+   reportes y recordatorios.
+5. **Token precalentado.** En modo diferido el token se pide dentro del job, no en la
+   respuesta; si el caché está frío, solo retrasa la transmisión, no la entrega de la factura.
+
+No se hace en esta tanda: paralelizar consultas sobre un mismo `DbContext` (no es seguro) ni
+cambiar el motor de firma o de validación XSD, salvo que la fase 0 demuestre que son el cuello
+de botella.
+
 ## Librería (`Zynstorm.DGII.ECF`)
 
 - **Un solo envío en vuelo por eNCF dentro del proceso.** `EcfClient.EmitAsync` guarda en un
@@ -147,6 +182,9 @@ integrador corrige y reenvía el mismo eNCF: la sección 1 lo permite.
   documentos con el mismo eNCF y el caso de la 118 (aceptado + rechazado → `Replay`).
 - Traducción de `EcfLookupResponse` a la respuesta de `emit` con `Replayed`.
 - Cálculo de `AttemptNumber`.
+- Caché de datos de referencia: se reutiliza dentro del TTL, se invalida al editar el cliente,
+  y nunca contiene el certificado.
+- El cronómetro por fase registra todas las fases y no altera el resultado de `emit`.
 - El candado, la transacción y el job se verifican con el build y una prueba manual en
   staging (el repo no tiene base de datos de prueba).
 
@@ -162,7 +200,7 @@ integrador corrige y reenvía el mismo eNCF: la sección 1 lo permite.
 1. Plataforma: idempotencia + modo diferido. Con la DLL actual, `emit` sigue síncrono y ya
    no duplica envíos.
 2. Probar en staging (`ecfstaging.zynstorm.com`): reenvío del mismo eNCF, concurrencia, modo
-   diferido, job caído.
+   diferido, job caído, y comparar los tiempos por fase antes y después.
 3. Librería: versión nueva, DLL ofuscada, y copiarla a EasyInvoice y MechanicalServ.
 4. En otra tanda: que los integradores consulten el estado final y se invierta el
    predeterminado.
