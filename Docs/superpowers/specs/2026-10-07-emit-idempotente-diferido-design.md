@@ -100,6 +100,27 @@ va fijo en 1). `BillingCountedAtUtc` no se toca: el consumo se cuenta una sola v
 
 El modo síncrono pasa por el mismo método de transmisión; solo cambia quién lo espera.
 
+### 5b. Reintento de la transmisión ante timeout
+
+Dentro de `EcfTransmitJob`, y solo para fallos de **transporte** hacia la DGII (timeout,
+red caída, HTTP 5xx; nunca un rechazo de la DGII ni «En Proceso», que ya resuelve
+`EcfTrackingJob`):
+
+- Se reprograma el mismo job con espera creciente: 5 s, 30 s y 2 min (3 reintentos como
+  máximo; configurable en `EcfTransmit:RetryDelaysSeconds`).
+- Entre intentos el documento vuelve a estado 7 (`SendPending`) con el motivo en el historial;
+  cada intento agrega una fila `EcfTransmission` (`AttemptNumber` +1) y un log.
+- Agotados los reintentos, el documento queda en estado 12 (`Error`) y pasa a ser `Retry`
+  permitido por la sección 1.
+- **Riesgo conocido:** si la DGII recibió el documento pero la respuesta se perdió, el
+  reintento recibe 1209/75 por culpa del propio primer envío (el mismo problema de la 118, ahora
+  entre la plataforma y la DGII), y el TrackId original no se conoce. Mitigación en dos
+  pasos: (a) la primera tarea del plan es verificar si la DGII permite consultar el TrackId por
+  `(RNC, eNCF)`; si existe, el job lo consulta antes de cada reintento y, si ya está, sigue con
+  el seguimiento en vez de reenviar; (b) si no existe, un 1209/75 en un reintento propio del
+  mismo documento **no** se trata como secuencia quemada: el documento queda `Pending` con un
+  aviso «recibido por la DGII, falta confirmar el TrackId», sin pedir un NCF nuevo.
+
 ### 6. QR en toda respuesta posterior a la firma
 
 `SecurityCode`, `SignatureDate` y `QrUrl` viajan también cuando la DGII rechaza o hay error de
@@ -160,6 +181,19 @@ de botella.
   comparten el resultado. La clave se libera siempre al terminar, con éxito o error, para no
   bloquear un reenvío legítimo. La tarea compartida usa el `CancellationToken` de la primera
   llamada (se documenta).
+- **Reintento único ante timeout contra la plataforma.** Si `EmitAsync` termina en timeout
+  (`TransportError` por tiempo agotado), la librería repite el envío **una vez**, tras una
+  espera corta (`EcfOptions.TimeoutRetryDelay`, 2 s). Es seguro porque la plataforma es
+  idempotente: si el primer envío llegó, el segundo devuelve lo guardado (`Replayed`). Se puede
+  apagar con `EcfOptions.RetryOnTimeout = false`. Otros errores de red no se reintentan.
+- **`WaitForFinalAsync(string eNcf, TimeSpan maxWait)`:** consulta `by-ncf` con espera
+  creciente (1 s, 2 s, 4 s… hasta 15 s) hasta que el estado deje de ser `Pending` o se agote
+  `maxWait`; devuelve el `EcfOutcome` final. La librería **no crea hilos ni colas propias**: el
+  integrador lo ejecuta en su propio segundo plano y solo avisa al usuario si el resultado
+  final es `Rejected` o un error definitivo. Sin Hangfire ni dependencias nuevas.
+- **No se agrega Hangfire a la librería:** no puede calcular el QR sin la firma de la
+  plataforma, exigiría almacenamiento propio en cada integrador y rompería la promesa de una
+  DLL sin dependencias desde .NET Framework 4.5.2. La cola vive en la plataforma.
 - **`EcfOptions.DeliveryMode`:** `Deferred` (predeterminado, agrega `deferred=true`) o
   `WaitForDgii` (comportamiento actual).
 - **`EcfEmitResponse.Replayed` / `Attempt`** y **`EcfOutcome.Replayed`**: el integrador sabe
@@ -180,6 +214,8 @@ de botella.
 **Plataforma** (`ZynstormECFPlatform.Tests`):
 - `EcfEmitDecision.Decide`: cada fila de la tabla, incluido el umbral `staleAfter`, varios
   documentos con el mismo eNCF y el caso de la 118 (aceptado + rechazado → `Replay`).
+- Política de reintentos de la transmisión: qué fallos se reintentan (transporte) y cuáles no
+  (rechazo, «En Proceso»), las esperas 5 s / 30 s / 2 min, y el estado final tras agotarlos.
 - Traducción de `EcfLookupResponse` a la respuesta de `emit` con `Replayed`.
 - Cálculo de `AttemptNumber`.
 - Caché de datos de referencia: se reutiliza dentro del TTL, se invalida al editar el cliente,
@@ -193,6 +229,9 @@ de botella.
 - Tras un fallo o timeout, la clave se libera y un reenvío vuelve a enviar.
 - eNCF distintos no se bloquean entre sí.
 - `DeliveryMode` agrega o no `deferred=true` a la URL.
+- Un timeout se reintenta una sola vez y el segundo resultado es el que se devuelve; con
+  `RetryOnTimeout = false` no se reintenta; un error que no es timeout no se reintenta.
+- `WaitForFinalAsync` termina al salir de `Pending`, respeta `maxWait` y no crea hilos.
 - `Replayed` se lee de la respuesta; `GetByNcf` mapea cada estado y devuelve `null` en 404.
 
 ## Orden de despliegue
