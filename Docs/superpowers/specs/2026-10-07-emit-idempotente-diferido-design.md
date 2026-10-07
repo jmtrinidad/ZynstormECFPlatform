@@ -167,11 +167,11 @@ Medidas, en este orden:
    firma, guardado, transmisión, espera del estado final) que se escribe en el log estructurado
    con el eNCF y el modo. Las fases siguientes se verifican contra estos números, no a ojo.
 1. **Modo diferido** (sección anterior): quita de la respuesta el envío y la espera de la DGII.
-2. **Menos viajes a la base de datos antes de firmar.** Moneda DOP, tipo de e-CF y los datos
-   del cliente (cliente, API key, sucursal principal) casi nunca cambian: se cachean en
-   memoria con `ICacheService` y TTL corto (5 min) y se invalidan al editar el cliente.
-   **No** se cachea el certificado ni su contraseña descifrada: esos se leen y descifran en
-   cada firma.
+2. **Menos viajes a la base de datos antes de firmar.** Moneda DOP, tipo de e-CF y sucursal
+   principal casi nunca cambian: se cachean en memoria con `ICacheService` y TTL de 5 min, sin
+   invalidación. **No** se cachea el cliente (su `ClientInactive` cambia por pagos,
+   recordatorios y ediciones, y un cliente suspendido no debe seguir emitiendo), ni la API key,
+   ni el certificado ni su contraseña descifrada: esos se leen en cada emisión.
 3. **Menos `SaveChanges`.** Los historiales y logs que hoy se agregan por separado se
    acumulan y se guardan junto con el cambio de estado, en un solo viaje por fase.
 4. **Cola propia para transmitir.** `EcfTransmitJob` va en una cola `ecf-transmit` con sus

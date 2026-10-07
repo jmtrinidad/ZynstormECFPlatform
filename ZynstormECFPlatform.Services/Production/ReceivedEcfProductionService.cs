@@ -50,6 +50,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     private readonly IHostEnvironment _hostEnvironment;
     private readonly IClientUsageService _clientUsageService;
     private readonly IEcfLookupService _lookupService;
+    private readonly EcfReferenceCache _referenceCache;
 
     public ReceivedEcfProductionService(
         IClientService clientService,
@@ -74,7 +75,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         IConfiguration configuration,
         IHostEnvironment hostEnvironment,
         IClientUsageService clientUsageService,
-        IEcfLookupService lookupService)
+        IEcfLookupService lookupService,
+        EcfReferenceCache referenceCache)
     {
         _clientService = clientService;
         _apiKeyService = apiKeyService;
@@ -99,6 +101,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         _hostEnvironment = hostEnvironment;
         _clientUsageService = clientUsageService;
         _lookupService = lookupService;
+        _referenceCache = referenceCache;
     }
 
     public async Task<ReceivedEcfEmissionResultDto> ProcessAsync(
@@ -139,14 +142,20 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         if (apiKey == null)
             return FailConfiguration(resultDto, "ApiKey no encontrada.");
 
-        var clientBranch = await _clientBrancheService.GetByAsync(x => x.ClientId == client.ClientId && x.IsMain)
-            ?? await _clientBrancheService.GetByAsync(x => x.ClientId == client.ClientId);
-        var currency = await _currencyService.GetByAsync(x => x.Code == "DOP")
-            ?? await _currencyService.GetByAsync(x => x.CurrencyId > 0);
+        var clientBranch = await _referenceCache.GetOrLoadAsync(
+            $"ecf-ref:branch:{client.ClientId}",
+            async () => await _clientBrancheService.GetByAsync(x => x.ClientId == client.ClientId && x.IsMain)
+                ?? await _clientBrancheService.GetByAsync(x => x.ClientId == client.ClientId));
+        var currency = await _referenceCache.GetOrLoadAsync(
+            "ecf-ref:currency",
+            async () => await _currencyService.GetByAsync(x => x.Code == "DOP")
+                ?? await _currencyService.GetByAsync(x => x.CurrencyId > 0));
         if (currency == null)
             return FailConfiguration(resultDto, "No hay moneda configurada para registrar el e-CF.");
 
-        var ecfTypeEntity = await _ecfTypeService.GetByAsync(x => x.Code == ecfType.ToString());
+        var ecfTypeEntity = await _referenceCache.GetOrLoadAsync(
+            $"ecf-ref:ecftype:{ecfType}",
+            () => _ecfTypeService.GetByAsync(x => x.Code == ecfType.ToString()));
         if (ecfTypeEntity == null)
             return FailConfiguration(resultDto, $"TipoeCF {ecfType} no esta configurado.");
 
