@@ -108,6 +108,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         CancellationToken cancellationToken = default)
     {
         var resultDto = new ReceivedEcfEmissionResultDto();
+        var timings = new EcfEmitTimings();
 
         var targetEnvironment = ResolveTargetEnvironment(environment);
         resultDto.TargetEnvironment = targetEnvironment.ToString();
@@ -167,12 +168,17 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         var ecfDocument = claim.Document!;
         resultDto.Attempt = claim.Attempt;
         resultDto.EcfDocumentId = ecfDocument.EcfDocumentId;
+        timings.Mark("consultas_previas");
 
         try
         {
-            return await ContinueProcessingAsync(
+            var processed = await ContinueProcessingAsync(
                 resultDto, dto, client, apiKey, ecfDocument, ecfType, targetEnvironment,
-                issuerRnc, eNcf, statusDelayMilliseconds, cancellationToken);
+                issuerRnc, eNcf, statusDelayMilliseconds, timings, cancellationToken);
+
+            await AddLogAsync(ecfDocument, client.ClientId, "Information", $"Tiempos de emit [{eNcf}]: {timings}");
+
+            return processed;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -285,6 +291,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         string issuerRnc,
         string eNcf,
         int statusDelayMilliseconds,
+        EcfEmitTimings timings,
         CancellationToken cancellationToken)
     {
         _ecfStatusHistoryService.Add(new EcfStatusHistory
@@ -336,6 +343,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         //    return resultDto;
         //}
 
+        timings.Mark("generacion_xsd");
+
         var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey ?? string.Empty);
         var certificate = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId);
         if (certificate == null)
@@ -354,6 +363,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         resultDto.SignedXml = signedXml;
         ApplyQrMetadata(resultDto, dto, signedXml, ecfType, targetEnvironment);
         resultDto.XmlValidation = BuildAcceptedValidationResult(dto, signedXml, ecfType, resultDto.QrUrl, resultDto.SecurityCode, resultDto.SignatureDate);
+        timings.Mark("firma");
 
         var useStagingValidation = ShouldUseStagingXmlValidation();
         var tokenTask = useStagingValidation
@@ -391,6 +401,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             CreateAtUtc = DateTime.UtcNow
         });
         await _unitOfWork.SaveChangesAsync();
+        timings.Mark("guardado_previo");
 
         if (useStagingValidation)
         {
@@ -410,6 +421,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
         var transmission = await _transmissionService.SendEcfAsync(targetEnvironment, token, signedXml, ecfType, total, issuerRnc, eNcf, isSummary);
         await AddDgiiResponseLogAsync(ecfDocument, client.ClientId, "recepcion", targetEnvironment, transmission);
+        timings.Mark("recepcion_dgii");
 
         resultDto.Transmission = transmission;
         resultDto.TrackId = transmission.TrackId;
@@ -430,6 +442,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             var status = await WaitForFinalDgiiStatusAsync(
                 targetEnvironment, token, transmission.TrackId, cancellationToken);
             _cacheService.Set($"EcfStatus_{transmission.TrackId}", status, TimeSpan.FromHours(1));
+            timings.Mark("espera_estado_final");
             await AddDgiiStatusLogAsync(ecfDocument, client.ClientId, targetEnvironment, transmission.TrackId, status);
             resultDto.Status = status;
             resultDto.DgiiResponse = status;
