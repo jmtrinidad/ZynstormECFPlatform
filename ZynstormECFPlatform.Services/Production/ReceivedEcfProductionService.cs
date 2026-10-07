@@ -354,19 +354,15 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
         timings.Mark("generacion_xsd");
 
-        var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey ?? string.Empty);
-        var certificate = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == client.ClientId);
-        if (certificate == null)
+        var material = await LoadSigningMaterialAsync(client.ClientId, apiKey);
+        if (material is null)
         {
             FailConfiguration(resultDto, "Certificado no encontrado.");
             await MarkDocumentAsync(ecfDocument, 3, resultDto.Message);
             await AddLogAsync(ecfDocument, client.ClientId, "Warning", resultDto.Message);
             return resultDto;
         }
-        var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
-        var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
-        var certBase64 = Convert.ToBase64String(certificateBytes);
-        var certPass = Encoding.UTF8.GetString(passwordBytes);
+        var (certBase64, certPass) = material.Value;
 
         var signedXml = _signerService.SignXml(unsignedXml, certBase64, certPass);
         resultDto.SignedXml = signedXml;
@@ -412,25 +408,72 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         await _unitOfWork.SaveChangesAsync();
         timings.Mark("guardado_previo");
 
-        if (useStagingValidation)
+        await TransmitAndTrackAsync(
+            resultDto,
+            ecfDocument,
+            client.ClientId,
+            signedXml,
+            ecfType,
+            total,
+            issuerRnc,
+            eNcf,
+            isSummary,
+            targetEnvironment,
+            certBase64,
+            certPass,
+            tokenTask,
+            statusDelayMilliseconds,
+            timings,
+            cancellationToken);
+
+        return resultDto;
+    }
+
+    private enum TransmitStep { Completed, TransportFailure }
+
+    /// <summary>
+    /// Transmite el documento ya firmado a la DGII y sigue su estado hasta donde se pueda.
+    /// Lo usan el modo síncrono de <c>emit</c> y, más adelante, el job de transmisión diferida.
+    /// </summary>
+    private async Task<TransmitStep> TransmitAndTrackAsync(
+        ReceivedEcfEmissionResultDto resultDto,
+        EcfDocument ecfDocument,
+        int clientId,
+        string signedXml,
+        int ecfType,
+        decimal total,
+        string issuerRnc,
+        string eNcf,
+        bool isSummary,
+        DgiiEnvironment targetEnvironment,
+        string certBase64,
+        string certPass,
+        Task<string>? tokenTask,
+        int statusDelayMilliseconds,
+        EcfEmitTimings? timings,
+        CancellationToken cancellationToken)
+    {
+        if (ShouldUseStagingXmlValidation())
         {
-            return await ProcessWithStagingValidationAsync(
+            await ProcessWithStagingValidationAsync(
                 resultDto,
                 ecfDocument,
-                client.ClientId,
+                clientId,
                 signedXml,
                 statusDelayMilliseconds,
                 issuerRnc,
                 targetEnvironment,
                 certBase64,
                 certPass);
+
+            return TransmitStep.Completed;
         }
 
         var token = await tokenTask!;
 
         var transmission = await _transmissionService.SendEcfAsync(targetEnvironment, token, signedXml, ecfType, total, issuerRnc, eNcf, isSummary);
-        await AddDgiiResponseLogAsync(ecfDocument, client.ClientId, "recepcion", targetEnvironment, transmission);
-        timings.Mark("recepcion_dgii");
+        await AddDgiiResponseLogAsync(ecfDocument, clientId, "recepcion", targetEnvironment, transmission);
+        timings?.Mark("recepcion_dgii");
 
         resultDto.Transmission = transmission;
         resultDto.TrackId = transmission.TrackId;
@@ -440,8 +483,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             resultDto.Message = BuildDgiiTransmissionError(transmission);
             await SaveTransmissionAsync(ecfDocument, transmission, statusId: 12, signedXml);
             await MarkDocumentAsync(ecfDocument, 12, resultDto.Message);
-            await AddLogAsync(ecfDocument, client.ClientId, "Error", resultDto.Message, JsonSerializer.Serialize(transmission));
-            return resultDto;
+            await AddLogAsync(ecfDocument, clientId, "Error", resultDto.Message, JsonSerializer.Serialize(transmission));
+            return TransmitStep.Completed;
         }
 
         if (!string.IsNullOrWhiteSpace(transmission.TrackId))
@@ -451,8 +494,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             var status = await WaitForFinalDgiiStatusAsync(
                 targetEnvironment, token, transmission.TrackId, cancellationToken);
             _cacheService.Set($"EcfStatus_{transmission.TrackId}", status, TimeSpan.FromHours(1));
-            timings.Mark("espera_estado_final");
-            await AddDgiiStatusLogAsync(ecfDocument, client.ClientId, targetEnvironment, transmission.TrackId, status);
+            timings?.Mark("espera_estado_final");
+            await AddDgiiStatusLogAsync(ecfDocument, clientId, targetEnvironment, transmission.TrackId, status);
             resultDto.Status = status;
             resultDto.DgiiResponse = status;
             resultDto.IsAcceptedConditional = IsAcceptedConditionalDgiiStatus(status);
@@ -462,13 +505,13 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             resultDto.Message = resultDto.Success ? $"TrackId: {transmission.TrackId}" : BuildDgiiStatusError(status);
 
             if (resultDto.Success)
-                await AddLogAsync(ecfDocument, client.ClientId, "Information", $"e-CF aprobado. TrackId: {transmission.TrackId}. CodigoSeguridad: {resultDto.SecurityCode}. FechaFirma: {resultDto.SignatureDate}. QR: {resultDto.QrUrl}.");
+                await AddLogAsync(ecfDocument, clientId, "Information", $"e-CF aprobado. TrackId: {transmission.TrackId}. CodigoSeguridad: {resultDto.SecurityCode}. FechaFirma: {resultDto.SignatureDate}. QR: {resultDto.QrUrl}.");
 
             await MarkDocumentAsync(ecfDocument, statusId, resultDto.Message);
             await CompleteTransmissionAsync(transmissionRecord, transmission, statusId, status);
 
             if (resultDto.Success || resultDto.IsAcceptedConditional)
-                await _clientUsageService.RegisterAcceptedAsync(ecfDocument.EcfDocumentId, client.ClientId, cancellationToken);
+                await _clientUsageService.RegisterAcceptedAsync(ecfDocument.EcfDocumentId, clientId, cancellationToken);
 
             if (IsPendingDgiiStatus(status))
             {
@@ -488,10 +531,10 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
                 ecfDocument.HangfireJobId = jobId;
                 await _ecfDocumentService.UpdateAsync(ecfDocument);
                 resultDto.HangfireJobId = jobId;
-                await AddLogAsync(ecfDocument, client.ClientId, "Information", $"DGII no retorno aceptacion inmediata. Job de seguimiento programado: {jobId}.");
+                await AddLogAsync(ecfDocument, clientId, "Information", $"DGII no retorno aceptacion inmediata. Job de seguimiento programado: {jobId}.");
             }
 
-            return resultDto;
+            return TransmitStep.Completed;
         }
 
         resultDto.Success = string.Equals(transmission.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase) || transmission.Codigo is 0 or 1;
@@ -500,15 +543,34 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
         await SaveTransmissionAsync(ecfDocument, transmission, finalStatusId, signedXml);
         await MarkDocumentAsync(ecfDocument, finalStatusId, resultDto.Message);
-        await AddLogAsync(ecfDocument, client.ClientId, resultDto.Success ? "Information" : "Error", resultDto.Message, JsonSerializer.Serialize(transmission));
+        await AddLogAsync(ecfDocument, clientId, resultDto.Success ? "Information" : "Error", resultDto.Message, JsonSerializer.Serialize(transmission));
 
         if (resultDto.Success)
         {
-            await AddLogAsync(ecfDocument, client.ClientId, "Information", $"e-CF aprobado. CodigoSeguridad: {resultDto.SecurityCode}. FechaFirma: {resultDto.SignatureDate}. QR: {resultDto.QrUrl}.");
-            await _clientUsageService.RegisterAcceptedAsync(ecfDocument.EcfDocumentId, client.ClientId, cancellationToken);
+            await AddLogAsync(ecfDocument, clientId, "Information", $"e-CF aprobado. CodigoSeguridad: {resultDto.SecurityCode}. FechaFirma: {resultDto.SignatureDate}. QR: {resultDto.QrUrl}.");
+            await _clientUsageService.RegisterAcceptedAsync(ecfDocument.EcfDocumentId, clientId, cancellationToken);
         }
 
-        return resultDto;
+        return TransmitStep.Completed;
+    }
+
+    /// <summary>
+    /// Certificado del cliente y su contraseña, descifrados con la clave de su API key. Null si el
+    /// cliente no tiene un certificado activo. Se lee de la base de datos en cada uso: nunca se
+    /// cachea ni se pasa como argumento de un job.
+    /// </summary>
+    private async Task<(string CertBase64, string CertPass)?> LoadSigningMaterialAsync(int clientId, ApiKey apiKey)
+    {
+        var decryptedSecretKey = _encryptedService.DecryptString(apiKey.SecretKey ?? string.Empty);
+        var certificate = await _clientCertificateService.GetActiveCertificateAsync(x => x.ClientId == clientId);
+
+        if (certificate == null)
+            return null;
+
+        var certificateBytes = _encryptedService.DecryptWithSecret(certificate.Certificate, decryptedSecretKey);
+        var passwordBytes = _encryptedService.DecryptWithSecret(certificate.Password, decryptedSecretKey);
+
+        return (Convert.ToBase64String(certificateBytes), Encoding.UTF8.GetString(passwordBytes));
     }
 
     private DgiiEnvironment ResolveTargetEnvironment(DgiiEnvironment requestedEnvironment)
