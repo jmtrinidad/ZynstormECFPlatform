@@ -96,7 +96,8 @@ de la última transmisión: si es condicional → `AcceptedConditional`, si no �
 
 ### Datos del comprobante
 
-- `trackId`: de la última transmisión con `Success` del documento elegido.
+- `trackId`: de la última transmisión del documento elegido que tenga `TrackId` no vacío (un
+  documento `Pending` aún no tiene `Success`, pero sí `TrackId`).
 - `securityCode` y `signatureDate`: del XML firmado guardado (`EcfXmlDocument.XmlSigned`,
   `CodigoSeguridad` y `FechaHoraFirma`), con los mismos extractores que usa
   `ReceivedEcfProductionService`.
