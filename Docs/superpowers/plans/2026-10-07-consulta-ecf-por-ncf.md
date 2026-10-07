@@ -8,7 +8,7 @@
 
 **Tech Stack:** .NET 10, ASP.NET Core, EF Core 10, xUnit 2.9, Moq no necesario.
 
-Spec: `docs/superpowers/specs/2026-10-07-consulta-ecf-por-ncf-design.md`
+Spec: `Docs/superpowers/specs/2026-10-07-consulta-ecf-por-ncf-design.md`
 
 ## Global Constraints
 
@@ -22,6 +22,7 @@ Spec: `docs/superpowers/specs/2026-10-07-consulta-ecf-por-ncf-design.md`
 - Mapeo de `EcfStatusId`: 10 → Accepted; 7, 8, 9 → Pending; 11 → AcceptedConditional si el `estado` de la última transmisión es condicional, si no Rejected; 3 → Rejected; 12 → Error; 1, 2, 4, 5, 6, 13 → NotSent.
 - Si falta el XML firmado en un documento utilizable: se devuelve el estado sin `securityCode`/`signatureDate`/`qrUrl` y con un `message`. No es un 500.
 - Ambiente del QR: `EcfXmlValidation:TargetDgiiEnvironment`; si falta o no se reconoce, `Production`.
+- Git registra la carpeta como `Docs/` (con mayúscula): usa esa ruta exacta en `git add`, porque con `docs/` el cambio no se agrega.
 - El repo tiene un cambio sin commitear en `.github/workflows/deploy.yml` que no pertenece a esta tarea: **nunca** uses `git add .` ni `git commit -a`; agrega solo los archivos de cada tarea.
 - Comandos desde `C:\Projects\ZynstormECF-WorkSpace\ZynstormECFPlatform`. Commits en español, terminan con `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 
@@ -45,7 +46,7 @@ Spec: `docs/superpowers/specs/2026-10-07-consulta-ecf-por-ncf-design.md`
 - Create: `ZynstormECFPlatform.Services/Production/EcfLookupModels.cs`
 - Create: `ZynstormECFPlatform.Services/Production/EcfLookupLogic.cs`
 - Create: `ZynstormECFPlatform.Tests/Production/EcfLookupLogicTests.cs`
-- Modify: `docs/superpowers/specs/2026-10-07-consulta-ecf-por-ncf-design.md` (una frase del `trackId`)
+- Modify: `Docs/superpowers/specs/2026-10-07-consulta-ecf-por-ncf-design.md` (una frase del `trackId`)
 
 **Interfaces:**
 - Produces:
@@ -368,7 +369,7 @@ Expected: `Passed!` con todas las pruebas de `EcfLookupLogicTests` en verde.
 
 - [ ] **Step 6: Ajustar la frase del TrackId en el spec**
 
-En `docs/superpowers/specs/2026-10-07-consulta-ecf-por-ncf-design.md`, reemplazar:
+En `Docs/superpowers/specs/2026-10-07-consulta-ecf-por-ncf-design.md`, reemplazar:
 
 ```
 - `trackId`: de la última transmisión con `Success` del documento elegido.
@@ -384,7 +385,7 @@ por:
 - [ ] **Step 7: Commit**
 
 ```bash
-git add ZynstormECFPlatform.Services/Production/EcfLookupModels.cs ZynstormECFPlatform.Services/Production/EcfLookupLogic.cs ZynstormECFPlatform.Tests/Production/EcfLookupLogicTests.cs docs/superpowers/specs/2026-10-07-consulta-ecf-por-ncf-design.md
+git add ZynstormECFPlatform.Services/Production/EcfLookupModels.cs ZynstormECFPlatform.Services/Production/EcfLookupLogic.cs ZynstormECFPlatform.Tests/Production/EcfLookupLogicTests.cs Docs/superpowers/specs/2026-10-07-consulta-ecf-por-ncf-design.md
 git commit -m "feat(ecf): lógica de consulta por eNCF (normalizar, estado y selección)
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
