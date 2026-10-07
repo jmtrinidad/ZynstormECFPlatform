@@ -425,6 +425,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
         if (!string.IsNullOrWhiteSpace(transmission.TrackId))
         {
+            var transmissionRecord = await BeginTransmissionAsync(ecfDocument, transmission, signedXml);
+
             var status = await WaitForFinalDgiiStatusAsync(
                 targetEnvironment, token, transmission.TrackId, cancellationToken);
             _cacheService.Set($"EcfStatus_{transmission.TrackId}", status, TimeSpan.FromHours(1));
@@ -441,7 +443,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
                 await AddLogAsync(ecfDocument, client.ClientId, "Information", $"e-CF aprobado. TrackId: {transmission.TrackId}. CodigoSeguridad: {resultDto.SecurityCode}. FechaFirma: {resultDto.SignatureDate}. QR: {resultDto.QrUrl}.");
 
             await MarkDocumentAsync(ecfDocument, statusId, resultDto.Message);
-            await SaveTransmissionAsync(ecfDocument, transmission, statusId, signedXml, status);
+            await CompleteTransmissionAsync(transmissionRecord, transmission, statusId, status);
 
             if (resultDto.Success || resultDto.IsAcceptedConditional)
                 await _clientUsageService.RegisterAcceptedAsync(ecfDocument.EcfDocumentId, client.ClientId, cancellationToken);
@@ -803,6 +805,52 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             ResponseMessage = BuildTransmissionResponseMessage(transmission, status),
             Success = statusId == 10 || (status == null && transmission.Success)
         });
+    }
+
+    /// <summary>
+    /// La DGII ya recibió el documento y devolvió su TrackId: se guarda ahora, antes de esperar
+    /// el estado final (hasta 60 s). Si la petición se corta en esa espera, el TrackId ya está
+    /// en la base de datos y el job de seguimiento y la consulta por eNCF lo encuentran.
+    /// </summary>
+    private async Task<EcfTransmission> BeginTransmissionAsync(
+        EcfDocument ecfDocument,
+        DgiiTransmissionResult transmission,
+        string signedXml)
+    {
+        var record = new EcfTransmission
+        {
+            EcfDocumentId = ecfDocument.EcfDocumentId,
+            TrackId = transmission.TrackId ?? string.Empty,
+            AttemptNumber = 1,
+            RequestPayload = signedXml,
+            ResponsePayload = JsonSerializer.Serialize(new { transmission, status = (DgiiStatusResponse?)null }),
+            EcfStatusId = 9,
+            SentAtUtc = DateTime.UtcNow,
+            ResponseCode = TrimTo(transmission.Codigo?.ToString() ?? string.Empty, 50),
+            ResponseMessage = BuildTransmissionResponseMessage(transmission, null),
+            Success = false
+        };
+
+        await _ecfTransmissionService.InsertAsync(record);
+        await MarkDocumentAsync(ecfDocument, 9, $"Recibido por la DGII. TrackId: {transmission.TrackId}");
+
+        return record;
+    }
+
+    /// <summary>Actualiza con el estado final la transmisión que <see cref="BeginTransmissionAsync"/> guardó.</summary>
+    private async Task CompleteTransmissionAsync(
+        EcfTransmission record,
+        DgiiTransmissionResult transmission,
+        int statusId,
+        DgiiStatusResponse status)
+    {
+        record.EcfStatusId = statusId;
+        record.ResponsePayload = JsonSerializer.Serialize(new { transmission, status });
+        record.ResponseCode = TrimTo(status.Codigo ?? transmission.Codigo?.ToString() ?? string.Empty, 50);
+        record.ResponseMessage = BuildTransmissionResponseMessage(transmission, status);
+        record.Success = statusId == 10;
+
+        await _ecfTransmissionService.UpdateAsync(record);
     }
 
     private async Task SaveValidationTransmissionAsync(
