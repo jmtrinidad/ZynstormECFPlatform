@@ -1,3 +1,4 @@
+using System.Data;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
@@ -48,6 +49,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly IClientUsageService _clientUsageService;
+    private readonly IEcfLookupService _lookupService;
 
     public ReceivedEcfProductionService(
         IClientService clientService,
@@ -71,7 +73,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         ICacheService cacheService,
         IConfiguration configuration,
         IHostEnvironment hostEnvironment,
-        IClientUsageService clientUsageService)
+        IClientUsageService clientUsageService,
+        IEcfLookupService lookupService)
     {
         _clientService = clientService;
         _apiKeyService = apiKeyService;
@@ -95,6 +98,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         _configuration = configuration;
         _hostEnvironment = hostEnvironment;
         _clientUsageService = clientUsageService;
+        _lookupService = lookupService;
     }
 
     public async Task<ReceivedEcfEmissionResultDto> ProcessAsync(
@@ -153,7 +157,15 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         resultDto.SecurityCode = dto.SecurityCodeOverride;
         resultDto.SignatureDate = dto.ECF.FechaHoraFirma ?? dto.SignatureDateOverride.Value.ToString("dd-MM-yyyy HH:mm:ss");
 
-        var ecfDocument = await CreateEcfDocumentAsync(dto, client, clientBranch, apiKey, currency, ecfTypeEntity);
+        var claim = await ClaimDocumentAsync(
+            client.ClientId, eNcf, dto, client, clientBranch, apiKey, currency, ecfTypeEntity, cancellationToken);
+
+        // El eNCF ya tenía un documento aceptado o en proceso: no se transmite de nuevo.
+        if (claim.Replay is not null)
+            return claim.Replay;
+
+        var ecfDocument = claim.Document!;
+        resultDto.Attempt = claim.Attempt;
         resultDto.EcfDocumentId = ecfDocument.EcfDocumentId;
 
         try
@@ -171,6 +183,77 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             await AddLogAsync(ecfDocument, client.ClientId, "Error", resultDto.Message, ex.ToString());
             return resultDto;
         }
+    }
+
+    private sealed record EmitClaim(EcfDocument? Document, ReceivedEcfEmissionResultDto? Replay, int Attempt);
+
+    /// <summary>
+    /// Decide y reclama el documento en una transacción corta READ COMMITTED protegida por un
+    /// candado de Postgres por (cliente, eNCF). La petición que llegue mientras otra decide
+    /// espera el candado y, cuando lo obtiene, ya ve el documento que la otra creó: así dos
+    /// emisiones simultáneas del mismo eNCF no crean dos envíos. No hay índice único porque
+    /// producción ya tiene eNCF repetidos.
+    /// </summary>
+    private async Task<EmitClaim> ClaimDocumentAsync(
+        int clientId,
+        string eNcf,
+        EcfInvoiceRequestDto dto,
+        Client client,
+        ClientBranche? clientBranch,
+        ApiKey apiKey,
+        Currency currency,
+        Core.Entities.EcfType ecfType,
+        CancellationToken cancellationToken)
+    {
+        var staleAfter = TimeSpan.FromMinutes(Math.Clamp(
+            _configuration.GetValue<int?>("EcfIdempotency:StaleInFlightMinutes") ?? 5,
+            1,
+            120));
+
+        return await _unitOfWork.ExecuteInTransactionAsync(async token =>
+        {
+            await _ecfDocumentService.ExecuteAsync(
+                "SELECT pg_advisory_xact_lock(@LockKey)",
+                new { LockKey = EcfEmitDecision.LockKey(clientId, eNcf) },
+                token);
+
+            var existing = await _lookupService.ListExistingAsync(clientId, eNcf, token);
+            var decision = EcfEmitDecision.Decide(existing, DateTime.UtcNow, staleAfter);
+
+            if (decision.Action == EcfEmitAction.Replay)
+            {
+                var documentId = decision.ReplayDocumentId!.Value;
+                var state = decision.ReplayState!.Value;
+
+                var lookup = await _lookupService.DescribeDocumentAsync(clientId, documentId, state, existing.Count, token);
+                var replay = EcfEmitReplay.ToResult(lookup, existing.Count);
+
+                var current = existing.First(document => document.EcfDocumentId == documentId);
+                var note = $"Reenvío ignorado: el eNCF {eNcf} ya tiene un documento en estado {state}; no se transmitió de nuevo.";
+
+                await _systemLogService.InsertAsync(new SystemLog
+                {
+                    ClientId = clientId,
+                    EcfDocumentId = documentId,
+                    LogLevel = "Information",
+                    Message = note,
+                    CreateAtUtc = DateTime.UtcNow
+                });
+
+                await _ecfStatusHistoryService.InsertAsync(new EcfStatusHistory
+                {
+                    EcfDocumentId = documentId,
+                    EcfStatusId = current.EcfStatusId,
+                    Message = note
+                });
+
+                return new EmitClaim(null, replay, existing.Count);
+            }
+
+            var document = await CreateEcfDocumentAsync(dto, client, clientBranch, apiKey, currency, ecfType);
+
+            return new EmitClaim(document, null, existing.Count + 1);
+        }, IsolationLevel.ReadCommitted, cancellationToken);
     }
 
     public const string ClientInactiveMessage = "El cliente se encuentra desactivado. Por favor, comuníquese con soporte.";
