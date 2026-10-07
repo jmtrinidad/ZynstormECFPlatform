@@ -19,9 +19,6 @@ concurrency:
 env:
   IMAGE_NAME: ghcr.io/jmtrinidad/zynstormecfplatform
   DOKPLOY_URL: https://deploy.zynstorm.com
-  # TODO: reemplazar por los Application ID de Dokploy.
-  DOKPLOY_APP_MAIN: REPLACE_ME_MAIN_APPLICATION_ID
-  DOKPLOY_APP_STAGING: REPLACE_ME_STAGING_APPLICATION_ID
 
 jobs:
 
@@ -48,31 +45,45 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Docker tags
-        id: tags
-        run: |
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "tags=$IMAGE_NAME:main,$IMAGE_NAME:${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tags=$IMAGE_NAME:staging,$IMAGE_NAME:staging-${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build and push
+      # --------------------------------------------------------
+      # MAIN
+      # --------------------------------------------------------
+      - name: Build and push MAIN
+        if: github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           provenance: false
-          tags: ${{ steps.tags.outputs.tags }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:main
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --------------------------------------------------------
+      # STAGING
+      # --------------------------------------------------------
+      - name: Build and push STAGING
+        if: github.ref == 'refs/heads/Staging'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.IMAGE_NAME }}:staging
+            ${{ env.IMAGE_NAME }}:staging-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
 
   # ============================================================
   # DEPLOY MAIN
+  # Borrar de la matriz los clientes que no apliquen a este proyecto.
   # ============================================================
   deploy-main:
-    name: Deploy MAIN
+    name: Deploy MAIN - ${{ matrix.application.name }}
 
     if: github.ref == 'refs/heads/main'
 
@@ -82,9 +93,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    strategy:
+      fail-fast: false
+
+      matrix:
+        application:
+
+          # ICCAYSI / Icaaysi Melissa
+          - name: ICCAYSI
+          - id: REPLACE_ME_ICCAYSI_APPLICATION_ID
+
+          # Madame
+          - name: MADAME
+          - id: REPLACE_ME_MADAME_APPLICATION_ID
+
+          # Surtidora Ñoña / SDANIA
+          - name: SDANIA
+          - id: REPLACE_ME_SDANIA_APPLICATION_ID
+
     steps:
 
-      - name: Deploy MAIN
+      - name: Deploy MAIN ${{ matrix.application.name }}
         env:
           DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
         run: |
@@ -94,9 +123,12 @@ jobs:
             exit 1
           fi
 
-          case "$DOKPLOY_APP_MAIN" in REPLACE_ME*) echo "DOKPLOY_APP_MAIN is not configured"; exit 1;; esac
+          case "${{ matrix.application.id }}" in
+            REPLACE_ME*) echo "applicationId de ${{ matrix.application.name }} no configurado"; exit 1 ;;
+          esac
 
-          echo "Deploying ZynstormECFPlatform MAIN"
+          echo "Deploying ${{ matrix.application.name }}"
+          echo "Application ID: ${{ matrix.application.id }}"
 
           curl --fail-with-body \
             --retry 3 \
@@ -107,9 +139,9 @@ jobs:
             -H "Content-Type: application/json" \
             -H "x-api-key: $DOKPLOY_API_TOKEN" \
             -d '{
-              "applicationId": "${{ env.DOKPLOY_APP_MAIN }}",
-              "title": "GitHub Actions - ZynstormECF API MAIN",
-              "description": "ZynstormECFPlatform MAIN - Commit ${{ github.sha }}"
+              "applicationId": "${{ matrix.application.id }}",
+              "title": "GitHub Actions - ZynstormECF API ${{ matrix.application.name }}",
+              "description": "ZynstormECF API MAIN - Commit ${{ github.sha }}"
             }'
 
 
@@ -132,6 +164,8 @@ jobs:
       - name: Deploy STAGING
         env:
           DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
+          # TODO: reemplazar por el Application ID de staging en Dokploy.
+          STAGING_APPLICATION_ID: dPCOuxeN4uve59aD66tX6
         run: |
 
           if [ -z "$DOKPLOY_API_TOKEN" ]; then
@@ -139,9 +173,11 @@ jobs:
             exit 1
           fi
 
-          case "$DOKPLOY_APP_STAGING" in REPLACE_ME*) echo "DOKPLOY_APP_STAGING is not configured"; exit 1;; esac
+          case "$STAGING_APPLICATION_ID" in
+            REPLACE_ME*) echo "STAGING_APPLICATION_ID no configurado"; exit 1 ;;
+          esac
 
-          echo "Deploying ZynstormECFPlatform STAGING"
+          echo "Deploying ZynstormECF API STAGING"
 
           curl --fail-with-body \
             --retry 3 \
@@ -152,7 +188,7 @@ jobs:
             -H "Content-Type: application/json" \
             -H "x-api-key: $DOKPLOY_API_TOKEN" \
             -d '{
-              "applicationId": "${{ env.DOKPLOY_APP_STAGING }}",
+              "applicationId": "'"$STAGING_APPLICATION_ID"'",
               "title": "GitHub Actions - ZynstormECF API STAGING",
-              "description": "ZynstormECFPlatform STAGING - Commit ${{ github.sha }}"
+              "description": "ZynstormECF API STAGING - Commit ${{ github.sha }}"
             }'
