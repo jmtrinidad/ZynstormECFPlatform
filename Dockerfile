@@ -18,6 +18,10 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
+# Menos trabajo en restore/publish: sin telemetria ni banner, y NuGet no extrae los
+# .xml de documentacion de cada paquete (miles de archivos que el runtime no usa).
+ENV DOTNET_NOLOGO=1     DOTNET_CLI_TELEMETRY_OPTOUT=1     DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1     NUGET_XMLDOC_MODE=skip
+
 # Copiar primero solo los .csproj del grafo de Web.Api: la capa del restore se
 # reutiliza mientras no cambien las dependencias.
 COPY ZynstormECFPlatform.Common/ZynstormECFPlatform.Common.csproj ZynstormECFPlatform.Common/
@@ -55,7 +59,7 @@ RUN dotnet publish "./ZynstormECFPlatform.Web.Api.csproj" \
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
 FROM base AS final
 WORKDIR /app
-COPY --from=build /app/publish .
+COPY --link --from=build /app/publish .
 
 # Set culture to invariant if needed or install ICU data (standard for .NET on Linux)
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false

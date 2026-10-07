@@ -23,3 +23,21 @@
 **/values.dev.yaml
 LICENSE
 README.md
+
+# Material que no entra al build de Web.Api. Un cambio aqui no debe invalidar
+# el COPY . . ni el publish.
+*.md
+*.xlsx
+*.pdf
+*.json
+*.txt
+*.slnx
+Docs
+docs
+tests
+TestApp
+EcfXmlTest
+SamplePayloads
+scratch
+packages
+ZynstormECFPlatform.Tests

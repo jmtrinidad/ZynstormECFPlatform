@@ -5,6 +5,11 @@ on:
     branches:
       - main
       - Staging
+    # Un push que solo toca documentacion no reconstruye ni redespliega nada.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'Docs/**'
 
   workflow_dispatch:
 
