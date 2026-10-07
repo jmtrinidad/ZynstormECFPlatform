@@ -58,14 +58,39 @@ public class UnitOfWork(StorageContext context) : IUnitOfWork
         });
     }
 
-    public async Task BeginAsync(CancellationToken cancellationToken = default)
+    public Task<TResult> ExecuteInTransactionAsync<TResult>(Func<CancellationToken, Task<TResult>> operation, IsolationLevel isolationLevel, CancellationToken cancellationToken = default)
+    {
+        var strategy = _context.Database.CreateExecutionStrategy();
+
+        return strategy.ExecuteAsync(async () =>
+        {
+            await BeginAsync(isolationLevel, cancellationToken).ConfigureAwait(false);
+
+            try
+            {
+                var result = await operation(cancellationToken).ConfigureAwait(false);
+                await CommitAsync(cancellationToken).ConfigureAwait(false);
+                return result;
+            }
+            catch
+            {
+                await RollbackAsync(cancellationToken).ConfigureAwait(false);
+                throw;
+            }
+        });
+    }
+
+    public Task BeginAsync(CancellationToken cancellationToken = default)
+        => BeginAsync(IsolationLevel.Serializable, cancellationToken);
+
+    public async Task BeginAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken = default)
     {
         if (_context.Database.CurrentTransaction is not null)
         {
             return;
         }
 
-        await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
+        await _context.Database.BeginTransactionAsync(isolationLevel, cancellationToken).ConfigureAwait(false);
     }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
