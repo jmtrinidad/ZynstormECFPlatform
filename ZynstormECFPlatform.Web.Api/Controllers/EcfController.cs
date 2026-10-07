@@ -16,11 +16,13 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
     public class EcfController(
         IEcfProductionGeneratorService ecfGeneratorService,
         IReceivedEcfProductionService receivedEcfProductionService,
+        IEcfLookupService ecfLookupService,
         ICacheService cacheService,
         ILogger<EcfController> logger) : ControllerBase
     {
         private readonly IEcfProductionGeneratorService _ecfGeneratorService = ecfGeneratorService;
         private readonly IReceivedEcfProductionService _receivedEcfProductionService = receivedEcfProductionService;
+        private readonly IEcfLookupService _ecfLookupService = ecfLookupService;
         private readonly ICacheService _cacheService = cacheService;
         private readonly ILogger<EcfController> _logger = logger;
 
@@ -169,6 +171,55 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 dgiiResponse = status,
                 status
             });
+        }
+
+        /// <summary>
+        /// Consulta un e-CF ya recibido por su eNCF, dentro del cliente dueño de la API key.
+        /// Existe para el integrador que perdió la respuesta de <c>emit</c> (timeout): devuelve
+        /// el estado, el TrackId, el código de seguridad, la fecha de firma y el QR, de modo que
+        /// no haga falta reenviar un comprobante que la DGII ya aceptó. No modifica nada.
+        /// </summary>
+        [HttpGet("by-ncf/{eNcf}")]
+        [ProducesResponseType(typeof(EcfLookupResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetByNcf(string eNcf, CancellationToken cancellationToken)
+        {
+            // Sin ClientId no hay forma de acotar la consulta: ocurre con una sesión JWT de la
+            // web, que no pasa por la API key. Nunca se consulta "sin cliente".
+            if (HttpContext.Items["ClientId"] is not int clientId)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    found = false,
+                    message = "Esta consulta requiere una API key válida en el header 'X-Api-Key'."
+                });
+            }
+
+            var normalized = EcfLookupLogic.NormalizeNcf(eNcf);
+
+            if (normalized is null)
+            {
+                return BadRequest(new
+                {
+                    found = false,
+                    message = "El eNCF no es válido: debe ser 'E' seguido de 12 dígitos (por ejemplo E310000000001)."
+                });
+            }
+
+            var result = await _ecfLookupService.FindByNcfAsync(clientId, normalized, cancellationToken);
+
+            if (result is null)
+            {
+                return NotFound(new
+                {
+                    found = false,
+                    message = "La plataforma no tiene registrado ese eNCF."
+                });
+            }
+
+            return Ok(result);
         }
 
         /// <summary>
