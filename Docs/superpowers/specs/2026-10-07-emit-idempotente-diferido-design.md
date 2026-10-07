@@ -49,7 +49,7 @@ borrados con ese `(ClientId, eNCF)` y se decide con una función pura
 |---|---|
 | `Accepted` o `AcceptedConditional` | `Replay`: no transmite; devuelve lo guardado |
 | `Pending` (ids 7, 8, 9) o en vuelo (ids 1, 2, 4, 5, 6) con `RegisteredAt`/`LastUpdateUtc` más reciente que `staleAfter` | `Replay`: no transmite; devuelve el estado actual |
-| `Rejected`, `Error`, `NotSent`/`ValidationFailed` (3), o en vuelo hace más de `staleAfter` | `Retry`: nuevo intento sobre **el mismo documento** |
+| `Rejected`, `Error`, `NotSent`/`ValidationFailed` (3), o en vuelo hace más de `staleAfter` | `Retry`: nuevo intento. Se crea un `EcfDocument` nuevo; los anteriores quedan como historial |
 | Ninguno | `Create` |
 
 - `staleAfter` = `EcfIdempotency:StaleInFlightMinutes`, 5 por defecto.
@@ -75,9 +75,12 @@ siempre (`Success` solo si está aceptado, `IsPending`, `IsAcceptedConditional`,
 
 ### 4. Retry
 
-Reutiliza el `EcfDocument`: actualiza sus campos con el contenido corregido, agrega una fila
-nueva de `EcfXmlDocument`, y cada transmisión usa `AttemptNumber` = máximo anterior + 1 (hoy
-va fijo en 1). `BillingCountedAtUtc` no se toca: el consumo se cuenta una sola vez, al aceptar.
+Crea un `EcfDocument` nuevo, como hoy, con el contenido corregido. Los documentos anteriores
+con ese eNCF no se tocan: son el historial de intentos, y `attempt` / `attempts` es la cantidad
+de documentos con ese eNCF (la misma definición que usa `by-ncf`). El consumo del cliente se
+cuenta una sola vez porque solo se registra al aceptar, y un eNCF aceptado nunca llega a
+`Retry`. Dentro de un documento, `EcfTransmission.AttemptNumber` solo crece con los reintentos
+de transporte de la sección 5b.
 
 ### 5. Modo diferido (`?deferred=true`)
 
@@ -112,14 +115,22 @@ red caída, HTTP 5xx; nunca un rechazo de la DGII ni «En Proceso», que ya resu
   cada intento agrega una fila `EcfTransmission` (`AttemptNumber` +1) y un log.
 - Agotados los reintentos, el documento queda en estado 12 (`Error`) y pasa a ser `Retry`
   permitido por la sección 1.
-- **Riesgo conocido:** si la DGII recibió el documento pero la respuesta se perdió, el
-  reintento recibe 1209/75 por culpa del propio primer envío (el mismo problema de la 118, ahora
-  entre la plataforma y la DGII), y el TrackId original no se conoce. Mitigación en dos
-  pasos: (a) la primera tarea del plan es verificar si la DGII permite consultar el TrackId por
-  `(RNC, eNCF)`; si existe, el job lo consulta antes de cada reintento y, si ya está, sigue con
-  el seguimiento en vez de reenviar; (b) si no existe, un 1209/75 en un reintento propio del
-  mismo documento **no** se trata como secuencia quemada: el documento queda `Pending` con un
-  aviso «recibido por la DGII, falta confirmar el TrackId», sin pedir un NCF nuevo.
+- **El TrackId se guarda en cuanto la DGII responde la recepción.** La DGII devuelve un
+  TrackId por cada documento que recibe. Hoy la plataforma lo persiste recién después de esperar
+  el estado final (hasta 60 s), así que una petición cortada en esa espera lo pierde. Desde
+  ahora, apenas vuelve `SendEcfAsync` con TrackId, se inserta la `EcfTransmission` (estado 9,
+  `Sent`) y el documento pasa a 9; el estado final solo la actualiza. Así `by-ncf` y el job de
+  seguimiento siempre tienen el TrackId de lo que la DGII ya recibió.
+- **Ventana de riesgo que queda:** que la respuesta de la recepción se pierda entre la DGII y
+  la plataforma (la DGII recibió pero no llegó el TrackId). En ese caso el reintento del job
+  recibe 1209/75 por culpa del primer envío, y el TrackId original no se conoce. Un 1209/75 en
+  un reintento **propio** del mismo documento (con envíos previos sin TrackId) no se trata como
+  secuencia quemada: el documento queda `Pending` con el aviso «la DGII ya recibió este
+  comprobante; falta confirmar su TrackId», sin pedir un NCF nuevo. Un 1209/75 en el primer
+  envío de un documento sin intentos previos sigue siendo secuencia quemada.
+- `SendEcfAsync` hoy solo captura `HttpRequestException`: un timeout (`TaskCanceledException`)
+  se escapa al `catch` general de `ProcessAsync` y deja el documento en `Error` sin reintento.
+  El job lo captura y lo trata como fallo de transporte.
 
 ### 6. QR en toda respuesta posterior a la firma
 
