@@ -1178,18 +1178,18 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     private async Task MarkDocumentAsync(EcfDocument ecfDocument, int statusId, string message)
     {
         ecfDocument.EcfStatusId = statusId;
-        await _ecfDocumentService.UpdateAsync(ecfDocument);
-        await AddHistoryAsync(ecfDocument, statusId, message);
-    }
 
-    private async Task AddHistoryAsync(EcfDocument ecfDocument, int statusId, string message)
-    {
-        await _ecfStatusHistoryService.InsertAsync(new EcfStatusHistory
+        // Modify + Add y un solo SaveChanges: antes eran dos viajes a la base de datos por cada
+        // cambio de estado.
+        _ecfDocumentService.Modify(ecfDocument);
+        _ecfStatusHistoryService.Add(new EcfStatusHistory
         {
             EcfDocumentId = ecfDocument.EcfDocumentId,
             EcfStatusId = statusId,
             Message = message
         });
+
+        await _unitOfWork.SaveChangesAsync();
     }
 
     private async Task AddDgiiResponseLogAsync(
