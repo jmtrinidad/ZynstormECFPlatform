@@ -116,7 +116,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     || result.ConfigurationErrors.Count > 0 || result.XmlValidation?.IsValid == false)
                     return BadRequest(result);
 
-                if (result.IsPending)
+                // Un replay pendiente no es un fallo de la plataforma: devolvió lo guardado.
+                if (result.IsPending && !result.Replayed)
                     return StatusCode(StatusCodes.Status504GatewayTimeout, result);
 
                 return Ok(result);

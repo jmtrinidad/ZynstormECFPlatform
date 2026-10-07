@@ -36,6 +36,12 @@ public class ReceivedEcfEmissionResultDto
     public string SignatureDate { get; set; } = string.Empty;
     public string QrUrl { get; set; } = string.Empty;
 
+    /// <summary>La plataforma no transmitió: devolvió lo que ya tenía guardado para ese eNCF.</summary>
+    public bool Replayed { get; set; }
+
+    /// <summary>Cantidad de documentos de la plataforma con este eNCF, contando este.</summary>
+    public int Attempt { get; set; }
+
     [JsonIgnore]
     public string QrImageUrl { get; set; } = string.Empty;
 
