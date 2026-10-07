@@ -99,17 +99,17 @@ jobs:
       matrix:
         application:
 
-          # ICCAYSI / Icaaysi Melissa
-          - name: ICCAYSI
-          - id: REPLACE_ME_ICCAYSI_APPLICATION_ID
+          # PRODUCTIONS
+          - name: PRODUCTIONS
+            id: YOf21sCZLCOu2wo_76Hrv
 
           # Madame
-          - name: MADAME
-          - id: REPLACE_ME_MADAME_APPLICATION_ID
+          # - name: MADAME
+          #   id: REPLACE_ME_MADAME_APPLICATION_ID
 
           # Surtidora Ñoña / SDANIA
-          - name: SDANIA
-          - id: REPLACE_ME_SDANIA_APPLICATION_ID
+          #- name: SDANIA
+          # id: REPLACE_ME_SDANIA_APPLICATION_ID
 
     steps:
 
