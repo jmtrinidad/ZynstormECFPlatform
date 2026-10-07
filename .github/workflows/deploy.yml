@@ -220,9 +220,11 @@ jobs:
 
   # ============================================================
   # DEPLOY PRUEBAS (feature/emit-idempotente)
-  # Aplicación de Dokploy propia, con su base de datos y su Hangfire aparte, para probar la
-  # rama antes de pasar a Staging. Mientras no se configure el Application ID, el job avisa
-  # y termina bien: la imagen "pruebas" igual queda publicada.
+  # Usa la MISMA aplicación de Dokploy que Staging (mismo Application ID), con su misma base
+  # de datos y su mismo Hangfire. Para probar la rama, en Dokploy se cambia la imagen de esa
+  # aplicación a ":pruebas"; para volver a Staging, a ":staging". Mientras apunte a ":pruebas",
+  # un push a Staging redespliega pero NO trae la imagen nueva de Staging, y mientras apunte a
+  # ":staging", un push a esta rama redespliega pero NO trae la imagen "pruebas".
   # ============================================================
   deploy-pruebas:
     name: Deploy PRUEBAS
@@ -240,8 +242,8 @@ jobs:
       - name: Deploy PRUEBAS
         env:
           DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
-          # TODO: reemplazar por el Application ID de la aplicación de pruebas en Dokploy.
-          PRUEBAS_APPLICATION_ID: REPLACE_ME_PRUEBAS_APPLICATION_ID
+          # Es el mismo Application ID que usa deploy-staging.
+          PRUEBAS_APPLICATION_ID: dPCOuxeN4uve59aD66tX6
         run: |
 
           if [ -z "$DOKPLOY_API_TOKEN" ]; then
