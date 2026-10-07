@@ -18,15 +18,27 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
-# Copy the main project and all its dependencies
-# It's usually better to copy all csproj files first for caching, but for simplicity we'll just copy everything
-COPY . .
+# Copiar primero solo los .csproj del grafo de Web.Api: la capa del restore se
+# reutiliza mientras no cambien las dependencias.
+COPY ZynstormECFPlatform.Common/ZynstormECFPlatform.Common.csproj ZynstormECFPlatform.Common/
+COPY ZynstormECFPlatform.Core/ZynstormECFPlatform.Core.csproj ZynstormECFPlatform.Core/
+COPY ZynstormECFPlatform.Dtos/ZynstormECFPlatform.Dtos.csproj ZynstormECFPlatform.Dtos/
+COPY ZynstormECFPlatform.Abstractions/ZynstormECFPlatform.Abstractions.csproj ZynstormECFPlatform.Abstractions/
+COPY ZynstormECFPlatform.Schemas/ZynstormECFPlatform.Schemas.csproj ZynstormECFPlatform.Schemas/
+COPY ZynstormECFPlatform.Data/ZynstormECFPlatform.Data.csproj ZynstormECFPlatform.Data/
+COPY ZynstormECFPlatform.Data.Services/ZynstormECFPlatform.Data.Services.csproj ZynstormECFPlatform.Data.Services/
+COPY ZynstormECFPlatform.Services/ZynstormECFPlatform.Services.csproj ZynstormECFPlatform.Services/
+COPY ZynstormECFPlatform.Mappings/ZynstormECFPlatform.Mappings.csproj ZynstormECFPlatform.Mappings/
+COPY ZynstormECFPlatform.Reports/ZynstormECFPlatform.Reports.csproj ZynstormECFPlatform.Reports/
+COPY ZynstormECFPlatform.Web.Api/ZynstormECFPlatform.Web.Api.csproj ZynstormECFPlatform.Web.Api/
 
-# Restore the application for the VPS architecture. The NuGet cache survives
-# across builds without becoming part of the resulting image.
+# Restore para la arquitectura del VPS. La cache de NuGet sobrevive entre builds
+# sin pasar a formar parte de la imagen resultante.
 RUN --mount=type=cache,id=zynstormecf-nuget,target=/root/.nuget/packages \
     dotnet restore "./ZynstormECFPlatform.Web.Api/ZynstormECFPlatform.Web.Api.csproj" \
     -r linux-x64
+
+COPY . .
 
 # Publish once; dotnet publish already includes compilation.
 WORKDIR "/src/ZynstormECFPlatform.Web.Api"
