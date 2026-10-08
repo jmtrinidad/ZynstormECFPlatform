@@ -759,7 +759,8 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                     SecurityCode = securityCode,
                     FechaFirma = signatureDateStr,
                     FechaEmision = issueDateStr,
-                    BuyerRnc = buyerRnc
+                    BuyerRnc = buyerRnc,
+                    DocumentGuidId = d.GuidId
                 });
             }
             catch (Exception ex)
