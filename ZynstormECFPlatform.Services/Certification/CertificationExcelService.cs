@@ -671,7 +671,8 @@ public class CertificationExcelService : ICertificationExcelService
 
                     var result = await _transmissionService.SendArecfAsync(DgiiEnvironment.CerteCF, token, signedXml, client.Rnc, requestDto.ENcf);
 
-                    Console.WriteLine($"[DEBUG-AC] Sent AC for {requestDto.ENcf}. Success: {result.Success}");
+                    var acAceptada = IsAprobacionComercialAceptada(result);
+                    Console.WriteLine($"[DEBUG-AC] Sent AC for {requestDto.ENcf}. Codigo: {result.Codigo} Estado: {result.Estado} Aceptada: {acAceptada}");
 
                     // Agregar una entrada de resultado nueva (no mutar la "Pendiente" en sitio),
                     // igual que el flujo de ECF (Paso 2). El frontend toma la última coincidencia
@@ -682,15 +683,17 @@ public class CertificationExcelService : ICertificationExcelService
                         {
                             Ncf = requestDto.ENcf,
                             Step = "3",
-                            Status = result.Success ? "Aceptado" : "Rechazado",
-                            Message = result.Success ? "Aprobación Comercial exitosa" : result.Error
+                            Status = acAceptada ? "Aceptado" : "Rechazado",
+                            Message = acAceptada
+                                ? "Aprobación Comercial exitosa"
+                                : (string.IsNullOrWhiteSpace(result.Error) ? result.Mensaje : result.Error)
                         });
                     }
 
                     // Notify listeners via SignalR
                     await NotifyJobUpdateAsync(jobId, status);
 
-                    if (!result.Success)
+                    if (!acAceptada)
                     {
                         // In Step 3, we might continue or stop based on requirements.
                         // User said "replicar paso 2", and step 2 stops on error for Step 1/2.
@@ -721,6 +724,12 @@ public class CertificationExcelService : ICertificationExcelService
             await NotifyJobUpdateAsync(jobId, status);
         }
     }
+
+    // DGII (Descripción técnica, Recepción de aprobación comercial): codigo "1" = aprobación comercial
+    // aprobada, "2" = rechazada. DgiiTransmissionResult.Success solo reconoce Codigo == 0, por lo que
+    // aquí se evalúa la respuesta del servicio de Aprobación Comercial con su propio código.
+    public static bool IsAprobacionComercialAceptada(DgiiTransmissionResult result) =>
+        string.IsNullOrEmpty(result.Error) && (result.Codigo == 1 || result.Success);
 
     public async Task<List<DgiiTransmissionResult>> ProcessAprobacionComercialAsync(byte[] excelBytes) => new List<DgiiTransmissionResult>();
 
