@@ -13,6 +13,11 @@ public interface IOldCertificationSimulationService
 
     [AutomaticRetry(Attempts = 0)]
     Task ProcessBusinessSimulationJobAsync(string businessTypeGuidId, string clientGuidId, string jobId, string webRootPath);
+
+    Task<string> EnqueueResendJobAsync(string businessTypeGuidId, string clientGuidId, string? group, string? documentGuidId, string webRootPath);
+
+    [AutomaticRetry(Attempts = 0)]
+    Task ProcessBusinessResendJobAsync(string businessTypeGuidId, string clientGuidId, string? group, string? documentGuidId, string jobId, string webRootPath);
     Task<CertificationJobStatusDto> GetJobStatusAsync(string jobId);
     Task<CertificationJobStatusDto> GetLastSimulationResultsByClientAsync(string clientGuidId);
     Task<List<CertificationStepResultDto>> GetJobLogsAsync(string jobId);

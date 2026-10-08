@@ -41,6 +41,9 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
     private static readonly ConcurrentDictionary<string, CertificationJobStatusDto> _jobStatuses = new();
 
+    // Simulación en curso por cliente (GuidId -> jobId): un reenvío no puede correr junto a otra simulación.
+    private static readonly ConcurrentDictionary<string, string> _runningByClient = new();
+
     public OldCertificationSimulationService(
         IClientService clientService,
         IApiKeyService apiKeyService,
@@ -81,6 +84,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
     {
         string jobId = Guid.NewGuid().ToString("N").Substring(0, 8);
         _jobStatuses[jobId] = new CertificationJobStatusDto { JobId = jobId, Status = "Pending" };
+        _runningByClient[clientGuidId] = jobId;
         Console.WriteLine($"[Simulation] Enqueueing job {jobId} for businessType {businessTypeGuidId}");
         BackgroundJob.Enqueue<IOldCertificationSimulationService>(x => x.ProcessBusinessSimulationJobAsync(businessTypeGuidId, clientGuidId, jobId, webRootPath));
         return jobId;
@@ -94,6 +98,76 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
     [AutomaticRetry(Attempts = 0)]
     public async Task ProcessBusinessSimulationJobAsync(string businessTypeGuidId, string clientGuidId, string jobId, string webRootPath)
+    {
+        try
+        {
+            var ctx = await LoadBusinessContextAsync(businessTypeGuidId, clientGuidId);
+            await ProcessSimulacionEcfJobInternalAsync(ctx.Dto, jobId, webRootPath, ctx.Samples, ctx.SampleIds, ctx.BusinessTypeId);
+        }
+        finally
+        {
+            _runningByClient.TryRemove(new KeyValuePair<string, string>(clientGuidId, jobId));
+        }
+    }
+
+    public async Task<string> EnqueueResendJobAsync(string businessTypeGuidId, string clientGuidId, string? group, string? documentGuidId, string webRootPath)
+    {
+        if (string.IsNullOrWhiteSpace(group) == string.IsNullOrWhiteSpace(documentGuidId))
+            throw new ArgumentException("Debe indicar un grupo o un comprobante a reenviar (solo uno).");
+        if (!string.IsNullOrWhiteSpace(group) && !SimulationResendSelection.IsResendableGroup(group))
+            throw new ArgumentException($"Grupo de simulación inválido: {group}.");
+
+        var client = await _clientService.GetByAsync(c => c.GuidId == clientGuidId)
+            ?? throw new ArgumentException("Cliente no encontrado.");
+        var process = await FindActiveProcessAsync(client.ClientId)
+            ?? throw new ArgumentException("Primero ejecute la simulación completa.");
+
+        if (!string.IsNullOrWhiteSpace(documentGuidId))
+        {
+            var doc = await _context.Set<CertificationDocument>()
+                .Include(d => d.EcfType)
+                .FirstOrDefaultAsync(d => d.GuidId == documentGuidId && d.CertificationProcessId == process.CertificationProcessId)
+                ?? throw new ArgumentException("Comprobante no encontrado en la simulación vigente.");
+            if (SimulationResendSelection.GroupOfDocument(doc.EcfType?.Code, doc.TrackId, doc.XmlSent) == SimulationResendSelection.Manual32)
+                throw new ArgumentException("Los comprobantes manuales se regeneran reenviando Consumo (Resumen).");
+        }
+
+        string jobId = Guid.NewGuid().ToString("N").Substring(0, 8);
+        if (!_runningByClient.TryAdd(clientGuidId, jobId))
+            throw new InvalidOperationException("Ya hay una simulación en curso para este cliente.");
+
+        _jobStatuses[jobId] = new CertificationJobStatusDto { JobId = jobId, Status = "Pending" };
+        try
+        {
+            Console.WriteLine($"[Simulation] Enqueueing resend job {jobId} (group={group ?? "-"}, document={documentGuidId ?? "-"})");
+            BackgroundJob.Enqueue<IOldCertificationSimulationService>(x =>
+                x.ProcessBusinessResendJobAsync(businessTypeGuidId, clientGuidId, group, documentGuidId, jobId, webRootPath));
+        }
+        catch
+        {
+            _runningByClient.TryRemove(new KeyValuePair<string, string>(clientGuidId, jobId));
+            throw;
+        }
+        return jobId;
+    }
+
+    [AutomaticRetry(Attempts = 0)]
+    public async Task ProcessBusinessResendJobAsync(string businessTypeGuidId, string clientGuidId, string? group, string? documentGuidId, string jobId, string webRootPath)
+    {
+        try
+        {
+            var ctx = await LoadBusinessContextAsync(businessTypeGuidId, clientGuidId);
+            await ProcessSimulacionEcfJobInternalAsync(ctx.Dto, jobId, webRootPath, ctx.Samples, ctx.SampleIds, ctx.BusinessTypeId,
+                resendGroup: string.IsNullOrWhiteSpace(group) ? null : group,
+                resendDocumentGuid: string.IsNullOrWhiteSpace(documentGuidId) ? null : documentGuidId);
+        }
+        finally
+        {
+            _runningByClient.TryRemove(new KeyValuePair<string, string>(clientGuidId, jobId));
+        }
+    }
+
+    private async Task<(OldEcfInvoiceRequestDto Dto, Dictionary<string, string> Samples, Dictionary<string, int> SampleIds, int BusinessTypeId)> LoadBusinessContextAsync(string businessTypeGuidId, string clientGuidId)
     {
         var client = await _clientService.GetByAsync(c => c.GuidId == clientGuidId) ?? throw new Exception("Cliente no encontrado.");
         var businessType = await _context.Set<BusinessType>().FirstOrDefaultAsync(b => b.GuidId == businessTypeGuidId) ?? throw new Exception("Tipo de negocio no encontrado.");
@@ -116,12 +190,53 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
             ClientId = client.ClientId
         };
 
-        await ProcessSimulacionEcfJobInternalAsync(initialDto, jobId, webRootPath, samples, sampleIds, businessType.BusinessTypeId);
+        return (initialDto, samples, sampleIds, businessType.BusinessTypeId);
+    }
+
+    private Task<CertificationProcess?> FindActiveProcessAsync(int clientId) =>
+        _context.Set<CertificationProcess>()
+            .OrderByDescending(p => p.RegisteredAt)
+            .FirstOrDefaultAsync(p => p.ClientId == clientId &&
+                                      (p.Status == CertificationStatus.Pending || p.Status == CertificationStatus.InProgress));
+
+    // Facturas 31 aceptadas de la simulación vigente, para que una nota 33/34 reenviada sola las referencie.
+    private async Task<List<(string Ncf, DateTime IssueDate, string? CustomerRnc, OldEcfInvoiceRequestDto Dto)>> LoadAccepted31PoolAsync(int processId, Dictionary<string, string>? samples)
+    {
+        var pool = new List<(string Ncf, DateTime IssueDate, string? CustomerRnc, OldEcfInvoiceRequestDto Dto)>();
+        if (samples == null || !samples.TryGetValue("31", out var sampleJson)) return pool;
+
+        var docs = await _context.Set<CertificationDocument>()
+            .Include(d => d.EcfType)
+            .Where(d => d.CertificationProcessId == processId && d.Status == DocumentStatus.Accepted && d.EcfType.Code == "31")
+            .OrderBy(d => d.ENcfSecuence)
+            .ToListAsync();
+
+        foreach (var d in docs)
+        {
+            var reference = SimulationResendSelection.ParseAccepted31(d.XmlSent);
+            if (reference == null) continue;
+
+            var dto = JsonSerializer.Deserialize<OldEcfInvoiceRequestDto>(sampleJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (dto == null) continue;
+
+            dto.Ncf = reference.Ncf;
+            dto.IssueDate = reference.IssueDate;
+            dto.CustomerRnc = reference.CustomerRnc!;
+            dto.CustomerName = reference.CustomerName!;
+            if (reference.FirstItemUnitPrice.HasValue && dto.Items.Count > 0)
+                dto.Items[0].UnitPrice = reference.FirstItemUnitPrice.Value;
+
+            pool.Add((reference.Ncf, reference.IssueDate, reference.CustomerRnc, dto));
+        }
+        return pool;
     }
 
     [AutomaticRetry(Attempts = 0)]
-    private async Task ProcessSimulacionEcfJobInternalAsync(OldEcfInvoiceRequestDto dto, string jobId, string webRootPath, Dictionary<string, string>? samples = null, Dictionary<string, int>? sampleIds = null, int? businessTypeId = null)
+    private async Task ProcessSimulacionEcfJobInternalAsync(OldEcfInvoiceRequestDto dto, string jobId, string webRootPath, Dictionary<string, string>? samples = null, Dictionary<string, int>? sampleIds = null, int? businessTypeId = null, string? resendGroup = null, string? resendDocumentGuid = null)
     {
+        bool isResend = resendGroup != null || resendDocumentGuid != null;
+        CertificationDocument? docToReplace = null;
+        var preservedDocs = new List<CertificationDocument>();
         var accepted31Pool = new List<(string Ncf, DateTime IssueDate, string? CustomerRnc, OldEcfInvoiceRequestDto Dto)>();
         var rfcePool = new List<(string Ncf, string SecurityCode, OldEcfInvoiceRequestDto Dto, string SignedXml)>();
 
@@ -145,12 +260,49 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                 await _context.SaveChangesAsync();
             }
 
-            var process = await _context.Set<CertificationProcess>()
-                .OrderByDescending(p => p.RegisteredAt)
-                .FirstOrDefaultAsync(p => p.ClientId == client.ClientId &&
-                                          (p.Status == CertificationStatus.Pending || p.Status == CertificationStatus.InProgress));
+            var process = await FindActiveProcessAsync(client.ClientId);
 
-            if (process != null)
+            if (isResend)
+            {
+                if (process == null) throw new Exception("Primero ejecute la simulación completa.");
+
+                var processDocs = await _context.Set<CertificationDocument>()
+                    .Include(d => d.EcfType)
+                    .Where(d => d.CertificationProcessId == process.CertificationProcessId)
+                    .ToListAsync();
+
+                string GroupOf(CertificationDocument d) => SimulationResendSelection.GroupOfDocument(d.EcfType?.Code, d.TrackId, d.XmlSent);
+
+                if (resendDocumentGuid != null)
+                {
+                    // Un comprobante: el viejo (y su manual, si es RFCE) se reemplaza solo si el nuevo es aceptado.
+                    docToReplace = processDocs.FirstOrDefault(d => d.GuidId == resendDocumentGuid)
+                        ?? throw new Exception("Comprobante no encontrado en la simulación vigente.");
+                    resendGroup = GroupOf(docToReplace);
+                    var oldNcf = docToReplace.ENcfSecuence;
+                    preservedDocs = processDocs
+                        .Where(d => d != docToReplace && !(resendGroup == SimulationResendSelection.Rfce32 && d.TrackId == "MANUAL" && d.ENcfSecuence == oldNcf))
+                        .ToList();
+                }
+                else
+                {
+                    // Un grupo: se borran sus registros vigentes y se envían de nuevo.
+                    var replaced = SimulationResendSelection.GroupsReplacedBy(resendGroup!);
+                    var toDelete = processDocs.Where(d => replaced.Contains(GroupOf(d))).ToList();
+                    preservedDocs = processDocs.Except(toDelete).ToList();
+                    Console.WriteLine($"[Simulation] Resend group {resendGroup}: deleting {toDelete.Count} documents.");
+                    if (toDelete.Any())
+                    {
+                        _context.Set<CertificationDocument>().RemoveRange(toDelete);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
+                // Las tarjetas que no se reenvían conservan sus contadores.
+                foreach (var d in preservedDocs)
+                    SimulationResendSelection.AddCount(status.SimulationStats, GroupOf(d));
+            }
+            else if (process != null)
             {
                 var docsToDelete = await _context.Set<CertificationDocument>()
                     .Where(d => d.CertificationProcessId == process.CertificationProcessId)
@@ -205,9 +357,14 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                 (32, 4, false, true, 10, 249000)
             };
 
+            bool RowSelected((int Type, int Count, bool IsSummary, bool IsManual, decimal? MinAmount, decimal? MaxAmount) m) =>
+                SimulationResendSelection.RunsRow(resendGroup, SimulationResendSelection.GroupOfRow(m.Type, m.IsSummary, m.IsManual));
+            int RowCount((int Type, int Count, bool IsSummary, bool IsManual, decimal? MinAmount, decimal? MaxAmount) m) =>
+                docToReplace != null ? 1 : m.Count;
+
             Console.WriteLine($"[Simulation] Starting simulation loop with {matrix.Sum(m => m.Count)} documents...");
 
-            status.TotalSteps = matrix.Sum(m => m.Count);
+            status.TotalSteps = matrix.Where(RowSelected).Sum(RowCount);
             status.CurrentStep = 0;
 
             // Initialize totals in stats
@@ -231,9 +388,9 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
             var stopRequested = false;
 
             // 1. PROCESS AUTOMATIC ITEMS (Non-manual)
-            foreach (var item in matrix.Where(m => !m.IsManual))
+            foreach (var item in matrix.Where(m => !m.IsManual).Where(RowSelected))
             {
-                for (int i = 0; i < item.Count; i++)
+                for (int i = 0; i < RowCount(item); i++)
                 {
                     status.CurrentStep++;
                     Console.WriteLine($"[Simulation] Processing Step {status.CurrentStep}/{status.TotalSteps} - Type {item.Type} (Iteration {i + 1}/{item.Count})");
@@ -318,7 +475,14 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
                     if (isNote)
                     {
+                        if (isResend && accepted31Pool.Count == 0)
+                        {
+                            accepted31Pool.AddRange(await LoadAccepted31PoolAsync(process.CertificationProcessId, samples));
+                            if (accepted31Pool.Count == 0)
+                                throw new Exception("No hay facturas 31 aceptadas para referenciar. Reenvíe primero Factura de Crédito Fiscal.");
+                        }
                         int poolIndex = (item.Type == 33) ? i : (1 + i);
+                        if (isResend) poolIndex %= accepted31Pool.Count;
                         if (accepted31Pool.Count <= poolIndex) continue;
                         var reference = accepted31Pool[poolIndex];
                         currentDto.Items = CloneDto(reference.Dto)?.Items.Take(1).ToList() ?? new List<OldEcfItemRequestDto>();
@@ -492,22 +656,41 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                         hasRejectedDocuments = true;
                     }
 
-                    // PERSISTENCE: Save to CertificationDocument table
-                    var certDoc = new CertificationDocument
+                    // PERSISTENCE: Save to CertificationDocument table.
+                    // Reenvío de un comprobante rechazado: se conserva el registro anterior y el
+                    // rechazo queda solo en el log del job.
+                    CertificationDocument? certDoc = null;
+                    if (docToReplace == null || isAccepted)
                     {
-                        CertificationProcessId = process.CertificationProcessId,
-                        ENcfSecuence = currentDto.Ncf,
-                        ENcfId = encfRecord.ENcfId,
-                        EcfTypeId = ecfTypeRecord.EcfTypeId,
-                        XmlSent = signedXml,
-                        TrackId = trackId,
-                        Status = isAccepted ? DocumentStatus.Accepted : DocumentStatus.Rejected,
-                        SentAt = DateTimeExtensions.DrNow,
-                        RegisteredAt = DateTimeExtensions.DrNow,
-                        GuidId = Guid.NewGuid().ToString()
-                    };
-                    _context.Set<CertificationDocument>().Add(certDoc);
-                    await _context.SaveChangesAsync();
+                        certDoc = new CertificationDocument
+                        {
+                            CertificationProcessId = process.CertificationProcessId,
+                            ENcfSecuence = currentDto.Ncf,
+                            ENcfId = encfRecord.ENcfId,
+                            EcfTypeId = ecfTypeRecord.EcfTypeId,
+                            XmlSent = signedXml,
+                            TrackId = trackId,
+                            Status = isAccepted ? DocumentStatus.Accepted : DocumentStatus.Rejected,
+                            SentAt = DateTimeExtensions.DrNow,
+                            RegisteredAt = DateTimeExtensions.DrNow,
+                            GuidId = Guid.NewGuid().ToString()
+                        };
+                        _context.Set<CertificationDocument>().Add(certDoc);
+
+                        if (docToReplace != null)
+                        {
+                            _context.Set<CertificationDocument>().Remove(docToReplace);
+                            if (item.IsSummary)
+                            {
+                                var oldManual = await _context.Set<CertificationDocument>()
+                                    .Where(d => d.CertificationProcessId == process.CertificationProcessId && d.TrackId == "MANUAL" && d.ENcfSecuence == docToReplace.ENcfSecuence)
+                                    .ToListAsync();
+                                _context.Set<CertificationDocument>().RemoveRange(oldManual);
+                            }
+                        }
+
+                        await _context.SaveChangesAsync();
+                    }
 
                     var existingLog = status.CompletedSteps.FirstOrDefault(l => l.Index == status.CurrentStep);
                     if (existingLog != null) status.CompletedSteps.Remove(existingLog);
@@ -524,7 +707,8 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                         FechaFirma = signatureDate.ToString("dd-MM-yyyy hh:mm:ss tt"),
                         FechaEmision = currentDto.IssueDate.ToString("dd-MM-yyyy"),
                         BuyerRnc = currentDto.CustomerRnc,
-                        XmlFileName = xmlFileName
+                        XmlFileName = xmlFileName,
+                        DocumentGuidId = certDoc?.GuidId
                     });
 
                     if (approvedXmls.Any())
@@ -554,10 +738,12 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
             }
 
             // 3. PROCESS MANUAL ITEMS (Step 4 documents that must be uploaded manually)
-            foreach (var item in matrix.Where(m => m.IsManual))
+            foreach (var item in matrix.Where(m => m.IsManual).Where(RowSelected))
             {
                 if (stopRequested) break;
-                for (int i = 0; i < item.Count; i++)
+                // Reenvío de un RFCE: solo su manual (el pool tiene un solo RFCE).
+                int manualCount = docToReplace != null ? rfcePool.Count : item.Count;
+                for (int i = 0; i < manualCount; i++)
                 {
                     status.CurrentStep++;
                     status.SimulationStats.Type32Manual++;
@@ -640,7 +826,8 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                         FechaFirma = signatureDate.ToString("dd-MM-yyyy hh:mm:ss tt"),
                         FechaEmision = currentDto.IssueDate.ToString("dd-MM-yyyy"),
                         BuyerRnc = currentDto.CustomerRnc,
-                        XmlFileName = xmlFileName
+                        XmlFileName = xmlFileName,
+                        DocumentGuidId = certDocManual.GuidId
                     });
 
                     await CreateSimulationZipAsync(jobId, webRootPath, manualUploadXmls, status, "subir_dgii", setAsPrimaryDownload: false);
