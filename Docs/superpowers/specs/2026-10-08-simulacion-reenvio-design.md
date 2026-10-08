@@ -23,8 +23,10 @@ Solo se envía lo seleccionado; todo lo demás ya aceptado queda intacto. No con
 
 - `ZynstormECFPlatform.Services/Certification/OldSimulation/*` (servicio e interfaz)
 - `ZynstormECFPlatform.Dtos/CertificationJobStatusDto.cs` (DTO solo de certificación; campo opcional)
+- `ZynstormECFPlatform.Dtos/BusinessSimulationDtos.cs` (DTOs solo de simulación; request nuevo)
 - `ZynstormECFPlatform.Web.Api/Controllers/CertificationController.cs`
 - `ZynstormECFPlatform-FrontEnd/app/certificacion/page.tsx`
+- `ZynstormECFPlatform-FrontEnd/services/certification.service.ts` (cliente API de certificación)
 - Tests nuevos en `ZynstormECFPlatform.Tests/Certification/`
 
 No se tocan `DgiiTransmissionService`, `DgiiTransmissionResult`, `EcfRequestDtos`, generadores de
