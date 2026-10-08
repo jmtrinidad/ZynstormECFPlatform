@@ -490,6 +490,18 @@ public class CertificationExcelGeneratorService : ICertificationExcelGeneratorSe
                 Totales = totales
             },
             Items = xmlItems,
+            Adjustments = dto.ECF.DescuentosORecargos?.DescuentoORecargo
+                .Select(a => new EcfXmlDescuentoORecargo
+                {
+                    NumeroLinea = int.TryParse(a.NumeroLinea, out int nl) ? nl : 0,
+                    TipoAjuste = a.TipoAjuste,
+                    DescripcionDescuentooRecargo = a.DescripcionDescuentooRecargo,
+                    TipoValor = a.TipoValor,
+                    ValorDescuentooRecargo = a.ValorDescuentooRecargo,
+                    MontoDescuentooRecargo = a.MontoDescuentooRecargo,
+                    IndicadorFacturacionDescuentooRecargo = a.IndicadorFacturacionDescuentooRecargo
+                })
+                .ToList() ?? [],
             InformacionReferencia = dto.ECF.InformacionReferencia != null ? new EcfXmlInformacionReferencia
             {
                 NCFModificado = dto.ECF.InformacionReferencia.NCFModificado!,
