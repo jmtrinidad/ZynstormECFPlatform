@@ -234,9 +234,32 @@ public class CertificationExcelMappingService : ICertificationExcelMappingServic
             dto.ECF.DetallesItems.Item.Add(item);
         }
 
-
+        dto.ECF.DescuentosORecargos = GetDescuentosORecargos(row);
 
         return dto;
+    }
+
+    // Sección global DescuentosORecargos: NumeroLineaDoR[k], TipoAjuste[k], ... (máx 20 por XSD). Verbatim.
+    private static EcfDescuentosORecargosRequest? GetDescuentosORecargos(IDictionary<string, object> row)
+    {
+        var list = new List<EcfDescuentoORecargoRequest>();
+        for (int k = 1; k <= 20; k++)
+        {
+            var tipoAjuste = GetStr(row, $"TipoAjuste[{k}]");
+            if (string.IsNullOrWhiteSpace(tipoAjuste)) continue;
+
+            list.Add(new EcfDescuentoORecargoRequest
+            {
+                NumeroLinea = GetStr(row, $"NumeroLineaDoR[{k}]") ?? k.ToString(),
+                TipoAjuste = tipoAjuste,
+                DescripcionDescuentooRecargo = GetStr(row, $"DescripcionDescuentooRecargo[{k}]"),
+                TipoValor = GetStr(row, $"TipoValor[{k}]"),
+                ValorDescuentooRecargo = GetDec(row, $"ValorDescuentooRecargo[{k}]"),
+                MontoDescuentooRecargo = GetDec(row, $"MontoDescuentooRecargo[{k}]"),
+                IndicadorFacturacionDescuentooRecargo = GetStr(row, $"IndicadorFacturacionDescuentooRecargo[{k}]")
+            });
+        }
+        return list.Count > 0 ? new EcfDescuentosORecargosRequest { DescuentoORecargo = list } : null;
     }
 
     public AcecfRequestDto MapRowToAcecfRequest(IDictionary<string, object> row, DateTime? fallbackDate = null)
