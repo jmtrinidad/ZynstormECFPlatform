@@ -305,6 +305,11 @@ public class CertificationExcelService : ICertificationExcelService
             status.TotalSteps = tests.Count;
             status.CurrentStep = 0;
 
+            // Las secuencias del Excel de la DGII quedan usadas: se registran para que la
+            // simulación (Paso 4) arranque por encima y no reciba "secuencia ya utilizada".
+            await RegisterUsedSequencesAsync(client.ClientId,
+                ecfRows.Concat(rfceRows).Select(r => CleanNcf(GetStr(r, "ENCF") ?? "")));
+
             var jobStartTime = DateTime.Now;
 
             // Create a 'Virtual' collection for data mapping
@@ -723,6 +728,49 @@ public class CertificationExcelService : ICertificationExcelService
             // Always push the terminal state (Completed/Failed) so listeners stop waiting.
             await NotifyJobUpdateAsync(jobId, status);
         }
+    }
+
+    // Siguiente secuencia libre por tipo (p. ej. "31" -> 35 si el mayor eNCF es E310000000034).
+    public static Dictionary<string, int> GetNextSequencesByType(IEnumerable<string?> encfs)
+    {
+        var next = new Dictionary<string, int>();
+        foreach (var encf in encfs)
+        {
+            if (string.IsNullOrWhiteSpace(encf) || encf.Length != 13 || char.ToUpperInvariant(encf[0]) != 'E') continue;
+            var type = encf.Substring(1, 2);
+            if (!int.TryParse(encf.Substring(3), out var seq)) continue;
+            if (!next.TryGetValue(type, out var current) || seq + 1 > current) next[type] = seq + 1;
+        }
+        return next;
+    }
+
+    private async Task RegisterUsedSequencesAsync(int clientId, IEnumerable<string?> encfs)
+    {
+        foreach (var (typeCode, nextSequence) in GetNextSequencesByType(encfs))
+        {
+            var ecfType = await _context.Set<ZynstormECFPlatform.Core.Entities.EcfType>().FirstOrDefaultAsync(t => t.Code == typeCode);
+            if (ecfType == null) continue;
+
+            var encf = await _context.Set<ENcf>()
+                .FirstOrDefaultAsync(e => e.ClientId == clientId && e.NcfTypeId == ecfType.EcfTypeId);
+            if (encf == null)
+            {
+                encf = new ENcf
+                {
+                    ClientId = clientId,
+                    NcfTypeId = ecfType.EcfTypeId,
+                    Sequence = nextSequence,
+                    GuidId = Guid.NewGuid().ToString(),
+                    RegisteredAt = ZynstormECFPlatform.Common.DateTimeExtensions.DrNow
+                };
+                await _context.Set<ENcf>().AddAsync(encf);
+            }
+            else if (encf.Sequence < nextSequence)
+            {
+                encf.Sequence = nextSequence;
+            }
+        }
+        await _context.SaveChangesAsync();
     }
 
     // DGII (Descripción técnica, Recepción de aprobación comercial): codigo "1" = aprobación comercial
