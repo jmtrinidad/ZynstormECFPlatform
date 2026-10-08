@@ -1005,6 +1005,51 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
         return new List<CertificationStepResultDto>();
     }
 
+    // Resultados cargados desde la base (GetLastSimulationResultsByClientAsync) usan el id "DB_{processId}":
+    // ese job no existe en memoria (tampoco tras reiniciar el API), así que el ZIP se arma con los XML guardados.
+    public async Task<byte[]?> BuildDatabaseSimulationZipAsync(string jobId, bool manual)
+    {
+        if (!TryParseDatabaseJobId(jobId, out var processId)) return null;
+
+        var docs = await _context.Set<CertificationDocument>()
+            .Where(d => d.CertificationProcessId == processId)
+            .OrderBy(d => d.RegisteredAt)
+            .ToListAsync();
+
+        var entries = GetDatabaseZipEntries(docs, manual);
+        return entries.Count == 0 ? null : BuildZip(entries);
+    }
+
+    public static bool TryParseDatabaseJobId(string? jobId, out int processId)
+    {
+        processId = 0;
+        return jobId != null
+            && jobId.StartsWith("DB_", StringComparison.Ordinal)
+            && int.TryParse(jobId.AsSpan(3), out processId);
+    }
+
+    public static List<(string Name, string Content)> GetDatabaseZipEntries(IEnumerable<CertificationDocument> docs, bool manual) =>
+        docs.Where(d => manual
+                ? d.TrackId == "MANUAL"
+                : d.TrackId != "MANUAL" && d.Status == DocumentStatus.Accepted)
+            .Select(d => (manual ? $"SUBIR_DGII_{d.ENcfSecuence}.xml" : $"{d.ENcfSecuence}.xml", d.XmlSent))
+            .ToList();
+
+    public static byte[] BuildZip(IEnumerable<(string Name, string Content)> entries)
+    {
+        using var ms = new MemoryStream();
+        using (var archive = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, true))
+        {
+            foreach (var (name, content) in entries)
+            {
+                var zipEntry = archive.CreateEntry(name, System.IO.Compression.CompressionLevel.Optimal);
+                using var writer = new StreamWriter(zipEntry.Open());
+                writer.Write(content);
+            }
+        }
+        return ms.ToArray();
+    }
+
     private async Task NotifyUpdate(string jobId, CertificationJobStatusDto status)
     {
         await _hubContext.Clients.Group($"cert-job:{jobId}").SendAsync("ReceiveJobUpdate", status);

@@ -21,4 +21,5 @@ public interface IOldCertificationSimulationService
     Task<CertificationJobStatusDto> GetJobStatusAsync(string jobId);
     Task<CertificationJobStatusDto> GetLastSimulationResultsByClientAsync(string clientGuidId);
     Task<List<CertificationStepResultDto>> GetJobLogsAsync(string jobId);
+    Task<byte[]?> BuildDatabaseSimulationZipAsync(string jobId, bool manual);
 }
