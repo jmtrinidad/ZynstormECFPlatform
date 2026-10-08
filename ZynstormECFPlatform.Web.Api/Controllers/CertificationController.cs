@@ -200,6 +200,24 @@ public class CertificationController(
         }
     }
 
+    [HttpPost("simulation/resend")]
+    public async Task<ActionResult> ResendSimulation([FromBody] ResendSimulationRequestDto dto)
+    {
+        try
+        {
+            var jobId = await oldSimulationService.EnqueueResendJobAsync(dto.BusinessTypeGuidId, dto.ClientGuidId, dto.Group, dto.DocumentGuidId, env.WebRootPath);
+            return Ok(new { JobId = jobId, Message = "Reenvío de simulación iniciado." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { Message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+    }
+
     [HttpGet("job-status/{jobId}")]
     public async Task<ActionResult<CertificationJobStatusDto>> GetJobStatus(string jobId)
     {
