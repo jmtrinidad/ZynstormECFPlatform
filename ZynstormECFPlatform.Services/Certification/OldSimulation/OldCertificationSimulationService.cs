@@ -225,10 +225,24 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
             dto.CustomerName = reference.CustomerName!;
             if (reference.FirstItemUnitPrice.HasValue && dto.Items.Count > 0)
                 dto.Items[0].UnitPrice = reference.FirstItemUnitPrice.Value;
+            // Los mismos defaults que recibió la 31 al enviarse: la nota copia su item.
+            ApplyItemDefaults(dto.Items);
 
             pool.Add((reference.Ncf, reference.IssueDate, reference.CustomerRnc, dto));
         }
         return pool;
+    }
+
+    public static void ApplyItemDefaults(IEnumerable<OldEcfItemRequestDto> items)
+    {
+        foreach (var itm in items)
+        {
+            // DGII acepta IndicadorBienoServicio = 2 (servicio) para todos los tipos
+            // en certificación; el tipo 47 además lo exige obligatoriamente.
+            itm.ItemType ??= 2;
+            itm.Description ??= itm.Name;
+            itm.UnitOfMeasure ??= 43;
+        }
     }
 
     [AutomaticRetry(Attempts = 0)]
@@ -461,14 +475,7 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                         if (string.IsNullOrEmpty(currentDto.CustomerTelephone)) currentDto.CustomerTelephone = "809-233-6060";
                     }
 
-                    foreach (var itm in currentDto.Items)
-                    {
-                        // DGII acepta IndicadorBienoServicio = 2 (servicio) para todos los tipos
-                        // en certificación; el tipo 47 además lo exige obligatoriamente.
-                        itm.ItemType ??= 2;
-                        itm.Description ??= itm.Name;
-                        itm.UnitOfMeasure ??= 43;
-                    }
+                    ApplyItemDefaults(currentDto.Items);
 
                     currentDto.SequenceExpirationDate = new DateTime(DateTime.Now.Year + 2, 12, 31);
                     bool isNote = item.Type == 33 || item.Type == 34;
