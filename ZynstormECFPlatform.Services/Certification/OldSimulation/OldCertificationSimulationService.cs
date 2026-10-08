@@ -393,9 +393,9 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
 
                     // Reintento por "secuencia ya utilizada": si DGII rechaza el eNCF por estar
                     // duplicado, avanzamos la secuencia y reenviamos el MISMO comprobante.
-                    // Se intenta 3 veces en total (envío inicial + 2 reintentos). Si aún falla,
-                    // queda rechazado y el flujo se detiene notificando el error.
-                    const int MaxSequenceAttempts = 3;
+                    // Se reintenta, aumentando el eNCF en uno, hasta que DGII lo acepte. El tope solo
+                    // evita un ciclo infinito; si se alcanza, queda rechazado y el flujo se detiene.
+                    const int MaxSequenceAttempts = 100;
                     int sequenceAttempt = 1;
                     bool retryWithNewSequence;
 
@@ -475,6 +475,11 @@ public class OldCertificationSimulationService : IOldCertificationSimulationServ
                         }
                     }
                     while (retryWithNewSequence);
+
+                    if (!isAccepted)
+                    {
+                        status.ErrorMessage = $"Proceso detenido: el comprobante {currentDto.Ncf} (paso {status.CurrentStep}) fue rechazado. {resultMessage}";
+                    }
 
                     if (isAccepted)
                     {
