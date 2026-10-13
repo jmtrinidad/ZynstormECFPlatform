@@ -115,25 +115,6 @@ public class DgiiTransmissionService : IDgiiTransmissionService
                 TransportFailure = true
             };
         }
-        catch (TaskCanceledException ex)
-        {
-            // HttpClient reporta su timeout como cancelación: la DGII no respondió a tiempo.
-            _logger.LogError(
-                ex,
-                "DGII SendEcf timed out. Environment={Environment} Endpoint={Endpoint} EcfType={EcfType} ENcf={ENcf} IsRfce={IsRfce}",
-                environment,
-                endpointUrl,
-                ecfType,
-                eNcf,
-                isSummary);
-
-            return new DgiiTransmissionResult
-            {
-                Error = $"La DGII no respondió a tiempo para {(isSummary ? "Resumen B2C/RFCE" : "e-CF")}. Endpoint: {endpointUrl}.",
-                Mensaje = ex.Message,
-                TransportFailure = true
-            };
-        }
 
         var responseString = await response.Content.ReadAsStringAsync();
         LogDgiiRawResponse("SendEcf", environment, endpointUrl, ecfType, eNcf, isSummary, response, responseString);

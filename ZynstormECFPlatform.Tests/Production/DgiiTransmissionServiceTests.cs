@@ -31,15 +31,15 @@ public class DgiiTransmissionServiceTests
     }
 
     [Fact]
-    public async Task Timeout_IsReportedAsATransportFailure()
+    public async Task Timeout_StillPropagatesTheException_AsInMain()
     {
+        // La certificación (y cualquier otro llamador de SendEcfAsync) depende de que un timeout
+        // siga lanzando la excepción. La conversión a fallo de transporte la hace DgiiSendGuard,
+        // solo para el envío diferido de emit.
         var service = ServiceThatThrows(new TaskCanceledException("timeout"));
 
-        var result = await service.SendEcfAsync(DgiiEnvironment.Test, "token", "<x/>", 32, 10m, "132293894", "E320000000098");
-
-        Assert.True(result.TransportFailure);
-        Assert.False(result.Success);
-        Assert.False(string.IsNullOrWhiteSpace(result.Error));
+        await Assert.ThrowsAsync<TaskCanceledException>(() =>
+            service.SendEcfAsync(DgiiEnvironment.Test, "token", "<x/>", 32, 10m, "132293894", "E320000000098"));
     }
 
     [Fact]

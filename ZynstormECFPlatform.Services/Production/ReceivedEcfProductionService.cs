@@ -515,7 +515,11 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
         var token = await tokenTask!;
 
-        var transmission = await _transmissionService.SendEcfAsync(targetEnvironment, token, signedXml, ecfType, total, issuerRnc, eNcf, isSummary);
+        // Un timeout de la DGII se convierte aquí en fallo de transporte (lo que el envío diferido
+        // reintenta); SendEcfAsync sigue lanzando la excepción, como en main, para la certificación.
+        var transmission = await DgiiSendGuard.SendAsync(
+            () => _transmissionService.SendEcfAsync(targetEnvironment, token, signedXml, ecfType, total, issuerRnc, eNcf, isSummary),
+            isSummary);
         await AddDgiiResponseLogAsync(ecfDocument, clientId, "recepcion", targetEnvironment, transmission);
         timings?.Mark("recepcion_dgii");
 
