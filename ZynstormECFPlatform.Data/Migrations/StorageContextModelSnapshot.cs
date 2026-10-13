@@ -2569,6 +2569,9 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<int?>("ClientTypeId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("DailyReportEmails")
                         .HasMaxLength(500)
                         .IsUnicode(false)
@@ -2655,6 +2658,9 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasColumnType("timestamp without time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<int?>("RiHtmlTemplateId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Rnc")
                         .IsRequired()
                         .HasMaxLength(25)
@@ -2672,7 +2678,11 @@ namespace ZynstormECFPlatform.Data.Migrations
 
                     b.HasKey("ClientId");
 
+                    b.HasIndex("ClientTypeId");
+
                     b.HasIndex("PlanId");
+
+                    b.HasIndex("RiHtmlTemplateId");
 
                     b.HasIndex("StatusId");
 
@@ -3124,6 +3134,64 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.HasIndex("ClientPaymentId");
 
                     b.ToTable("ClientPaymentItem");
+                });
+
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ClientType", b =>
+                {
+                    b.Property<int>("ClientTypeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("ClientTypeId"));
+
+                    b.Property<DateTime?>("DeletedTimeUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("GuidId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(450)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(450)")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("LastUpdateUtc")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime>("RegisteredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int?>("RiHtmlTemplateId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SampleDataJson")
+                        .HasColumnType("text");
+
+                    b.HasKey("ClientTypeId");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("RiHtmlTemplateId");
+
+                    b.ToTable("ClientTypes");
                 });
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.Currency", b =>
@@ -6101,6 +6169,58 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.ToTable("ReceivedB2BMessage");
                 });
 
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.RiHtmlTemplate", b =>
+                {
+                    b.Property<int>("RiHtmlTemplateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("RiHtmlTemplateId"));
+
+                    b.Property<DateTime?>("DeletedTimeUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("GuidId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(450)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(450)")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Html")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("LastUpdateUtc")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime>("RegisteredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("RiHtmlTemplateId");
+
+                    b.ToTable("RiHtmlTemplates");
+                });
+
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.Role", b =>
                 {
                     b.Property<string>("Id")
@@ -6748,11 +6868,23 @@ namespace ZynstormECFPlatform.Data.Migrations
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.Client", b =>
                 {
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.ClientType", "ClientType")
+                        .WithMany("Clients")
+                        .HasForeignKey("ClientTypeId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("FK_Client_ClientType");
+
                     b.HasOne("ZynstormECFPlatform.Core.Entities.Plan", "Plan")
                         .WithMany("Clients")
                         .HasForeignKey("PlanId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("FK_Client_Plan");
+
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.RiHtmlTemplate", "RiHtmlTemplate")
+                        .WithMany("Clients")
+                        .HasForeignKey("RiHtmlTemplateId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("FK_Client_RiHtmlTemplate");
 
                     b.HasOne("ZynstormECFPlatform.Core.Entities.Status", "Status")
                         .WithMany("Clients")
@@ -6760,7 +6892,11 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Client_Status");
 
+                    b.Navigation("ClientType");
+
                     b.Navigation("Plan");
+
+                    b.Navigation("RiHtmlTemplate");
 
                     b.Navigation("Status");
                 });
@@ -6875,6 +7011,17 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Navigation("ClientMonthlyUsage");
 
                     b.Navigation("ClientPayment");
+                });
+
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ClientType", b =>
+                {
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.RiHtmlTemplate", "RiHtmlTemplate")
+                        .WithMany("ClientTypes")
+                        .HasForeignKey("RiHtmlTemplateId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("FK_ClientType_RiHtmlTemplate");
+
+                    b.Navigation("RiHtmlTemplate");
                 });
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ENcf", b =>
@@ -7231,6 +7378,11 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Navigation("Items");
                 });
 
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ClientType", b =>
+                {
+                    b.Navigation("Clients");
+                });
+
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.Currency", b =>
                 {
                     b.Navigation("EcfDocuments");
@@ -7290,6 +7442,13 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Navigation("Clients");
 
                     b.Navigation("OverageTiers");
+                });
+
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.RiHtmlTemplate", b =>
+                {
+                    b.Navigation("ClientTypes");
+
+                    b.Navigation("Clients");
                 });
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.Status", b =>
