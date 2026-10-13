@@ -57,9 +57,9 @@ de 60 segundos (`LastUpdateUtc`/`RegisteredAt`): puede haber un job en curso.
 2. Encola `EcfTransmitJob.Execute(ecfDocumentId, attemptNumber, environment)` con
    `attemptNumber` = cantidad de `EcfTransmission` del documento + 1. El job ya exige estado 7 y lo
    pasa a 8, lo que evita transmisiones dobles aunque se encolen dos veces.
-3. El job se comporta como siempre: si la DGII ya había recibido el documento y no se conoce su
-   TrackId, la regla existente de 1209/75 deja el documento `Pending` con el aviso «la DGII ya
-   recibió este comprobante; falta confirmar su TrackId» (sigue requiriendo soporte).
+3. Antes de volver a transmitir un documento que ya tuvo intentos sin TrackId, el job le **pregunta
+   a la DGII si ya lo recibió** (sección «Recuperar un TrackId perdido»). Si lo tiene, guarda su
+   TrackId y pasa al seguimiento sin retransmitir; si no, transmite como siempre.
 
 El ambiente de la DGII no se guarda en el documento; lo impone `EcfXmlValidation:TargetDgiiEnvironment`
 (`Production` en producción, `Test` en Staging), de modo que se pasa el valor por defecto.
@@ -76,6 +76,43 @@ No retransmite. `EcfRetrackJob.Execute(ecfDocumentId, attemptNumber)` (cola `ecf
    `EcfTrackingJob` (estado, historial, QR si queda aceptado).
 3. Si sigue pendiente y `attemptNumber < 20`, se reprograma a sí mismo a los 3 s; igual que el
    seguimiento actual, pero sin llevar el certificado en los argumentos.
+
+## Recuperar un TrackId perdido (Consulta de TrackId de la DGII)
+
+**Problema:** la DGII recibió el comprobante pero la respuesta con el TrackId se perdió entre la DGII
+y la plataforma. Hoy el documento queda sin TrackId, y cada reenvío recibe 1209/75: la regla
+existente lo deja `Pending` con el aviso «falta confirmar su TrackId» y solo soporte lo resuelve.
+
+**Solución:** la DGII ofrece el servicio *Consulta de TrackId e-CF* («Descripción técnica de
+facturación electrónica», sección 24): `GET {base}/api/trackids/consulta?rncemisor=…&encf=…` con el
+token, que devuelve `trackId`, `estado` y `fechaRecepcion` de lo recibido para ese eNCF (puede haber
+varios si se remitió el mismo eNCF más de una vez). Requiere que el usuario del token esté delegado por
+el emisor, igual que el resto de servicios.
+
+- `IDgiiTransmissionService.GetTrackIdsAsync(environment, token, rncEmisor, eNcf, cancellationToken)`
+  → `DgiiTrackIdsResult { Available, Entries, Error }`, con `DgiiTrackIdEntry { TrackId, Estado,
+  FechaRecepcion }`. La lectura acepta una lista o un objeto suelto (la guía de la DGII muestra uno).
+- Nueva configuración `DgiiUrls:{ambiente}:ConsultaTrackIds`: `Test` →
+  `https://ecf.dgii.gov.do/TesteCF/ConsultaTrackIds`, `Production` →
+  `https://ecf.dgii.gov.do/ecf/ConsultaTrackIds`. **`CerteCF` no la tiene** (la DGII no la publica en
+  certificación) y con el validador interno (`UseInternalValidator`) tampoco existe: en esos casos
+  `Available = false` y todo se comporta como hoy.
+- `DgiiTrackIdPicker.Pick(entries)` (función pura): descarta entradas sin TrackId o con estado «No
+  encontrado»; prefiere Aceptado o Aceptado Condicional, luego En proceso y por último Rechazado, y
+  dentro de cada grupo el de `fechaRecepcion` más reciente. Devuelve la entrada elegida o `null`.
+
+**Dónde se usa:**
+
+1. En `TransmitDeferredAsync`, cuando el documento ya tuvo intentos sin TrackId
+   (`earlierAttemptsWithoutTrackId`: cubre los reintentos automáticos y la acción `Transmit`), **antes**
+   de transmitir. Si hay una entrada, se guarda una `EcfTransmission` con ese TrackId (documento a
+   estado 9) y se continúa con la consulta de estado de ese TrackId, sin retransmitir. Si no hay
+   entrada, o no está disponible, se transmite como hoy.
+2. En la rama existente del 1209/75 de un reintento propio sin TrackId: antes de dejar el aviso, se
+   intenta recuperar el TrackId; solo si no se logra se conserva el aviso actual.
+
+Con esto desaparece el caso que exigía soporte, salvo en `CerteCF` y con el validador interno, donde
+no hay forma de consultarlo.
 
 ## API
 
@@ -106,6 +143,10 @@ se resuelve con subconsultas `EXISTS` (XML firmado y TrackId) sobre la página p
 - `EcfRequeuePolicy`: cada fila de la tabla de elegibilidad, el umbral de 60 s, los de 5 min y 2 min,
   con y sin TrackId, con y sin XML, y los estados excluidos (3, 10, 11, 13).
 - Cálculo de `attemptNumber` y traducción de la decisión a la respuesta del endpoint.
+- `DgiiTrackIdPicker`: lista vacía, solo «No encontrado», prioridad aceptado > en proceso > rechazado,
+  desempate por fecha más reciente, y lectura de lista, de objeto suelto y de respuesta vacía.
+- `GetTrackIdsAsync` con un `HttpMessageHandler` de prueba: arma la URL con `rncemisor` y `encf`,
+  manda el token, y devuelve `Available = false` sin configuración (`CerteCF`) o con validador interno.
 - `EcfRetrackJob`: reprogramación mientras siga pendiente y tope de 20 intentos (lógica pura
   extraída, sin Hangfire).
 - La transición condicional, el job y el endpoint se verifican con el build y a mano en Staging (el
@@ -116,7 +157,7 @@ se resuelve con subconsultas `EXISTS` (XML firmado y TrackId) sobre la página p
 
 - Que `by-ncf` consulte a la DGII por su cuenta cuando un documento lleva mucho tiempo pendiente.
 - Re-encolar en lote o desde la librería.
-- Comprobantes cuya DGII ya los recibió pero sin TrackId conocido: siguen requiriendo soporte.
+- Recuperar el TrackId en `CerteCF` o con el validador interno: no hay consulta disponible ahí.
 - Cambiar el texto de las guías de la librería («avise a soporte»); se ajusta cuando esto se publique.
 
 ## Despliegue
