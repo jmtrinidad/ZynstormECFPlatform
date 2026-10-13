@@ -30,6 +30,16 @@ public partial class Client : BaseEntity
 
     public int? PlanId { get; set; }
 
+    /// <summary>Tipo de cliente (define el formato HTML de RI y datos de muestra). Null = formato por defecto.</summary>
+    public int? ClientTypeId { get; set; }
+
+    /// <summary>Formato HTML de RI propio de este cliente; tiene prioridad sobre el de su tipo.</summary>
+    public int? RiHtmlTemplateId { get; set; }
+
+    public virtual ClientType? ClientType { get; set; }
+
+    public virtual RiHtmlTemplate? RiHtmlTemplate { get; set; }
+
     public bool ClientInactive { get; set; }
 
     /// <summary>Fecha calendario del último pago del plan.</summary>

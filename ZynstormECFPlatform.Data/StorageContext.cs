@@ -171,6 +171,8 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
     }
 
     public DbSet<CertificationInvoicePrintTemplateEcfType> CertificationInvoicePrintTemplateEcfTypes { get; set; }
+    public DbSet<ClientType> ClientTypes { get; set; }
+    public DbSet<RiHtmlTemplate> RiHtmlTemplates { get; set; }
     public DbSet<GeneratedSerial> GeneratedSerials { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -1960,6 +1962,57 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasForeignKey(d => d.ClientId)
                   .OnDelete(DeleteBehavior.ClientSetNull)
                   .HasConstraintName("FK_CertificationInvoicePrintTemplate_Client");
+        });
+
+        modelBuilder.Entity<RiHtmlTemplate>(entity =>
+        {
+            entity.HasKey(c => c.RiHtmlTemplateId);
+            entity.Property(e => e.Name).HasMaxLength(150).IsRequired();
+            entity.Property(e => e.FileName).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Html).IsRequired();
+
+            entity.Property(c => c.RegisteredAt).HasColumnType(DateTimeColumnType).HasDefaultValueSql(DefaultDateTimeSqlValue);
+            entity.Property(c => c.LastUpdateUtc).HasColumnType(DateTimeColumnType);
+            entity.Property(c => c.DeletedTimeUtc).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false).IsRequired();
+            entity.Property(e => e.GuidId).IsRequired().HasMaxLength(450).IsUnicode(false).HasDefaultValueSql(DefaultGUIDSqlValue);
+            entity.HasQueryFilter(c => !c.IsDeleted);
+        });
+
+        modelBuilder.Entity<ClientType>(entity =>
+        {
+            entity.HasKey(c => c.ClientTypeId);
+            entity.Property(e => e.Name).HasMaxLength(150).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.HasIndex(e => e.Name).IsUnique();
+
+            entity.Property(c => c.RegisteredAt).HasColumnType(DateTimeColumnType).HasDefaultValueSql(DefaultDateTimeSqlValue);
+            entity.Property(c => c.LastUpdateUtc).HasColumnType(DateTimeColumnType);
+            entity.Property(c => c.DeletedTimeUtc).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false).IsRequired();
+            entity.Property(e => e.GuidId).IsRequired().HasMaxLength(450).IsUnicode(false).HasDefaultValueSql(DefaultGUIDSqlValue);
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.RiHtmlTemplate)
+                  .WithMany(p => p.ClientTypes)
+                  .HasForeignKey(d => d.RiHtmlTemplateId)
+                  .OnDelete(DeleteBehavior.SetNull)
+                  .HasConstraintName("FK_ClientType_RiHtmlTemplate");
+        });
+
+        modelBuilder.Entity<Client>(entity =>
+        {
+            entity.HasOne(d => d.ClientType)
+                  .WithMany(p => p.Clients)
+                  .HasForeignKey(d => d.ClientTypeId)
+                  .OnDelete(DeleteBehavior.SetNull)
+                  .HasConstraintName("FK_Client_ClientType");
+
+            entity.HasOne(d => d.RiHtmlTemplate)
+                  .WithMany(p => p.Clients)
+                  .HasForeignKey(d => d.RiHtmlTemplateId)
+                  .OnDelete(DeleteBehavior.SetNull)
+                  .HasConstraintName("FK_Client_RiHtmlTemplate");
         });
 
         modelBuilder.Entity<CertificationInvoicePrintTemplateEcfType>(entity =>
