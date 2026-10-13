@@ -462,8 +462,9 @@ public class CertificationController(
     {
         try
         {
-            var bytes = await riModelService.RenderRiForDocumentAsync(clientGuidId, ncf);
-            return File(bytes, "application/pdf");
+            var result = await riModelService.RenderRiAsync(clientGuidId, ncf);
+            ApplyHtmlSecurityHeaders(result);
+            return File(result.Content, result.ContentType);
         }
         catch (InvalidOperationException ex)
         {
@@ -475,13 +476,23 @@ public class CertificationController(
         }
     }
 
+    /// <summary>El HTML de un formato propio no debe poder ejecutar scripts ni cargar recursos externos.</summary>
+    private void ApplyHtmlSecurityHeaders(RiRenderResult result)
+    {
+        if (result.ContentType == "text/html")
+        {
+            Response.Headers["Content-Security-Policy"] = "default-src 'none'; img-src data:; style-src 'unsafe-inline'";
+        }
+    }
+
     [HttpGet("ri/{clientGuidId}/{ncf}/download")]
     public async Task<ActionResult> DownloadRi(string clientGuidId, string ncf)
     {
         try
         {
-            var bytes = await riModelService.RenderRiForDocumentAsync(clientGuidId, ncf);
-            return File(bytes, "application/pdf", $"RI_{ncf}.pdf");
+            var result = await riModelService.RenderRiAsync(clientGuidId, ncf);
+            ApplyHtmlSecurityHeaders(result);
+            return File(result.Content, result.ContentType, result.FileName);
         }
         catch (InvalidOperationException ex)
         {
