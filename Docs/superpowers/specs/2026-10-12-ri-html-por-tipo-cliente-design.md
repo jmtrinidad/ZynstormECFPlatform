@@ -40,9 +40,9 @@ Planos, PascalCase, tal como en el HTML de referencia del usuario:
 - **Comprobante** (del XML): `TipoComprobante` (nombre, ej. "FACTURA DE CONSUMO ELECTRÓNICA"), `eNCF`, `FechaVencimiento`, `NoFactura` (NumeroFacturaInterna), `Fecha`, `FormaPago`, `Nombre` (comprador), `QR`, `CodigoSeguridad`, `FechaFirma`.
 - **Totales** (del XML): `Total`, `TotalDescuento`, más `Subtotal` e `Itbis`.
 - **De muestra** (del tipo de cliente, §5): `Cedula`, `Sexo`, `FechaNac`, `Edad`, `SegMed`, `NSS`, `Devolucion`, `Medico`, `MontoPagado`, `Restante`.
-- **Ítems** (repetibles): `Descripcion`, `Monto`, `Cantidad`, `Precio`, `Itbis`, `Unidad`.
+- **Ítems** (repetibles): `Descripcion`, `Monto`, `Cantidad`, `Precio`, `ItemItbis`, `Unidad` (el ITBIS por ítem usa `ItemItbis` para no chocar con el `Itbis` de totales).
 
-Datos de comprobante, totales e ítems salen de `RiInvoiceModel` vía `EcfRiTemplateMapper.MapInvoice`/`MapPurchase`/`MapExpense` según el tipo (se reutiliza el mapeo existente, sin duplicarlo). Un marcador desconocido se deja tal cual y se reporta como aviso en la subida.
+Datos de comprobante, totales e ítems salen de `RiInvoiceModel` vía `EcfRiTemplateMapper.MapInvoice` para todos los tipos (el mapper es genérico) (se reutiliza el mapeo existente, sin duplicarlo). Un marcador desconocido se deja tal cual y se reporta como aviso en la subida.
 
 ## 5. Datos de muestra por tipo de cliente
 
@@ -52,7 +52,7 @@ Datos de comprobante, totales e ítems salen de `RiInvoiceModel` vía `EcfRiTemp
 
 1. **Ítems**: se localiza el menor `<tr>` o elemento de bloque que contenga un marcador de ítem (`Descripcion`, `Monto`, `Cantidad`, `Precio`, `Itbis`, `Unidad`) y se repite por cada ítem del XML. Sin bucles en el HTML. Debe haber al menos una fila de ítems.
 2. **Elemento vacío se elimina**: si todos los marcadores de un elemento contenedor (fila, `div`, `p`, `span` de línea) resuelven a vacío, se elimina ese elemento. Con esto, en los tipos **32 y 34** desaparece la línea `VALIDO HASTA` (no tiene `FechaVencimiento`) sin modificar el HTML; un `EmisorLogo` vacío elimina el recuadro.
-3. **Bloques obligatorios**: si el HTML trae `{{eNCF}}` / `{{FechaVencimiento}}`, `{{QR}}`, `{{CodigoSeguridad}}` y `{{FechaFirma}}`, se usan donde estén. Si faltan, el sistema los agrega: el bloque `eNCF` + `VALIDO HASTA` justo debajo del título del comprobante (el elemento con `{{TipoComprobante}}` o, en su defecto, el primer encabezado), y el bloque del QR (imagen QR, código de seguridad, fecha de firma digital, "REPRESENTACION IMPRESA DEL e-CF") antes de `</body>`.
+3. **Bloques obligatorios**: si el HTML trae `{{eNCF}}` / `{{FechaVencimiento}}`, `{{QR}}`, `{{CodigoSeguridad}}` y `{{FechaFirma}}`, se usan donde estén. Si falta `{{eNCF}}`, el sistema agrega el bloque `eNCF` + `VALIDO HASTA` justo debajo del título del comprobante (el elemento con `{{TipoComprobante}}` o, en su defecto, el primer encabezado), y si falta `{{QR}}` agrega el bloque del QR (imagen QR, código de seguridad, fecha de firma digital, "REPRESENTACION IMPRESA DEL e-CF") antes de `</body>`.
 4. **QR**: imagen generada con QRCoder a partir de la URL de `EcfQrUrlBuilder` (la misma ya usada por `RiInvoicePdf`), inline como `data:image/png;base64`.
 5. **Escapado**: todo valor se escapa como HTML. Solo `EmisorLogo` y `QR` se emiten como `<img src="data:...">`, y `EmisorLogo` solo acepta un `data:image/...`.
 6. **Regla de fecha de vencimiento**: `FechaVencimiento` solo se llena para los tipos que la tienen; los consumo (32) y la nota de crédito (34) nunca, igual que `RiInvoicePdf`.
@@ -69,11 +69,11 @@ Defensa en profundidad: la vista previa se muestra en un `iframe` con `sandbox` 
 
 ## 8. API (`CertificationController`)
 
-Existentes, **misma ruta y contrato**: `GET ri/{clientGuidId}/{ncf}/preview|download`, `GET ri/{clientGuidId}/zip`. Con formato HTML resuelto devuelven `text/html` (descarga como `RI_{ncf}.html`); sin formato, PDF como hoy. El ZIP contiene `.html` o `.pdf` según corresponda.
+Los endpoints nuevos viven en un `RiFormatController` (`v1/RiFormat/...`, `[Authorize]`), no en `CertificationController`; las rutas exactas están en el plan. Existentes, **misma ruta y contrato**: `GET ri/{clientGuidId}/{ncf}/preview|download`, `GET ri/{clientGuidId}/zip`. Con formato HTML resuelto devuelven `text/html` (descarga como `RI_{ncf}.html`); sin formato, PDF como hoy. El ZIP contiene `.html` o `.pdf` según corresponda.
 
 Nuevos:
 - `GET/POST/PUT/DELETE client-types` — CRUD de tipos de cliente, incluido `SampleDataJson`.
-- `GET/POST/PUT/DELETE ri/html-templates` — biblioteca de formatos (la subida valida según §7); no se permite borrar un formato en uso sin confirmar la reasignación.
+- `GET/POST/PUT/DELETE ri/html-templates` — biblioteca de formatos (la subida valida según §7); no se permite borrar un formato en uso (se rechaza con mensaje).
 - `PUT clients/{clientGuidId}/ri-format` — asigna `ClientTypeId` y/o `RiHtmlTemplateId` propio (o los quita con null).
 - `GET ri/html-templates/sample` — HTML de ejemplo descargable (el de referencia con todos los marcadores).
 - `GET ri/{clientGuidId}/format` — formato resuelto (propio / tipo / defecto) para mostrarlo en la UI.
