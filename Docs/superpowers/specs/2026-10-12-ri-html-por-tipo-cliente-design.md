@@ -106,3 +106,9 @@ Tarjeta **"Formato de factura"** sobre la lista de comprobantes:
 ## 12. Replicación a otras ramas
 
 Ver la nota al inicio. Plan: implementar y verificar en una rama de trabajo, luego llevar los commits a `Staging` y `feature/emit-idempotente` (backend) y a `Staging` (frontend). Revisar conflictos en `StorageContext.cs`, `StorageContextModelSnapshot.cs`, `CertificationController.cs` y la migración, que son los puntos que divergen entre ramas.
+
+## 13. Actualizaciones posteriores (2026-10-13)
+
+- **Logo del cliente:** tabla `ClientLogo` (1 a 1 con `Client`), PNG/JPG/WebP de hasta 500 KB, `GET/PUT RiFormat/clients/{guid}/logo`. Prioridad: logo del cliente > `EmisorLogo` de los datos de muestra del tipo > sin logo (el recuadro se elimina).
+- **Varios formatos por tipo:** tabla `ClientTypeTemplate` (formatos disponibles del tipo). El predeterminado sigue siendo `ClientType.RiHtmlTemplateId` y siempre cuenta como disponible. `POST/DELETE RiFormat/client-types/{guid}/templates/{templateGuid}`. El cliente elige su formato entre los de su tipo (o cualquiera de la biblioteca) con `Client.RiHtmlTemplateId`. No se puede quitar el predeterminado de un tipo.
+- **Dependencia:** AngleSharp 1.8.4 (la 1.3.0 tenía GHSA-pgww-w46g-26qg, mXSS).
