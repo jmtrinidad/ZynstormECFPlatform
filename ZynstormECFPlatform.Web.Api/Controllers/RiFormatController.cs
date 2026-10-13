@@ -34,6 +34,14 @@ public class RiFormatController(IRiFormatService formatService) : ControllerBase
             return NoContent();
         });
 
+    [HttpPost("client-types/{guidId}/templates/{templateGuidId}")]
+    public Task<ActionResult> AddTemplateToClientType(string guidId, string templateGuidId) =>
+        Run(async () => Ok(await formatService.AddTemplateToClientTypeAsync(guidId, templateGuidId)));
+
+    [HttpDelete("client-types/{guidId}/templates/{templateGuidId}")]
+    public Task<ActionResult> RemoveTemplateFromClientType(string guidId, string templateGuidId) =>
+        Run(async () => Ok(await formatService.RemoveTemplateFromClientTypeAsync(guidId, templateGuidId)));
+
     [HttpGet("templates")]
     public async Task<ActionResult<IReadOnlyList<RiHtmlTemplateDto>>> ListTemplates() =>
         Ok(await formatService.ListTemplatesAsync());

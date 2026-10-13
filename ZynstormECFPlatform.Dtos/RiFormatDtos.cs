@@ -1,5 +1,7 @@
 namespace ZynstormECFPlatform.Dtos;
 
+/// <param name="RiHtmlTemplateGuidId">Formato predeterminado del tipo (null si no tiene).</param>
+/// <param name="Formats">Todos los formatos disponibles del tipo, con el predeterminado marcado.</param>
 public record ClientTypeDto(
     string GuidId,
     string Name,
@@ -7,7 +9,10 @@ public record ClientTypeDto(
     string? RiHtmlTemplateGuidId,
     string? RiHtmlTemplateName,
     string? SampleDataJson,
-    int ClientCount);
+    int ClientCount,
+    IReadOnlyList<ClientTypeFormatDto> Formats);
+
+public record ClientTypeFormatDto(string GuidId, string Name, bool IsDefault);
 
 public record ClientTypeSaveDto(
     string Name,
