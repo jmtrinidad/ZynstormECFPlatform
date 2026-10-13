@@ -47,16 +47,23 @@ de 60 segundos (`LastUpdateUtc`/`RegisteredAt`): puede haber un job en curso.
 |---|---|---|
 | Sin TrackId en ninguna `EcfTransmission` y estado 12 | `Transmit` | Agotó los reintentos. |
 | Sin TrackId y estado 7 u 8 con más de 5 min sin cambios (`EcfIdempotency:StaleInFlightMinutes`) | `Transmit` | El job se perdió. |
-| Con TrackId, estado 9 y más de 2 min sin cambios | `Track` | El seguimiento se agotó; la DGII ya lo tiene. |
+| Sin TrackId y estado 9 con más de 5 min sin cambios | `Transmit` | Reintento propio que la DGII ya tenía y cuyo TrackId no se pudo recuperar (ver más abajo). |
+| Con TrackId y estado 9 o 12 con más de 2 min sin cambios | `Track` | El seguimiento se agotó o falló; la DGII ya lo tiene. |
 | Cualquier otra | ninguna | |
+
+«Tiene TrackId» significa que alguna `EcfTransmission` del documento guarda un TrackId no vacío.
 
 ## Acción `Transmit` (reenviar)
 
-1. Transición **condicional** a estado 7 (`UPDATE … WHERE EcfDocumentId = @id AND EcfStatusId = @actual`):
-   si otra petición ya lo movió, responde 409 y no encola. Así dos clics no encolan dos envíos.
+1. Transición **condicional** a estado 7 (`ExecuteUpdateAsync` con `WHERE EcfDocumentId = @id AND
+   EcfStatusId = @actual AND COALESCE(LastUpdateUtc, RegisteredAt) = @observado`): si otra petición
+   ya lo movió, responde 409 y no encola. Así dos clics no encolan dos envíos.
 2. Encola `EcfTransmitJob.Execute(ecfDocumentId, attemptNumber, environment)` con
-   `attemptNumber` = cantidad de `EcfTransmission` del documento + 1. El job ya exige estado 7 y lo
-   pasa a 8, lo que evita transmisiones dobles aunque se encolen dos veces.
+   `attemptNumber` = `max(2, cantidad de EcfTransmission + 1)`. El mínimo de 2 hace que el job
+   siempre pregunte primero a la DGII (la comprobación aplica desde el intento 2). El job ya exige
+   estado 7 y lo pasa a 8, lo que evita transmisiones dobles aunque se encolen dos veces. Un envío
+   manual cuenta como un intento: si falla por red, no hay más reintentos automáticos y se puede
+   volver a pulsar el botón.
 3. Antes de volver a transmitir un documento que ya tuvo intentos sin TrackId, el job le **pregunta
    a la DGII si ya lo recibió** (sección «Recuperar un TrackId perdido»). Si lo tiene, guarda su
    TrackId y pasa al seguimiento sin retransmitir; si no, transmite como siempre.
@@ -74,8 +81,12 @@ No retransmite. `EcfRetrackJob.Execute(ecfDocumentId, attemptNumber)` (cola `ecf
    los argumentos en claro.
 2. Pide token, consulta el estado por TrackId y lo guarda con la misma lógica de
    `EcfTrackingJob` (estado, historial, QR si queda aceptado).
-3. Si sigue pendiente y `attemptNumber < 20`, se reprograma a sí mismo a los 3 s; igual que el
-   seguimiento actual, pero sin llevar el certificado en los argumentos.
+3. Si sigue pendiente, se reprograma a sí mismo **con espera creciente** y sin llevar el
+   certificado en los argumentos: 5 s (intentos 1 a 3), 30 s (4 a 6) y 2 min (7 a 10). Son 10
+   intentos, unos 10 minutos; a diferencia del seguimiento original (20 × 3 s ≈ 1 min), cubre a una
+   DGII lenta. Agotados, el documento queda como está y se puede volver a re-encolar.
+4. La lógica de leer y guardar el estado es la de `EcfTrackingJob` (se separa en un método
+   `CheckAsync` que no programa nada, para reutilizarla sin copiarla).
 
 ## Recuperar un TrackId perdido (Consulta de TrackId de la DGII)
 
@@ -108,8 +119,13 @@ el emisor, igual que el resto de servicios.
    de transmitir. Si hay una entrada, se guarda una `EcfTransmission` con ese TrackId (documento a
    estado 9) y se continúa con la consulta de estado de ese TrackId, sin retransmitir. Si no hay
    entrada, o no está disponible, se transmite como hoy.
-2. En la rama existente del 1209/75 de un reintento propio sin TrackId: antes de dejar el aviso, se
-   intenta recuperar el TrackId; solo si no se logra se conserva el aviso actual.
+2. En la rama existente del 1209/75 de un reintento propio sin TrackId: la DGII respondió con un
+   TrackId **nuevo y rechazado** (el del intento duplicado). Antes de dejar el aviso se intenta
+   recuperar el TrackId **original** (se excluye el del duplicado). Si se logra, se adopta y se
+   sigue su estado; el intento duplicado queda como rechazado en el historial. Si no se logra, se
+   conserva el aviso actual, pero **se vacía el TrackId guardado del duplicado**: dejarlo haría que una
+   reconsulta posterior marcara como rechazado un comprobante que la DGII sí aceptó (la respuesta
+   completa sigue en `ResponsePayload`).
 
 Con esto desaparece el caso que exigía soporte, salvo en `CerteCF` y con el validador interno, donde
 no hay forma de consultarlo.
