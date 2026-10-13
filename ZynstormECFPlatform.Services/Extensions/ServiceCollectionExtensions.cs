@@ -49,6 +49,8 @@ public static class ServiceCollectionExtensions
 
         // --- Certification: Representación Impresa (RI) ---
         services.AddTransient<ICertificationRiModelService, Ri.CertificationRiModelService>();
+        services.AddTransient<Ri.RiFormatService>();
+        services.AddTransient<IRiFormatService>(sp => sp.GetRequiredService<Ri.RiFormatService>());
 
         // --- Production ---
         services.AddTransient<IEcfProductionGeneratorService, Production.EcfProductionGeneratorService>();
