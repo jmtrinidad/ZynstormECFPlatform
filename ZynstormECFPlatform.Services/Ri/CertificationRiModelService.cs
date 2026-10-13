@@ -38,7 +38,8 @@ public class CertificationRiModelService(
             ?? throw new InvalidOperationException($"No se encontró el comprobante {ncf} para el cliente.");
 
         var company = await BuildCompanyHeaderAsync(client);
-        var html = RiHtmlRenderer.Render(format.Template.Html, doc.XmlSent, company, format.SampleDataJson);
+        var logo = await formatService.GetLogoForClientAsync(client.ClientId);
+        var html = RiHtmlRenderer.Render(format.Template.Html, doc.XmlSent, company, format.SampleDataJson, logo);
         return new RiRenderResult(Encoding.UTF8.GetBytes(html), "text/html", $"RI_{ncf}.html");
     }
 
@@ -76,6 +77,7 @@ public class CertificationRiModelService(
 
         var company = await BuildCompanyHeaderAsync(client);
         var format = await formatService.ResolveForClientAsync(client.ClientId);
+        var logo = format.Template is null ? null : await formatService.GetLogoForClientAsync(client.ClientId);
         var faltantes = new List<string>();
 
         using (var zipStream = new FileStream(zipPath, FileMode.Create))
@@ -94,7 +96,7 @@ public class CertificationRiModelService(
                     }
                     else
                     {
-                        bytes = Encoding.UTF8.GetBytes(RiHtmlRenderer.Render(format.Template.Html, doc.XmlSent, company, format.SampleDataJson));
+                        bytes = Encoding.UTF8.GetBytes(RiHtmlRenderer.Render(format.Template.Html, doc.XmlSent, company, format.SampleDataJson, logo));
                         extension = "html";
                     }
 

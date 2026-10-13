@@ -118,6 +118,45 @@ public class RiHtmlRendererTests
     }
 
     [Fact]
+    public void Render_ClientLogo_WinsOverSampleLogo()
+    {
+        var html = RiHtmlRenderer.Render(
+            RiHtmlTestTemplates.Reference,
+            Load("Paso_1_E310000000402.xml"),
+            Company,
+            "{\"EmisorLogo\":\"data:image/png;base64,SAMPLE\"}",
+            "data:image/png;base64,CLIENTE");
+
+        Assert.Contains("data:image/png;base64,CLIENTE", html);
+        Assert.DoesNotContain("SAMPLE", html);
+    }
+
+    [Fact]
+    public void Render_ClientLogo_ShowsLogoBox_WithoutSampleData()
+    {
+        var html = RiHtmlRenderer.Render(
+            RiHtmlTestTemplates.Reference, Load("Paso_1_E310000000402.xml"), Company, null, "data:image/png;base64,CLIENTE");
+
+        Assert.Contains("id=\"logo\"", html);
+        Assert.Contains("data:image/png;base64,CLIENTE", html);
+    }
+
+    [Fact]
+    public void Render_InvalidClientLogo_FallsBackToSampleLogo_OrHidesBox()
+    {
+        var withSample = RiHtmlRenderer.Render(
+            RiHtmlTestTemplates.Reference, Load("Paso_1_E310000000402.xml"), Company,
+            "{\"EmisorLogo\":\"data:image/png;base64,SAMPLE\"}", "http://evil/x.png");
+        var withoutSample = RiHtmlRenderer.Render(
+            RiHtmlTestTemplates.Reference, Load("Paso_1_E310000000402.xml"), Company, null, "http://evil/x.png");
+
+        Assert.Contains("SAMPLE", withSample);
+        Assert.DoesNotContain("evil", withSample);
+        Assert.DoesNotContain("evil", withoutSample);
+        Assert.DoesNotContain("id=\"logo\"", withoutSample);
+    }
+
+    [Fact]
     public void Render_EscapesValuesFromXmlAndCompany()
     {
         var company = new RiCompanyHeader("<b>X</b> & Co", "1", "<script>alert(1)</script>", "1", "1");

@@ -70,6 +70,18 @@ public class RiFormatController(IRiFormatService formatService) : ControllerBase
     public Task<ActionResult> Resolved(string clientGuidId) =>
         Run(async () => Ok(await formatService.GetResolvedAsync(clientGuidId)));
 
+    [HttpGet("clients/{clientGuidId}/logo")]
+    public Task<ActionResult> GetLogo(string clientGuidId) =>
+        Run(async () => Ok(await formatService.GetClientLogoAsync(clientGuidId)));
+
+    [HttpPut("clients/{clientGuidId}/logo")]
+    public Task<ActionResult> SetLogo(string clientGuidId, [FromBody] ClientLogoDto dto) =>
+        Run(async () =>
+        {
+            await formatService.SetClientLogoAsync(clientGuidId, dto);
+            return NoContent();
+        });
+
     private static async Task<ActionResult> Run(Func<Task<ActionResult>> action)
     {
         try

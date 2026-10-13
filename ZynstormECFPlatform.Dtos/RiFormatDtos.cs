@@ -29,6 +29,9 @@ public record RiHtmlTemplateUploadResultDto(
     IReadOnlyList<string> Errors,
     IReadOnlyList<string> Warnings);
 
+/// <param name="DataUri">data:image/png|jpeg|webp;base64,... ; null/vacío = sin logo.</param>
+public record ClientLogoDto(string? DataUri);
+
 public record ClientRiFormatAssignDto(string? ClientTypeGuidId, string? RiHtmlTemplateGuidId);
 
 /// <param name="Source">"Default" | "ClientType" | "Client".</param>
