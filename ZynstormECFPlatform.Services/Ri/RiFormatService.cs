@@ -171,6 +171,64 @@ public class RiFormatService(StorageContext context) : IRiFormatService
             resolved.Template?.Name);
     }
 
+    public async Task<ClientLogoDto> GetClientLogoAsync(string clientGuidId)
+    {
+        var clientId = await ClientIdAsync(clientGuidId);
+        return new ClientLogoDto(await GetLogoForClientAsync(clientId));
+    }
+
+    public async Task SetClientLogoAsync(string clientGuidId, ClientLogoDto dto)
+    {
+        var clientId = await ClientIdAsync(clientGuidId);
+        var existing = await context.Set<ClientLogo>().FirstOrDefaultAsync(l => l.ClientId == clientId);
+
+        if (string.IsNullOrWhiteSpace(dto.DataUri))
+        {
+            if (existing is not null)
+            {
+                context.Set<ClientLogo>().Remove(existing);
+                await context.SaveChangesAsync();
+            }
+
+            return;
+        }
+
+        var error = RiLogoValidator.Validate(dto.DataUri);
+        if (error is not null)
+        {
+            throw new InvalidOperationException(error);
+        }
+
+        if (existing is null)
+        {
+            context.Set<ClientLogo>().Add(new ClientLogo
+            {
+                GuidId = Guid.NewGuid().ToString(),
+                RegisteredAt = DateTime.UtcNow,
+                ClientId = clientId,
+                DataUri = dto.DataUri.Trim(),
+            });
+        }
+        else
+        {
+            existing.DataUri = dto.DataUri.Trim();
+            existing.LastUpdateUtc = DateTime.UtcNow;
+        }
+
+        await context.SaveChangesAsync();
+    }
+
+    /// <summary>Logo del cliente o null (usado por <see cref="CertificationRiModelService"/>).</summary>
+    public Task<string?> GetLogoForClientAsync(int clientId) =>
+        context.Set<ClientLogo>()
+            .Where(l => l.ClientId == clientId)
+            .Select(l => (string?)l.DataUri)
+            .FirstOrDefaultAsync();
+
+    private async Task<int> ClientIdAsync(string clientGuidId) =>
+        (await context.Set<Client>().Where(c => c.GuidId == clientGuidId).Select(c => (int?)c.ClientId).FirstOrDefaultAsync())
+        ?? throw new InvalidOperationException($"Cliente {clientGuidId} no encontrado.");
+
     /// <summary>Formato efectivo de un cliente (usado por <see cref="CertificationRiModelService"/>).</summary>
     public async Task<ResolvedRiFormat> ResolveForClientAsync(int clientId)
     {

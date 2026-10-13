@@ -34,7 +34,13 @@ public static class RiHtmlRenderer
 </div>
 """;
 
-    public static string Render(string templateHtml, string signedXml, RiCompanyHeader? company, string? sampleDataJson)
+    /// <param name="clientLogoDataUri">Logo subido para el cliente; tiene prioridad sobre el EmisorLogo de los datos de muestra.</param>
+    public static string Render(
+        string templateHtml,
+        string signedXml,
+        RiCompanyHeader? company,
+        string? sampleDataJson,
+        string? clientLogoDataUri = null)
     {
         var model = EcfRiTemplateMapper.MapInvoice(signedXml, DgiiEnvironment.CerteCF);
         if (company is not null)
@@ -49,7 +55,7 @@ public static class RiHtmlRenderer
             };
         }
 
-        var values = BuildValues(model, ParseSamples(sampleDataJson));
+        var values = BuildValues(model, ParseSamples(sampleDataJson), clientLogoDataUri);
 
         var document = new HtmlParser().ParseDocument(templateHtml);
         var body = document.Body ?? throw new InvalidOperationException("El formato HTML no tiene <body>.");
@@ -82,16 +88,21 @@ public static class RiHtmlRenderer
         }
     }
 
-    private static Dictionary<string, string> BuildValues(RiInvoiceModel model, Dictionary<string, string> samples)
+    private static bool IsImageDataUri(string? value) =>
+        !string.IsNullOrEmpty(value) && value.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase);
+
+    private static Dictionary<string, string> BuildValues(
+        RiInvoiceModel model, Dictionary<string, string> samples, string? clientLogoDataUri)
     {
         string Sample(string key) => samples.TryGetValue(key, out var v) ? v ?? string.Empty : string.Empty;
 
         var hideValidUntil = model.EcfType is 32 or 34;
-        var logo = Sample("EmisorLogo");
+        // Logo del cliente primero; si no hay (o no es una imagen), el de muestra del tipo; si no, vacío.
+        var logo = IsImageDataUri(clientLogoDataUri) ? clientLogoDataUri! : Sample("EmisorLogo");
 
         var values = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["EmisorLogo"] = logo.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase) ? logo : string.Empty,
+            ["EmisorLogo"] = IsImageDataUri(logo) ? logo : string.Empty,
             ["EmisorNombre"] = model.Company.Name,
             ["EmisorDireccion"] = model.Company.Address,
             ["EmisorRNC"] = model.Company.Rnc,

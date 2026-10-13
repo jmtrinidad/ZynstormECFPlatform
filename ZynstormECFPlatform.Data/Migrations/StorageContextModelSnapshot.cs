@@ -2896,6 +2896,54 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.ToTable("ClientCertificate");
                 });
 
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ClientLogo", b =>
+                {
+                    b.Property<int>("ClientLogoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("ClientLogoId"));
+
+                    b.Property<int>("ClientId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DataUri")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DeletedTimeUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("GuidId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(450)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(450)")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("LastUpdateUtc")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime>("RegisteredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("ClientLogoId");
+
+                    b.HasIndex("ClientId")
+                        .IsUnique();
+
+                    b.ToTable("ClientLogos");
+                });
+
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ClientMonthlyUsage", b =>
                 {
                     b.Property<int>("ClientMonthlyUsageId")
@@ -6960,6 +7008,18 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasForeignKey("ClientId")
                         .IsRequired()
                         .HasConstraintName("FK_ClientCertificate_Client");
+
+                    b.Navigation("Client");
+                });
+
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ClientLogo", b =>
+                {
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.Client", "Client")
+                        .WithOne()
+                        .HasForeignKey("ZynstormECFPlatform.Core.Entities.ClientLogo", "ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_ClientLogo_Client");
 
                     b.Navigation("Client");
                 });
