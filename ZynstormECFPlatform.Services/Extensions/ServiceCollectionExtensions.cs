@@ -70,6 +70,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Jobs.EcfTrackingJob>();
         services.AddTransient<Jobs.EcfTransmitJob>();
         services.AddTransient<Jobs.EcfRetrackJob>();
+        services.AddTransient<Production.IEcfRequeueService, Production.EcfRequeueService>();
         services.AddTransient<Jobs.AutomaticReportsJob>();
         services.AddTransient<Jobs.ReceivedB2BMessagesCleanupJob>();
         services.AddTransient<Jobs.CertificateExpirationJob>();

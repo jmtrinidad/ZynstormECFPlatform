@@ -18,6 +18,7 @@ namespace ZynstormECFPlatform.Dtos
         public string? ResponseDate { get; set; } // Fecha de procesamiento o respuesta
         public string? Xml { get; set; } // Solo poblado en consulta por GUID
         public string? DgiiMessage { get; set; } // Mensaje devuelto por la DGII
+        public string? RequeueAction { get; set; } // "transmit" | "track" | null: qué se puede hacer con un comprobante atascado
     }
 
     public class EcfDocumentStatsDto
