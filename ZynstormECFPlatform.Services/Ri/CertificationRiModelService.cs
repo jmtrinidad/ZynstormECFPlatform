@@ -6,6 +6,7 @@ using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Data;
+using ZynstormECFPlatform.Services.Ri.Html;
 
 namespace ZynstormECFPlatform.Services.Ri;
 
@@ -16,8 +17,31 @@ namespace ZynstormECFPlatform.Services.Ri;
 /// </summary>
 public class CertificationRiModelService(
     IClientService clientService,
-    StorageContext context) : ICertificationRiModelService
+    StorageContext context,
+    RiFormatService formatService) : ICertificationRiModelService
 {
+    public async Task<RiRenderResult> RenderRiAsync(string clientGuidId, string ncf)
+    {
+        var client = await clientService.GetByAsync(c => c.GuidId == clientGuidId)
+            ?? throw new InvalidOperationException($"Cliente {clientGuidId} no encontrado.");
+
+        var format = await formatService.ResolveForClientAsync(client.ClientId);
+        if (format.Template is null)
+        {
+            // Sin formato HTML: comportamiento original (PDF QuestPDF).
+            return new RiRenderResult(await RenderRiForDocumentAsync(clientGuidId, ncf), "application/pdf", $"RI_{ncf}.pdf");
+        }
+
+        var doc = await context.Set<CertificationDocument>()
+            .Include(d => d.CertificationProcess)
+            .FirstOrDefaultAsync(d => d.CertificationProcess.ClientId == client.ClientId && d.ENcfSecuence == ncf)
+            ?? throw new InvalidOperationException($"No se encontró el comprobante {ncf} para el cliente.");
+
+        var company = await BuildCompanyHeaderAsync(client);
+        var html = RiHtmlRenderer.Render(format.Template.Html, doc.XmlSent, company, format.SampleDataJson);
+        return new RiRenderResult(Encoding.UTF8.GetBytes(html), "text/html", $"RI_{ncf}.html");
+    }
+
     public async Task<byte[]> RenderRiForDocumentAsync(string clientGuidId, string ncf)
     {
         var client = await clientService.GetByAsync(c => c.GuidId == clientGuidId)
@@ -51,6 +75,7 @@ public class CertificationRiModelService(
         var zipPath = Path.Combine(zipDir, zipFileName);
 
         var company = await BuildCompanyHeaderAsync(client);
+        var format = await formatService.ResolveForClientAsync(client.ClientId);
         var faltantes = new List<string>();
 
         using (var zipStream = new FileStream(zipPath, FileMode.Create))
@@ -60,11 +85,22 @@ public class CertificationRiModelService(
             {
                 try
                 {
-                    var pdfBytes = RiPdfRenderer.Render(ParseEcfType(doc.EcfType.Code), doc.XmlSent, company);
+                    byte[] bytes;
+                    string extension;
+                    if (format.Template is null)
+                    {
+                        bytes = RiPdfRenderer.Render(ParseEcfType(doc.EcfType.Code), doc.XmlSent, company);
+                        extension = "pdf";
+                    }
+                    else
+                    {
+                        bytes = Encoding.UTF8.GetBytes(RiHtmlRenderer.Render(format.Template.Html, doc.XmlSent, company, format.SampleDataJson));
+                        extension = "html";
+                    }
 
-                    var entry = archive.CreateEntry($"{doc.ENcfSecuence}.pdf", CompressionLevel.Optimal);
+                    var entry = archive.CreateEntry($"{doc.ENcfSecuence}.{extension}", CompressionLevel.Optimal);
                     using var entryStream = entry.Open();
-                    await entryStream.WriteAsync(pdfBytes);
+                    await entryStream.WriteAsync(bytes);
                 }
                 catch (Exception ex)
                 {
