@@ -3242,6 +3242,55 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.ToTable("ClientTypes");
                 });
 
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ClientTypeTemplate", b =>
+                {
+                    b.Property<int>("ClientTypeTemplateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("ClientTypeTemplateId"));
+
+                    b.Property<int>("ClientTypeId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DeletedTimeUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("GuidId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(450)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(450)")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("LastUpdateUtc")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime>("RegisteredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("RiHtmlTemplateId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ClientTypeTemplateId");
+
+                    b.HasIndex("RiHtmlTemplateId");
+
+                    b.HasIndex("ClientTypeId", "RiHtmlTemplateId")
+                        .IsUnique();
+
+                    b.ToTable("ClientTypeTemplates");
+                });
+
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.Currency", b =>
                 {
                     b.Property<int>("CurrencyId")
@@ -7084,6 +7133,27 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Navigation("RiHtmlTemplate");
                 });
 
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ClientTypeTemplate", b =>
+                {
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.ClientType", "ClientType")
+                        .WithMany("TemplateLinks")
+                        .HasForeignKey("ClientTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_ClientTypeTemplate_ClientType");
+
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.RiHtmlTemplate", "RiHtmlTemplate")
+                        .WithMany("ClientTypeLinks")
+                        .HasForeignKey("RiHtmlTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_ClientTypeTemplate_RiHtmlTemplate");
+
+                    b.Navigation("ClientType");
+
+                    b.Navigation("RiHtmlTemplate");
+                });
+
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ENcf", b =>
                 {
                     b.HasOne("ZynstormECFPlatform.Core.Entities.Client", "Client")
@@ -7441,6 +7511,8 @@ namespace ZynstormECFPlatform.Data.Migrations
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ClientType", b =>
                 {
                     b.Navigation("Clients");
+
+                    b.Navigation("TemplateLinks");
                 });
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.Currency", b =>
@@ -7506,6 +7578,8 @@ namespace ZynstormECFPlatform.Data.Migrations
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.RiHtmlTemplate", b =>
                 {
+                    b.Navigation("ClientTypeLinks");
+
                     b.Navigation("ClientTypes");
 
                     b.Navigation("Clients");

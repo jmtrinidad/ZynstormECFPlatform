@@ -15,6 +15,7 @@ public class RiFormatService(StorageContext context) : IRiFormatService
     {
         var types = await context.Set<ClientType>()
             .Include(t => t.RiHtmlTemplate)
+            .Include(t => t.TemplateLinks).ThenInclude(l => l.RiHtmlTemplate)
             .OrderBy(t => t.Name)
             .ToListAsync();
 
@@ -45,6 +46,16 @@ public class RiFormatService(StorageContext context) : IRiFormatService
             RiHtmlTemplateId = await ResolveTemplateIdAsync(dto.RiHtmlTemplateGuidId),
         };
 
+        if (entity.RiHtmlTemplateId is { } defaultId)
+        {
+            entity.TemplateLinks.Add(new ClientTypeTemplate
+            {
+                GuidId = Guid.NewGuid().ToString(),
+                RegisteredAt = DateTime.UtcNow,
+                RiHtmlTemplateId = defaultId,
+            });
+        }
+
         context.Set<ClientType>().Add(entity);
         await context.SaveChangesAsync();
 
@@ -66,10 +77,52 @@ public class RiFormatService(StorageContext context) : IRiFormatService
         entity.Description = dto.Description;
         entity.SampleDataJson = NormalizeSamples(dto.SampleDataJson);
         entity.RiHtmlTemplateId = await ResolveTemplateIdAsync(dto.RiHtmlTemplateGuidId);
+        if (entity.RiHtmlTemplateId is { } defaultId)
+        {
+            await EnsureLinkAsync(entity.ClientTypeId, defaultId);
+        }
+
         entity.LastUpdateUtc = DateTime.UtcNow;
         await context.SaveChangesAsync();
 
         return await GetTypeDtoAsync(guidId);
+    }
+
+    public async Task<ClientTypeDto> AddTemplateToClientTypeAsync(string clientTypeGuidId, string templateGuidId)
+    {
+        var type = await context.Set<ClientType>().FirstOrDefaultAsync(t => t.GuidId == clientTypeGuidId)
+            ?? throw new InvalidOperationException("Tipo de cliente no encontrado.");
+        var templateId = await ResolveTemplateIdAsync(templateGuidId)
+            ?? throw new InvalidOperationException("Formato no encontrado.");
+
+        await EnsureLinkAsync(type.ClientTypeId, templateId);
+        type.RiHtmlTemplateId ??= templateId;   // el primer formato del tipo queda como predeterminado
+        type.LastUpdateUtc = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+
+        return await GetTypeDtoAsync(clientTypeGuidId);
+    }
+
+    public async Task<ClientTypeDto> RemoveTemplateFromClientTypeAsync(string clientTypeGuidId, string templateGuidId)
+    {
+        var type = await context.Set<ClientType>().FirstOrDefaultAsync(t => t.GuidId == clientTypeGuidId)
+            ?? throw new InvalidOperationException("Tipo de cliente no encontrado.");
+        var templateId = await ResolveTemplateIdAsync(templateGuidId)
+            ?? throw new InvalidOperationException("Formato no encontrado.");
+
+        if (type.RiHtmlTemplateId == templateId)
+        {
+            throw new InvalidOperationException("Es el formato predeterminado del tipo; marque otro como predeterminado antes de quitarlo.");
+        }
+
+        var links = await context.Set<ClientTypeTemplate>()
+            .Where(l => l.ClientTypeId == type.ClientTypeId && l.RiHtmlTemplateId == templateId)
+            .ToListAsync();
+        context.Set<ClientTypeTemplate>().RemoveRange(links);
+        type.LastUpdateUtc = DateTime.UtcNow;
+        await context.SaveChangesAsync();
+
+        return await GetTypeDtoAsync(clientTypeGuidId);
     }
 
     public async Task DeleteClientTypeAsync(string guidId)
@@ -257,11 +310,19 @@ public class RiFormatService(StorageContext context) : IRiFormatService
         return template.RiHtmlTemplateId;
     }
 
+    /// <summary>Tipos que lo tienen (como predeterminado o disponible, sin contar dos veces) más clientes que lo usan.</summary>
     private async Task<int> UsageCountAsync(int templateId)
     {
-        var types = await context.Set<ClientType>().CountAsync(t => t.RiHtmlTemplateId == templateId);
+        var defaultTypes = await context.Set<ClientType>()
+            .Where(t => t.RiHtmlTemplateId == templateId)
+            .Select(t => t.ClientTypeId)
+            .ToListAsync();
+        var linkedTypes = await context.Set<ClientTypeTemplate>()
+            .Where(l => l.RiHtmlTemplateId == templateId)
+            .Select(l => l.ClientTypeId)
+            .ToListAsync();
         var clients = await context.Set<Client>().CountAsync(c => c.RiHtmlTemplateId == templateId);
-        return types + clients;
+        return defaultTypes.Union(linkedTypes).Count() + clients;
     }
 
     private async Task<RiHtmlTemplateDto> ToDtoAsync(RiHtmlTemplate t) =>
@@ -269,13 +330,41 @@ public class RiFormatService(StorageContext context) : IRiFormatService
 
     private async Task<ClientTypeDto> GetTypeDtoAsync(string guidId)
     {
-        var type = await context.Set<ClientType>().Include(t => t.RiHtmlTemplate).FirstAsync(t => t.GuidId == guidId);
+        var type = await context.Set<ClientType>()
+            .Include(t => t.RiHtmlTemplate)
+            .Include(t => t.TemplateLinks).ThenInclude(l => l.RiHtmlTemplate)
+            .FirstAsync(t => t.GuidId == guidId);
         var count = await context.Set<Client>().CountAsync(c => c.ClientTypeId == type.ClientTypeId);
         return ToDto(type, count);
     }
 
     private static ClientTypeDto ToDto(ClientType t, int clientCount) =>
-        new(t.GuidId, t.Name, t.Description, t.RiHtmlTemplate?.GuidId, t.RiHtmlTemplate?.Name, t.SampleDataJson, clientCount);
+        new(
+            t.GuidId,
+            t.Name,
+            t.Description,
+            t.RiHtmlTemplate?.GuidId,
+            t.RiHtmlTemplate?.Name,
+            t.SampleDataJson,
+            clientCount,
+            RiFormatResolver.FormatsOf(t).Select(f => new ClientTypeFormatDto(f.Template.GuidId, f.Template.Name, f.IsDefault)).ToList());
+
+    /// <summary>Vincula el formato al tipo si aún no lo está (no guarda; lo hace el llamador).</summary>
+    private async Task EnsureLinkAsync(int clientTypeId, int templateId)
+    {
+        var linked = await context.Set<ClientTypeTemplate>()
+            .AnyAsync(l => l.ClientTypeId == clientTypeId && l.RiHtmlTemplateId == templateId);
+        if (!linked)
+        {
+            context.Set<ClientTypeTemplate>().Add(new ClientTypeTemplate
+            {
+                GuidId = Guid.NewGuid().ToString(),
+                RegisteredAt = DateTime.UtcNow,
+                ClientTypeId = clientTypeId,
+                RiHtmlTemplateId = templateId,
+            });
+        }
+    }
 
     private static string ValidateTypeDto(ClientTypeSaveDto dto)
     {

@@ -13,6 +13,12 @@ public interface IRiFormatService
 
     Task DeleteClientTypeAsync(string guidId);
 
+    /// <summary>Agrega un formato de la biblioteca a los disponibles del tipo; si el tipo no tenía predeterminado, queda como tal.</summary>
+    Task<ClientTypeDto> AddTemplateToClientTypeAsync(string clientTypeGuidId, string templateGuidId);
+
+    /// <summary>Quita un formato de los disponibles del tipo. No se puede quitar el predeterminado.</summary>
+    Task<ClientTypeDto> RemoveTemplateFromClientTypeAsync(string clientTypeGuidId, string templateGuidId);
+
     Task<IReadOnlyList<RiHtmlTemplateDto>> ListTemplatesAsync();
 
     Task<RiHtmlTemplateUploadResultDto> UploadTemplateAsync(RiHtmlTemplateUploadDto dto);

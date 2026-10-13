@@ -13,5 +13,7 @@ public class RiHtmlTemplate : BaseEntity
 
     public virtual ICollection<ClientType> ClientTypes { get; set; } = [];
 
+    public virtual ICollection<ClientTypeTemplate> ClientTypeLinks { get; set; } = [];
+
     public virtual ICollection<Client> Clients { get; set; } = [];
 }
