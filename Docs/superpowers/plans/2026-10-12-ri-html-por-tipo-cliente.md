@@ -2598,7 +2598,7 @@ Reportar al usuario: commits aplicados en cada rama, resultado de build/tests en
 - §10 pruebas → incluidas en Tasks 2–4; DB no se prueba con tests (no hay proveedor en memoria en el proyecto de tests): la lógica de resolución es pura y está cubierta, y el CRUD se verifica manualmente (Task 6 Step 4).
 - §12 replicación → Task 9.
 
-**Placeholders:** ninguno ("sanity" del test 1 está resuelto con instrucción explícita de borrarlo).
+**Placeholders:** ninguno.
 
 **Consistencia de tipos:** `RiHtmlRenderer.Render(string templateHtml, string signedXml, RiCompanyHeader? company, string? sampleDataJson)` coincide entre Task 3 (definición/tests) y Task 5 (uso). `ResolvedRiFormat`/`RiFormatSource` (Task 4) coinciden con su uso en Task 5. `RiRenderResult(byte[] Content, string ContentType, string FileName)` coincide en Tasks 5 y 6. DTOs (Task 4) coinciden con tipos TS (Task 7): `clientCount`, `inUseCount`, `riHtmlTemplateGuidId`, `source` como string. `RiFormatService` se registra como clase concreta y como `IRiFormatService` (Task 4 Step 7) porque `CertificationRiModelService` inyecta la clase concreta (Task 5).
 
