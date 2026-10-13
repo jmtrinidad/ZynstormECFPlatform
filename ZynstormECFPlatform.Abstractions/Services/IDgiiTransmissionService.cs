@@ -26,6 +26,25 @@ public class DgiiTransmissionResult
     public bool Success => (!string.IsNullOrEmpty(TrackId) || string.Equals(Estado, "Aceptado", StringComparison.OrdinalIgnoreCase) || Codigo == 0) && string.IsNullOrEmpty(Error);
 }
 
+/// <summary>Un TrackId que la DGII devolvió para un eNCF recibido (servicio «Consulta de TrackId e-CF»).</summary>
+public class DgiiTrackIdEntry
+{
+    public string TrackId { get; set; } = string.Empty;
+    public string? Estado { get; set; }
+    public string? FechaRecepcion { get; set; }
+}
+
+public class DgiiTrackIdsResult
+{
+    /// <summary>false cuando la consulta no existe en ese ambiente (CerteCF, validador interno): no es un error.</summary>
+    public bool Available { get; set; } = true;
+
+    /// <summary>Texto del fallo (HTTP, red) o del motivo de no estar disponible; null si la consulta se hizo bien.</summary>
+    public string? Error { get; set; }
+
+    public List<DgiiTrackIdEntry> Entries { get; set; } = [];
+}
+
 public class RfceMensaje
 {
     public string Codigo { get; set; } = string.Empty;
@@ -49,6 +68,17 @@ public interface IDgiiTransmissionService
         DgiiEnvironment environment,
         string token,
         string trackId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Consulta de TrackId e-CF de la DGII: los TrackId que recibió para un eNCF del emisor.
+    /// Sirve para recuperar el TrackId cuando la respuesta de la recepción se perdió.
+    /// </summary>
+    Task<DgiiTrackIdsResult> GetTrackIdsAsync(
+        DgiiEnvironment environment,
+        string token,
+        string rncEmisor,
+        string eNcf,
         CancellationToken cancellationToken = default);
 
     /// <summary>

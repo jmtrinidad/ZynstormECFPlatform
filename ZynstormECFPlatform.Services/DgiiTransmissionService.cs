@@ -251,6 +251,50 @@ public class DgiiTransmissionService : IDgiiTransmissionService
         };
     }
 
+    public async Task<DgiiTrackIdsResult> GetTrackIdsAsync(
+        DgiiEnvironment environment,
+        string token,
+        string rncEmisor,
+        string eNcf,
+        CancellationToken cancellationToken = default)
+    {
+        // El validador interno de staging no ofrece esta consulta.
+        if (_configuration.GetValue<bool>("EcfXmlValidation:UseInternalValidator"))
+        {
+            return new DgiiTrackIdsResult { Available = false, Error = "El validador interno no ofrece la consulta de TrackId." };
+        }
+
+        // La DGII no la publica en certificación (CerteCF): sin URL configurada no existe.
+        var baseUrl = _configuration[$"DgiiUrls:{environment}:ConsultaTrackIds"];
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return new DgiiTrackIdsResult { Available = false, Error = $"No hay URL de consulta de TrackId para {environment}." };
+        }
+
+        var url = $"{baseUrl.TrimEnd('/')}/api/trackids/consulta?rncemisor={Uri.EscapeDataString(rncEmisor)}&encf={Uri.EscapeDataString(eNcf)}";
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            var responseString = await response.Content.ReadAsStringAsync(cancellationToken);
+            LogDgiiRawResponse("GetTrackIds", environment, url, ecfType: null, eNcf, isRfce: false, response, responseString);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return new DgiiTrackIdsResult { Error = $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}" };
+            }
+
+            return new DgiiTrackIdsResult { Entries = Production.DgiiTrackIdParser.Parse(responseString) };
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            return new DgiiTrackIdsResult { Error = ex.Message };
+        }
+    }
+
     public async Task<DgiiTransmissionResult> SendArecfAsync(DgiiEnvironment environment, string token, string signedXml, string rncEmisor, string eNcf)
     {
         string endpointUrl;
