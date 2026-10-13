@@ -548,73 +548,10 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
         if (!string.IsNullOrWhiteSpace(transmission.TrackId))
         {
-            var transmissionRecord = await BeginTransmissionAsync(ecfDocument, transmission, signedXml, attemptNumber);
-
-            var status = await WaitForFinalDgiiStatusAsync(
-                targetEnvironment, token, transmission.TrackId, cancellationToken);
-            _cacheService.Set($"EcfStatus_{transmission.TrackId}", status, TimeSpan.FromHours(1));
-            timings?.Mark("espera_estado_final");
-            await AddDgiiStatusLogAsync(ecfDocument, clientId, targetEnvironment, transmission.TrackId, status);
-            resultDto.Status = status;
-            resultDto.DgiiResponse = status;
-            resultDto.IsAcceptedConditional = IsAcceptedConditionalDgiiStatus(status);
-            resultDto.RequiresCorrection = RequiresCorrectionDgiiStatus(status);
-            resultDto.Success = string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase);
-            var statusId = MapDgiiStatusToEcfStatus(status);
-            resultDto.Message = resultDto.Success ? $"TrackId: {transmission.TrackId}" : BuildDgiiStatusError(status);
-
-            // 1209/75 en un reintento propio: el primer envío probablemente sí llegó y la
-            // respuesta se perdió. No es una secuencia quemada ni un rechazo: se deja Pendiente
-            // con un aviso, sin Status/DgiiResponse rechazados (la librería los clasificaría
-            // como secuencia quemada) y sin pedir un NCF nuevo.
-            if (EcfTransmitRetryPolicy.IsOwnDuplicate(status, earlierAttemptsWithoutTrackId))
-            {
-                statusId = 9;
-                resultDto.Success = false;
-                resultDto.IsAcceptedConditional = false;
-                resultDto.RequiresCorrection = false;
-                resultDto.IsPending = true;
-                resultDto.Status = null;
-                resultDto.DgiiResponse = null;
-                resultDto.Message = "La DGII ya recibió este comprobante en un envío anterior; falta confirmar su TrackId.";
-
-                await AddLogAsync(
-                    ecfDocument,
-                    clientId,
-                    "Warning",
-                    $"Reintento {attemptNumber}: la DGII ya tenía el eNCF {eNcf} de un envío anterior sin TrackId. No se trata como secuencia quemada; conciliar con la DGII.",
-                    JsonSerializer.Serialize(status));
-            }
-
-            if (resultDto.Success)
-                await AddLogAsync(ecfDocument, clientId, "Information", $"e-CF aprobado. TrackId: {transmission.TrackId}. CodigoSeguridad: {resultDto.SecurityCode}. FechaFirma: {resultDto.SignatureDate}. QR: {resultDto.QrUrl}.");
-
-            await MarkDocumentAsync(ecfDocument, statusId, resultDto.Message);
-            await CompleteTransmissionAsync(transmissionRecord, transmission, statusId, status);
-
-            if (resultDto.Success || resultDto.IsAcceptedConditional)
-                await _clientUsageService.RegisterAcceptedAsync(ecfDocument.EcfDocumentId, clientId, cancellationToken);
-
-            if (IsPendingDgiiStatus(status))
-            {
-                resultDto.IsPending = true;
-                resultDto.Success = false;
-                resultDto.Message = string.IsNullOrWhiteSpace(status.Error)
-                    ? $"DGII aun procesa el e-CF. TrackId: {transmission.TrackId}"
-                    : status.Error;
-
-                var trackingDelaySeconds = Math.Max(
-                    1,
-                    _configuration.GetValue<int?>("EcfPerformance:TrackingInitialDelaySeconds") ?? 1);
-                var jobId = BackgroundJob.Schedule<EcfTrackingJob>(
-                    j => j.Execute(transmission.TrackId, targetEnvironment, issuerRnc, certBase64, certPass, ecfDocument.EcfDocumentId, 1),
-                    TimeSpan.FromSeconds(trackingDelaySeconds));
-
-                ecfDocument.HangfireJobId = jobId;
-                await _ecfDocumentService.UpdateAsync(ecfDocument);
-                resultDto.HangfireJobId = jobId;
-                await AddLogAsync(ecfDocument, clientId, "Information", $"DGII no retorno aceptacion inmediata. Job de seguimiento programado: {jobId}.");
-            }
+            await TrackReceivedAsync(
+                resultDto, ecfDocument, clientId, transmission, signedXml, eNcf, issuerRnc,
+                targetEnvironment, certBase64, certPass, token, attemptNumber,
+                earlierAttemptsWithoutTrackId, timings, cancellationToken);
 
             return TransmitStep.Completed;
         }
@@ -634,6 +571,179 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         }
 
         return TransmitStep.Completed;
+    }
+
+    /// <summary>
+    /// La DGII recibió el documento y devolvió un TrackId: se guarda, se espera el estado final y,
+    /// si sigue en proceso, se programa el seguimiento. Lo usan el envío normal y la recuperación
+    /// de un TrackId perdido.
+    /// </summary>
+    private async Task TrackReceivedAsync(
+        ReceivedEcfEmissionResultDto resultDto,
+        EcfDocument ecfDocument,
+        int clientId,
+        DgiiTransmissionResult transmission,
+        string signedXml,
+        string eNcf,
+        string issuerRnc,
+        DgiiEnvironment targetEnvironment,
+        string certBase64,
+        string certPass,
+        string token,
+        int attemptNumber,
+        bool earlierAttemptsWithoutTrackId,
+        EcfEmitTimings? timings,
+        CancellationToken cancellationToken)
+    {
+        var transmissionRecord = await BeginTransmissionAsync(ecfDocument, transmission, signedXml, attemptNumber);
+
+        var status = await WaitForFinalDgiiStatusAsync(
+            targetEnvironment, token, transmission.TrackId, cancellationToken);
+        _cacheService.Set($"EcfStatus_{transmission.TrackId}", status, TimeSpan.FromHours(1));
+        timings?.Mark("espera_estado_final");
+        await AddDgiiStatusLogAsync(ecfDocument, clientId, targetEnvironment, transmission.TrackId, status);
+        resultDto.Status = status;
+        resultDto.DgiiResponse = status;
+        resultDto.IsAcceptedConditional = IsAcceptedConditionalDgiiStatus(status);
+        resultDto.RequiresCorrection = RequiresCorrectionDgiiStatus(status);
+        resultDto.Success = string.Equals(status.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase);
+        var statusId = MapDgiiStatusToEcfStatus(status);
+        resultDto.Message = resultDto.Success ? $"TrackId: {transmission.TrackId}" : BuildDgiiStatusError(status);
+
+        // 1209/75 en un reintento propio: el primer envío probablemente sí llegó y la
+        // respuesta se perdió. No es una secuencia quemada ni un rechazo: se deja Pendiente
+        // con un aviso, sin Status/DgiiResponse rechazados (la librería los clasificaría
+        // como secuencia quemada) y sin pedir un NCF nuevo.
+        if (EcfTransmitRetryPolicy.IsOwnDuplicate(status, earlierAttemptsWithoutTrackId))
+        {
+            // La DGII respondió con un TrackId NUEVO y rechazado (el del intento duplicado). El del
+            // envío original sigue sin conocerse: se le pregunta a la DGII (se excluye el duplicado).
+            if (await TryAdoptExistingTrackIdAsync(
+                    resultDto, ecfDocument, clientId, signedXml, issuerRnc, eNcf, targetEnvironment,
+                    certBase64, certPass, token, attemptNumber, excludeTrackId: transmission.TrackId, cancellationToken))
+            {
+                await CompleteTransmissionAsync(transmissionRecord, transmission, 11, status);
+                return;
+            }
+
+            // No se pudo recuperar: se vacía el TrackId guardado del duplicado. Si quedara, una
+            // reconsulta posterior marcaría como rechazado un comprobante que la DGII sí aceptó
+            // (la respuesta completa sigue en ResponsePayload).
+            transmissionRecord.TrackId = string.Empty;
+
+            statusId = 9;
+            resultDto.Success = false;
+            resultDto.IsAcceptedConditional = false;
+            resultDto.RequiresCorrection = false;
+            resultDto.IsPending = true;
+            resultDto.Status = null;
+            resultDto.DgiiResponse = null;
+            resultDto.Message = "La DGII ya recibió este comprobante en un envío anterior; falta confirmar su TrackId.";
+
+            await AddLogAsync(
+                ecfDocument,
+                clientId,
+                "Warning",
+                $"Reintento {attemptNumber}: la DGII ya tenía el eNCF {eNcf} de un envío anterior sin TrackId. No se trata como secuencia quemada; conciliar con la DGII.",
+                JsonSerializer.Serialize(status));
+        }
+
+        if (resultDto.Success)
+            await AddLogAsync(ecfDocument, clientId, "Information", $"e-CF aprobado. TrackId: {transmission.TrackId}. CodigoSeguridad: {resultDto.SecurityCode}. FechaFirma: {resultDto.SignatureDate}. QR: {resultDto.QrUrl}.");
+
+        await MarkDocumentAsync(ecfDocument, statusId, resultDto.Message);
+        await CompleteTransmissionAsync(transmissionRecord, transmission, statusId, status);
+
+        if (resultDto.Success || resultDto.IsAcceptedConditional)
+            await _clientUsageService.RegisterAcceptedAsync(ecfDocument.EcfDocumentId, clientId, cancellationToken);
+
+        if (IsPendingDgiiStatus(status))
+        {
+            resultDto.IsPending = true;
+            resultDto.Success = false;
+            resultDto.Message = string.IsNullOrWhiteSpace(status.Error)
+                ? $"DGII aun procesa el e-CF. TrackId: {transmission.TrackId}"
+                : status.Error;
+
+            var trackingDelaySeconds = Math.Max(
+                1,
+                _configuration.GetValue<int?>("EcfPerformance:TrackingInitialDelaySeconds") ?? 1);
+            var jobId = BackgroundJob.Schedule<EcfTrackingJob>(
+                j => j.Execute(transmission.TrackId, targetEnvironment, issuerRnc, certBase64, certPass, ecfDocument.EcfDocumentId, 1),
+                TimeSpan.FromSeconds(trackingDelaySeconds));
+
+            ecfDocument.HangfireJobId = jobId;
+            await _ecfDocumentService.UpdateAsync(ecfDocument);
+            resultDto.HangfireJobId = jobId;
+            await AddLogAsync(ecfDocument, clientId, "Information", $"DGII no retorno aceptacion inmediata. Job de seguimiento programado: {jobId}.");
+        }
+    }
+
+    /// <summary>
+    /// Pregunta a la DGII si ya tiene recibido el eNCF (Consulta de TrackId). Si lo tiene, adopta
+    /// su TrackId y sigue su estado sin retransmitir. False cuando la consulta no está disponible,
+    /// falla o la DGII no lo tiene: quien llama sigue con su camino normal.
+    /// </summary>
+    private async Task<bool> TryAdoptExistingTrackIdAsync(
+        ReceivedEcfEmissionResultDto resultDto,
+        EcfDocument ecfDocument,
+        int clientId,
+        string signedXml,
+        string issuerRnc,
+        string eNcf,
+        DgiiEnvironment targetEnvironment,
+        string certBase64,
+        string certPass,
+        string token,
+        int attemptNumber,
+        string? excludeTrackId,
+        CancellationToken cancellationToken)
+    {
+        DgiiTrackIdsResult found;
+
+        try
+        {
+            found = await _transmissionService.GetTrackIdsAsync(targetEnvironment, token, issuerRnc, eNcf, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            await AddLogAsync(ecfDocument, clientId, "Warning", $"No se pudo consultar el TrackId de {eNcf} a la DGII: {ex.Message}");
+            return false;
+        }
+
+        if (!found.Available || found.Error is not null)
+        {
+            await AddLogAsync(
+                ecfDocument,
+                clientId,
+                "Information",
+                found.Available
+                    ? $"No se pudo consultar el TrackId de {eNcf} a la DGII: {found.Error}"
+                    : $"Consulta de TrackId no disponible: {found.Error}");
+            return false;
+        }
+
+        var entry = DgiiTrackIdPicker.Pick(found.Entries, excludeTrackId);
+        if (entry is null)
+        {
+            await AddLogAsync(ecfDocument, clientId, "Information", $"La DGII no tiene recibido el eNCF {eNcf}; se transmitirá.");
+            return false;
+        }
+
+        await AddLogAsync(
+            ecfDocument,
+            clientId,
+            "Information",
+            $"La DGII ya había recibido el eNCF {eNcf}: TrackId {entry.TrackId} ({entry.Estado}). Se recuperó sin retransmitir.");
+
+        var recovered = new DgiiTransmissionResult { TrackId = entry.TrackId, Estado = entry.Estado };
+
+        await TrackReceivedAsync(
+            resultDto, ecfDocument, clientId, recovered, signedXml, eNcf, issuerRnc,
+            targetEnvironment, certBase64, certPass, token, attemptNumber,
+            earlierAttemptsWithoutTrackId: false, timings: null, cancellationToken);
+
+        return true;
     }
 
     /// <summary>
@@ -726,7 +836,19 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
                 EcfType = ecfType
             };
 
-            step = await TransmitAndTrackAsync(
+            // Un reintento de un documento que ya tuvo intentos sin TrackId: antes de volver a
+            // enviar se le pregunta a la DGII si ya lo recibió (cubre los reintentos automáticos y
+            // el re-encolado manual). Si lo tiene, se sigue su estado sin retransmitir.
+            var adopted = earlierAttemptsWithoutTrackId
+                && tokenTask is not null
+                && await TryAdoptExistingTrackIdAsync(
+                    resultDto, ecfDocument, clientId, xml.XmlSigned, issuerRnc, ecfDocument.Ncf,
+                    targetEnvironment, certBase64, certPass, await tokenTask, attemptNumber,
+                    excludeTrackId: null, cancellationToken);
+
+            step = adopted
+                ? TransmitStep.Completed
+                : await TransmitAndTrackAsync(
                 resultDto,
                 ecfDocument,
                 clientId,
