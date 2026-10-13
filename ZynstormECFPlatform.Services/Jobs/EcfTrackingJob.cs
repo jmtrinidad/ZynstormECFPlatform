@@ -74,6 +74,29 @@ public class EcfTrackingJob
         int ecfDocumentId = 0,
         int attemptNumber = 1)
     {
+        var stillPending = await CheckAsync(trackId, environment, rncEmisor, certBase64, certPass, ecfDocumentId, attemptNumber);
+
+        if (stillPending && attemptNumber < MaxAttempts)
+        {
+            BackgroundJob.Schedule<EcfTrackingJob>(
+                j => j.Execute(trackId, environment, rncEmisor, certBase64, certPass, ecfDocumentId, attemptNumber + 1),
+                TimeSpan.FromSeconds(3));
+        }
+    }
+
+    /// <summary>
+    /// Consulta una vez el estado a la DGII y lo guarda. No programa nada. True si la DGII sigue
+    /// procesando el comprobante. Lo usan este job y <see cref="EcfRetrackJob"/>.
+    /// </summary>
+    public async Task<bool> CheckAsync(
+        string trackId,
+        DgiiEnvironment environment,
+        string rncEmisor,
+        string certBase64,
+        string certPass,
+        int ecfDocumentId = 0,
+        int attemptNumber = 1)
+    {
         _logger.LogInformation("Checking status for TrackId: {TrackId}", trackId);
 
         try
@@ -91,12 +114,7 @@ public class EcfTrackingJob
                 await PersistStatusAsync(ecfDocumentId, trackId, rncEmisor, statusResponse, attemptNumber, environment);
             }
 
-            if (ReceivedEcfProductionService.IsPendingDgiiStatus(statusResponse) && attemptNumber < MaxAttempts)
-            {
-                BackgroundJob.Schedule<EcfTrackingJob>(
-                    j => j.Execute(trackId, environment, rncEmisor, certBase64, certPass, ecfDocumentId, attemptNumber + 1),
-                    TimeSpan.FromSeconds(3));
-            }
+            return ReceivedEcfProductionService.IsPendingDgiiStatus(statusResponse);
         }
         catch (Exception ex)
         {
@@ -105,6 +123,8 @@ public class EcfTrackingJob
             {
                 await PersistJobErrorAsync(ecfDocumentId, trackId, ex);
             }
+
+            return false;
         }
     }
 

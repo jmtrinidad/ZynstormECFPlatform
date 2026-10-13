@@ -24,9 +24,18 @@ public interface IReceivedEcfProductionService
         int attemptNumber,
         DgiiEnvironment environment,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lo que necesita la reconsulta manual: el TrackId más reciente del documento y el
+    /// certificado del cliente, leídos de la base de datos (nunca viajan como argumento de un
+    /// job). Null si no hay TrackId, cliente, API key o certificado.
+    /// </summary>
+    Task<RetrackMaterial?> PrepareRetrackAsync(int ecfDocumentId);
 }
 
 public sealed record DeferredTransmitOutcome(TimeSpan? RetryAfter);
+
+public sealed record RetrackMaterial(string TrackId, string IssuerRnc, string CertBase64, string CertPass);
 
 public class ReceivedEcfEmissionResultDto
 {

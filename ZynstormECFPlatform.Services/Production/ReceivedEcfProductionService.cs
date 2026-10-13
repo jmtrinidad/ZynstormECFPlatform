@@ -765,6 +765,34 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         return (Convert.ToBase64String(certificateBytes), Encoding.UTF8.GetString(passwordBytes));
     }
 
+    public async Task<RetrackMaterial?> PrepareRetrackAsync(int ecfDocumentId)
+    {
+        var ecfDocument = await _ecfDocumentService.GetAsync(ecfDocumentId);
+        if (ecfDocument is null)
+            return null;
+
+        var trackId = await _ecfTransmissionService.Table
+            .AsNoTracking()
+            .Where(t => t.EcfDocumentId == ecfDocumentId && t.TrackId != string.Empty)
+            .OrderByDescending(t => t.SentAtUtc)
+            .Select(t => t.TrackId)
+            .FirstOrDefaultAsync();
+
+        if (string.IsNullOrEmpty(trackId))
+            return null;
+
+        var client = await _clientService.GetAsync(ecfDocument.ClientId);
+        var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == ecfDocument.ClientId);
+        if (client is null || apiKey is null)
+            return null;
+
+        var material = await LoadSigningMaterialAsync(ecfDocument.ClientId, apiKey);
+        if (material is null)
+            return null;
+
+        return new RetrackMaterial(trackId, client.Rnc, material.Value.CertBase64, material.Value.CertPass);
+    }
+
     public async Task<DeferredTransmitOutcome> TransmitDeferredAsync(
         int ecfDocumentId,
         int attemptNumber,
