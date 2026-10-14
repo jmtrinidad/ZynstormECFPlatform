@@ -7,10 +7,13 @@ public static class RiHtmlMarkers
 {
     public static readonly Regex Pattern = new(@"\{\{\s*([A-Za-z][A-Za-z0-9_]*)\s*\}\}", RegexOptions.Compiled);
 
-    /// <summary>Marcadores que viven dentro de la fila repetible de ítems.</summary>
+    /// <summary>
+    /// Marcadores que viven dentro de la fila repetible de ítems. <c>ITBIS</c> es el nombre que usa el diseñador
+    /// y equivale a <c>ItemItbis</c>; <c>TotalITBIS</c> equivale al <c>Itbis</c> de totales.
+    /// </summary>
     public static readonly IReadOnlySet<string> ItemMarkers = new HashSet<string>(StringComparer.Ordinal)
     {
-        "Descripcion", "Monto", "Cantidad", "Precio", "Unidad", "ItemItbis"
+        "Descripcion", "Monto", "Cantidad", "Precio", "Unidad", "ItemItbis", "ITBIS"
     };
 
     /// <summary>Marcadores que el XML no trae: salen de los datos de muestra del tipo de cliente.</summary>
@@ -23,7 +26,7 @@ public static class RiHtmlMarkers
     [
         "EmisorLogo", "EmisorNombre", "EmisorDireccion", "EmisorRNC", "EmisorTelefono",
         "TipoComprobante", "eNCF", "FechaVencimiento", "NoFactura", "Fecha", "FormaPago", "Nombre",
-        "QR", "CodigoSeguridad", "FechaFirma", "Subtotal", "Itbis", "Total", "TotalDescuento"
+        "QR", "CodigoSeguridad", "FechaFirma", "Subtotal", "Itbis", "TotalITBIS", "Total", "TotalDescuento"
     ];
 
     public static readonly IReadOnlySet<string> Known =

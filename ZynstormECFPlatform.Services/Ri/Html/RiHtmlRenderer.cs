@@ -119,6 +119,7 @@ public static class RiHtmlRenderer
             ["FechaFirma"] = string.IsNullOrEmpty(model.FechaFirma) ? "N/D" : model.FechaFirma,
             ["Subtotal"] = Money(model.SubTotal),
             ["Itbis"] = Money(model.Itbis),
+            ["TotalITBIS"] = Money(model.Itbis),
             ["Total"] = Money(model.Total),
             ["TotalDescuento"] = Money(model.Discount),
             // El XML tiene prioridad sobre la muestra (la cédula del comprador).
@@ -140,6 +141,7 @@ public static class RiHtmlRenderer
         ["Unidad"] = item.Unit,
         ["Precio"] = Money(item.Price),
         ["ItemItbis"] = Money(item.Itbis),
+        ["ITBIS"] = Money(item.Itbis),
         ["Monto"] = Money(item.Amount),
     };
 
