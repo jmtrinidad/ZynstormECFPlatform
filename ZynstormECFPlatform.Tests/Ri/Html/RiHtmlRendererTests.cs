@@ -190,6 +190,20 @@ public class RiHtmlRendererTests
     }
 
     [Fact]
+    public void Render_ItbisMarkers_FillPerItemAndTotal_EvenWhenExempt()
+    {
+        const string t = "<html><body><table id=\"items\"><tbody><tr><td>{{Descripcion}}</td><td>{{ITBIS}}</td><td>{{Monto}}</td></tr></tbody></table>" +
+                         "<div id=\"ti\">Total ITBIS: {{TotalITBIS}}</div>{{Total}}</body></html>";
+
+        var html = Render31(t);
+
+        var document = new AngleSharp.Html.Parser.HtmlParser().ParseDocument(html);
+        Assert.DoesNotContain("{{", html);
+        Assert.All(document.QuerySelectorAll("#items tbody tr"), r => Assert.Contains("RD$0.00", r.Children[1].TextContent));
+        Assert.Contains("RD$0.00", document.QuerySelector("#ti")!.TextContent);
+    }
+
+    [Fact]
     public void Render_KeepsUnknownMarkersAsIs()
     {
         const string t = "<html><body><table><tr><td>{{Descripcion}}</td></tr></table>{{Total}} {{Inventado}}</body></html>";
