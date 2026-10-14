@@ -139,13 +139,17 @@ public static class RiHtmlRenderer
         ["Descripcion"] = item.Description,
         ["Cantidad"] = item.Quantity.ToString("0.##", CultureInfo.InvariantCulture),
         ["Unidad"] = item.Unit,
-        ["Precio"] = Money(item.Price),
-        ["ItemItbis"] = Money(item.Itbis),
-        ["ITBIS"] = Money(item.Itbis),
-        ["Monto"] = Money(item.Amount),
+        ["Precio"] = Amount(item.Price),
+        ["ItemItbis"] = Amount(item.Itbis),
+        ["ITBIS"] = Amount(item.Itbis),
+        ["Monto"] = Amount(item.Amount),
     };
 
+    /// <summary>Monto con símbolo de moneda (totales).</summary>
     private static string Money(decimal value) => string.Format(Culture, "{0:C2}", value);
+
+    /// <summary>Monto sin símbolo de moneda (columnas de la fila de ítems).</summary>
+    private static string Amount(decimal value) => string.Format(Culture, "{0:N2}", value);
 
     private static string QrDataUri(string url)
     {

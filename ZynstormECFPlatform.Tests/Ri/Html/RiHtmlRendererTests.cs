@@ -62,7 +62,9 @@ public class RiHtmlRendererTests
         var rows = document.QuerySelectorAll("#items tbody tr");
         Assert.True(rows.Length >= 1);
         Assert.All(rows, r => Assert.DoesNotContain("{{", r.TextContent));
-        Assert.All(rows, r => Assert.Contains("RD$", r.TextContent));
+        // Los montos de la fila van sin el símbolo de moneda; los totales sí lo llevan.
+        Assert.All(rows, r => Assert.DoesNotContain("RD$", r.TextContent));
+        Assert.All(rows, r => Assert.Matches(@"\d+\.\d{2}", r.TextContent));
     }
 
     [Fact]
@@ -199,7 +201,7 @@ public class RiHtmlRendererTests
 
         var document = new AngleSharp.Html.Parser.HtmlParser().ParseDocument(html);
         Assert.DoesNotContain("{{", html);
-        Assert.All(document.QuerySelectorAll("#items tbody tr"), r => Assert.Contains("RD$0.00", r.Children[1].TextContent));
+        Assert.All(document.QuerySelectorAll("#items tbody tr"), r => Assert.Equal("0.00", r.Children[1].TextContent.Trim()));
         Assert.Contains("RD$0.00", document.QuerySelector("#ti")!.TextContent);
     }
 
