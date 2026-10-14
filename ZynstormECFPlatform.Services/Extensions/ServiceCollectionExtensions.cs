@@ -59,6 +59,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Production.IEcfLookupService, Production.EcfLookupService>();
         services.AddSingleton<Production.EcfReferenceCache>();
         services.AddTransient<Production.IReceivedEcfService, Production.ReceivedEcfService>();
+        services.AddTransient<Production.ISignedXmlExportService, Production.SignedXmlExportService>();
         services.AddTransient<Billing.IClientUsageService, Billing.ClientUsageService>();
         services.AddTransient<Billing.IPaymentReminderService, Billing.PaymentReminderService>();
         services.AddTransient<Billing.IClientPaymentRegistrationService, Billing.ClientPaymentRegistrationService>();
