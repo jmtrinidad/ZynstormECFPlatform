@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
@@ -21,6 +22,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         IReceivedEcfProductionService receivedEcfProductionService,
         IEcfLookupService ecfLookupService,
         IReceivedEcfService receivedEcfService,
+        ISignedXmlExportService signedXmlExportService,
         IConfiguration configuration,
         ICacheService cacheService,
         ILogger<EcfController> logger) : ControllerBase
@@ -29,6 +31,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         private readonly IReceivedEcfProductionService _receivedEcfProductionService = receivedEcfProductionService;
         private readonly IEcfLookupService _ecfLookupService = ecfLookupService;
         private readonly IReceivedEcfService _receivedEcfService = receivedEcfService;
+        private readonly ISignedXmlExportService _signedXmlExport = signedXmlExportService;
         private readonly IConfiguration _configuration = configuration;
         private readonly ICacheService _cacheService = cacheService;
         private readonly ILogger<EcfController> _logger = logger;
@@ -367,6 +370,89 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 }), null),
                 _ => (null, pick.Message)
             };
+        }
+
+        /// <summary>
+        /// Descarga el XML firmado de un comprobante emitido por el cliente de la API key,
+        /// identificado por su eNCF. Si el eNCF se reintentó, entrega el documento válido.
+        /// </summary>
+        [HttpGet("signed-xml/{eNcf}")]
+        [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/xml")]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetSignedXml(string eNcf, CancellationToken cancellationToken)
+        {
+            if (HttpContext.Items["ClientId"] is not int clientId)
+            {
+                return ReceivedRequiresApiKey();
+            }
+
+            var normalized = EcfLookupLogic.NormalizeNcf(eNcf);
+
+            if (normalized is null)
+            {
+                return BadRequest(new
+                {
+                    found = false,
+                    message = "El eNCF no es válido: debe ser 'E' seguido de 12 dígitos (por ejemplo E310000000001)."
+                });
+            }
+
+            return SignedXmlResponse(await _signedXmlExport.GetByNcfAsync(clientId, normalized, cancellationToken));
+        }
+
+        /// <summary>
+        /// Descarga los XML firmados de los comprobantes emitidos en un rango de fechas (días de RD,
+        /// ambos inclusivos). Un comprobante llega como XML; varios, como un ZIP con un XML por eNCF.
+        /// Máximo 2000 comprobantes por descarga.
+        /// </summary>
+        [HttpGet("signed-xml")]
+        [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetSignedXmlRange(
+            [FromQuery] string? from,
+            [FromQuery] string? to,
+            CancellationToken cancellationToken)
+        {
+            if (HttpContext.Items["ClientId"] is not int clientId)
+            {
+                return ReceivedRequiresApiKey();
+            }
+
+            if (!SignedXmlExportLogic.TryParseDate(from, out var fromDate) || !SignedXmlExportLogic.TryParseDate(to, out var toDate))
+            {
+                return BadRequest(new
+                {
+                    found = false,
+                    message = "Los parámetros 'from' y 'to' son obligatorios y deben tener el formato yyyy-MM-dd."
+                });
+            }
+
+            if (toDate < fromDate)
+            {
+                return BadRequest(new { found = false, message = "'to' no puede ser anterior a 'from'." });
+            }
+
+            return SignedXmlResponse(await _signedXmlExport.GetRangeAsync(clientId, fromDate, toDate, cancellationToken));
+        }
+
+        private IActionResult SignedXmlResponse(SignedXmlExportResult result)
+        {
+            switch (result.Kind)
+            {
+                case SignedXmlExportKind.Ok:
+                    Response.Headers["X-Ecf-Count"] = result.File!.Count.ToString(CultureInfo.InvariantCulture);
+                    return File(result.File.Content, result.File.ContentType, result.File.FileName);
+
+                case SignedXmlExportKind.TooMany:
+                    return BadRequest(new { found = false, tooMany = true, total = result.Total, message = result.Message });
+
+                default:
+                    return NotFound(new { found = false, message = result.Message });
+            }
         }
 
         /// <summary>

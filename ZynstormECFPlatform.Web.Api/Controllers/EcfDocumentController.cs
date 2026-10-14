@@ -6,7 +6,9 @@ using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Dtos;
 using System.Security.Claims;
 using Asp.Versioning;
+using System.Globalization;
 using ZynstormECFPlatform.Common;
+using ZynstormECFPlatform.Services.Production;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers
 {
@@ -16,9 +18,13 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
     [ApiController]
     public class EcfDocumentController(
         IEcfDocumentService ecfDocumentService,
+        ISignedXmlExportService signedXmlExportService,
+        IClientService clientService,
         ILogger<EcfDocumentController> logger) : ControllerBase
     {
         private readonly IEcfDocumentService _ecfDocumentService = ecfDocumentService;
+        private readonly ISignedXmlExportService _signedXmlExport = signedXmlExportService;
+        private readonly IClientService _clientService = clientService;
         private readonly ILogger<EcfDocumentController> _logger = logger;
 
         private string? CurrentUserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -276,6 +282,104 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 _logger.LogError(ex, "Error obteniendo factura por GUID {Guid}: {Message}", guid, ex.Message);
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error interno al recuperar factura." });
+            }
+        }
+
+        /// <summary>
+        /// Descarga el XML firmado de un comprobante (cualquier estado). 404 si no existe, no es del
+        /// usuario o no tiene XML firmado.
+        /// </summary>
+        [HttpGet("guid/{guid}/signed-xml")]
+        public async Task<IActionResult> DownloadSignedXml(string guid, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var query = _ecfDocumentService.Table
+                    .AsNoTracking()
+                    .Where(e => e.GuidId == guid && !e.IsDeleted);
+
+                if (!IsSA)
+                {
+                    var userId = CurrentUserId;
+                    query = query.Where(e => e.Client.UserClients.Any(uc => uc.UserId == userId));
+                }
+
+                var documentId = await query
+                    .Select(e => (int?)e.EcfDocumentId)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (documentId is null)
+                {
+                    return NotFound(new { message = "No se encontró la factura o no tiene permisos para verla." });
+                }
+
+                return SignedXmlResult(await _signedXmlExport.GetForDocumentAsync(documentId.Value, cancellationToken));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error descargando el XML firmado de {Guid}", guid);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error interno al descargar el XML firmado." });
+            }
+        }
+
+        /// <summary>
+        /// Descarga los XML firmados del cliente en un rango de fechas (días de RD, inclusivos):
+        /// un XML si hay uno, un ZIP si hay varios. El cliente es obligatorio.
+        /// </summary>
+        [HttpGet("signed-xml")]
+        public async Task<IActionResult> DownloadSignedXmlRange(
+            [FromQuery] int? clientId,
+            [FromQuery] DateTime? fromDate,
+            [FromQuery] DateTime? toDate,
+            CancellationToken cancellationToken = default)
+        {
+            if (clientId is null or <= 0 || fromDate is null || toDate is null)
+            {
+                return BadRequest(new { message = "Indique el cliente y el rango de fechas (fromDate y toDate)." });
+            }
+
+            if (toDate.Value.Date < fromDate.Value.Date)
+            {
+                return BadRequest(new { message = "La fecha final no puede ser anterior a la inicial." });
+            }
+
+            try
+            {
+                if (!IsSA)
+                {
+                    var userId = CurrentUserId;
+                    var owns = await _clientService.Table
+                        .AsNoTracking()
+                        .AnyAsync(c => c.ClientId == clientId.Value && c.UserClients.Any(uc => uc.UserId == userId), cancellationToken);
+
+                    if (!owns)
+                    {
+                        return NotFound(new { message = "No se encontró el cliente o no tiene permisos para verlo." });
+                    }
+                }
+
+                return SignedXmlResult(await _signedXmlExport.GetRangeAsync(clientId.Value, fromDate.Value, toDate.Value, cancellationToken));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error descargando los XML firmados del cliente {ClientId}", clientId);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error interno al descargar los XML firmados." });
+            }
+        }
+
+        private IActionResult SignedXmlResult(SignedXmlExportResult result)
+        {
+            switch (result.Kind)
+            {
+                case SignedXmlExportKind.Ok:
+                    Response.Headers["X-Ecf-Count"] = result.File!.Count.ToString(CultureInfo.InvariantCulture);
+                    return File(result.File.Content, result.File.ContentType, result.File.FileName);
+
+                case SignedXmlExportKind.TooMany:
+                    return BadRequest(new { tooMany = true, total = result.Total, message = result.Message });
+
+                default:
+                    return NotFound(new { message = result.Message });
             }
         }
 
