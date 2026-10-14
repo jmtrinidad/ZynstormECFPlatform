@@ -7,7 +7,10 @@ using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 using System.IO;
+using ZynstormECFPlatform.Services.Production;
+using ZynstormECFPlatform.Services.Ri.Received;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers;
 
@@ -31,6 +34,7 @@ public class FeController : ControllerBase
     private readonly IDgiiAuthService _dgiiAuthService;
     private readonly IReceivedB2BMessageService _receivedB2BMessageService;
     private readonly IEmailService _emailService;
+    private readonly IConfiguration _configuration;
 
     public FeController(
         ICacheService cacheService,
@@ -43,7 +47,8 @@ public class FeController : ControllerBase
         IEncryptedService encryptedService,
         IDgiiAuthService dgiiAuthService,
         IReceivedB2BMessageService receivedB2BMessageService,
-        IEmailService emailService)
+        IEmailService emailService,
+        IConfiguration configuration)
     {
         _cacheService = cacheService;
         _jwtTokenService = jwtTokenService;
@@ -56,6 +61,7 @@ public class FeController : ControllerBase
         _dgiiAuthService = dgiiAuthService;
         _receivedB2BMessageService = receivedB2BMessageService;
         _emailService = emailService;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -668,6 +674,50 @@ public class FeController : ControllerBase
         {
             _logger.LogError(ex, "Error downloading B2B message {Id} for client {ClientId}", id, clientId);
             return StatusCode(500, new { error = "Error interno al descargar el comprobante." });
+        }
+    }
+
+    /// <summary>
+    /// Descarga como PDF un e-CF recibido, generado a partir del XML guardado. Solo e-CF: las
+    /// aprobaciones comerciales no tienen representación impresa.
+    /// </summary>
+    [Authorize]
+    [HttpGet("client/{clientId}/received-files/{id:int}/pdf")]
+    public async Task<IActionResult> DownloadReceivedFilePdf(int clientId, int id)
+    {
+        try
+        {
+            var message = await _receivedB2BMessageService.GetByAsync(m => m.ReceivedB2BMessageId == id && m.ClientId == clientId);
+
+            if (message == null)
+            {
+                return NotFound(new { error = "El comprobante solicitado no existe." });
+            }
+
+            if (message.MessageType != MessageType.Ecf)
+            {
+                return BadRequest(new { error = "Solo los e-CF recibidos se pueden descargar como PDF." });
+            }
+
+            var environment = ReceivedEcfLogic.ResolveEnvironment(_configuration["EcfXmlValidation:TargetDgiiEnvironment"]);
+
+            byte[] pdf;
+            try
+            {
+                pdf = ReceivedEcfPdf.Render(message.RawXml, environment);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "No se pudo generar el PDF del comprobante recibido {Id}.", id);
+                return UnprocessableEntity(new { error = "El XML recibido no se pudo interpretar para generar el PDF. Descargue el XML original." });
+            }
+
+            return File(pdf, "application/pdf", $"ECF_{message.ENcf}.pdf");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating PDF for B2B message {Id} for client {ClientId}", id, clientId);
+            return StatusCode(500, new { error = "Error interno al generar el PDF del comprobante." });
         }
     }
 
