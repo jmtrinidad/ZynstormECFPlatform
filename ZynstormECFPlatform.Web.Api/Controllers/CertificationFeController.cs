@@ -24,7 +24,8 @@ public class CertificationFeController : FeController
         IEncryptedService encryptedService,
         IDgiiAuthService dgiiAuthService,
         IReceivedB2BMessageService receivedB2BMessageService,
-        IEmailService emailService)
+        IEmailService emailService,
+        IConfiguration configuration)
         : base(
             cacheService,
             jwtTokenService,
@@ -36,7 +37,8 @@ public class CertificationFeController : FeController
             encryptedService,
             dgiiAuthService,
             receivedB2BMessageService,
-            emailService)
+            emailService,
+            configuration)
     {
     }
 }

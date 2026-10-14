@@ -1,10 +1,13 @@
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Common.Utilities;
+using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Services.Production;
+using ZynstormECFPlatform.Services.Ri.Received;
 using ZynstormECFPlatform.Web.Api.Filters;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers
@@ -17,12 +20,16 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         IEcfProductionGeneratorService ecfGeneratorService,
         IReceivedEcfProductionService receivedEcfProductionService,
         IEcfLookupService ecfLookupService,
+        IReceivedEcfService receivedEcfService,
+        IConfiguration configuration,
         ICacheService cacheService,
         ILogger<EcfController> logger) : ControllerBase
     {
         private readonly IEcfProductionGeneratorService _ecfGeneratorService = ecfGeneratorService;
         private readonly IReceivedEcfProductionService _receivedEcfProductionService = receivedEcfProductionService;
         private readonly IEcfLookupService _ecfLookupService = ecfLookupService;
+        private readonly IReceivedEcfService _receivedEcfService = receivedEcfService;
+        private readonly IConfiguration _configuration = configuration;
         private readonly ICacheService _cacheService = cacheService;
         private readonly ILogger<EcfController> _logger = logger;
 
@@ -226,6 +233,146 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             }
 
             return Ok(result);
+        }
+
+        /// <summary>
+        /// Lista los e-CF que terceros le enviaron al cliente dueño de la API key. Pensado para
+        /// consultarlo cada cierto tiempo: guarde el <c>receivedAtUtc</c> del último ítem y úselo
+        /// como <c>since</c> en la próxima consulta. Se conservan 30 días.
+        /// </summary>
+        [HttpGet("received")]
+        [ProducesResponseType(typeof(ReceivedEcfListResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetReceived(
+            [FromQuery] string? since,
+            [FromQuery] int? limit,
+            CancellationToken cancellationToken)
+        {
+            if (HttpContext.Items["ClientId"] is not int clientId)
+            {
+                return ReceivedRequiresApiKey();
+            }
+
+            if (!ReceivedEcfLogic.TryParseSince(since, out var sinceUtc))
+            {
+                return BadRequest(new
+                {
+                    found = false,
+                    message = "El parámetro 'since' no es una fecha válida. Use el formato ISO 8601, por ejemplo 2026-10-14T12:30:00Z."
+                });
+            }
+
+            var result = await _receivedEcfService.ListAsync(
+                clientId, sinceUtc, ReceivedEcfLogic.ClampLimit(limit), cancellationToken);
+
+            return Ok(result);
+        }
+
+        /// <summary>Descarga el PDF de un e-CF recibido, identificado por su eNCF.</summary>
+        [HttpGet("received/{eNcf}/pdf")]
+        [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/pdf")]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+        public async Task<IActionResult> GetReceivedPdf(
+            string eNcf,
+            [FromQuery] string? rncEmisor,
+            CancellationToken cancellationToken)
+        {
+            var (error, message) = await ResolveReceivedAsync(eNcf, rncEmisor, cancellationToken);
+
+            if (error is not null)
+            {
+                return error;
+            }
+
+            try
+            {
+                var environment = ReceivedEcfLogic.ResolveEnvironment(_configuration["EcfXmlValidation:TargetDgiiEnvironment"]);
+                var pdf = ReceivedEcfPdf.Render(message!.RawXml, environment);
+
+                return File(pdf, "application/pdf", $"ECF_{message.ENcf}.pdf");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "No se pudo generar el PDF del e-CF recibido {ENcf}.", message!.ENcf);
+                return StatusCode(StatusCodes.Status422UnprocessableEntity, new
+                {
+                    found = true,
+                    message = "El XML recibido no se pudo interpretar para generar el PDF. Descargue el XML original."
+                });
+            }
+        }
+
+        /// <summary>Descarga el XML original de un e-CF recibido, identificado por su eNCF.</summary>
+        [HttpGet("received/{eNcf}/xml")]
+        [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/xml")]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> GetReceivedXml(
+            string eNcf,
+            [FromQuery] string? rncEmisor,
+            CancellationToken cancellationToken)
+        {
+            var (error, message) = await ResolveReceivedAsync(eNcf, rncEmisor, cancellationToken);
+
+            return error ?? File(Encoding.UTF8.GetBytes(message!.RawXml), "application/xml", $"ECF_{message.ENcf}.xml");
+        }
+
+        private IActionResult ReceivedRequiresApiKey() =>
+            StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                found = false,
+                message = "Esta consulta requiere una API key válida en el header 'X-Api-Key'."
+            });
+
+        /// <summary>
+        /// Valida el eNCF y busca el recibido del cliente. Devuelve la respuesta de error lista
+        /// (403, 400, 404 o 409) o el mensaje encontrado.
+        /// </summary>
+        private async Task<(IActionResult? Error, ReceivedB2BMessage? Message)> ResolveReceivedAsync(
+            string eNcf,
+            string? rncEmisor,
+            CancellationToken cancellationToken)
+        {
+            if (HttpContext.Items["ClientId"] is not int clientId)
+            {
+                return (ReceivedRequiresApiKey(), null);
+            }
+
+            var normalized = EcfLookupLogic.NormalizeNcf(eNcf);
+
+            if (normalized is null)
+            {
+                return (BadRequest(new
+                {
+                    found = false,
+                    message = "El eNCF no es válido: debe ser 'E' seguido de 12 dígitos (por ejemplo E310000000001)."
+                }), null);
+            }
+
+            var pick = await _receivedEcfService.FindAsync(clientId, normalized, rncEmisor, cancellationToken);
+
+            return pick.Kind switch
+            {
+                ReceivedEcfPickKind.NotFound => (NotFound(new
+                {
+                    found = false,
+                    message = "No hay un e-CF recibido con ese eNCF. Los recibidos se conservan 30 días."
+                }), null),
+                ReceivedEcfPickKind.Ambiguous => (Conflict(new
+                {
+                    found = true,
+                    message = "Hay recibidos con ese eNCF de más de un emisor. Indique el RNC del emisor con el parámetro 'rncEmisor'.",
+                    emisores = pick.Emisores
+                }), null),
+                _ => (null, pick.Message)
+            };
         }
 
         /// <summary>
