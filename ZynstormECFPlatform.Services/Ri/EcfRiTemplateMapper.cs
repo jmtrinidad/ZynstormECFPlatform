@@ -173,7 +173,7 @@ public static class EcfRiTemplateMapper
     }
 
     /// <summary>IndicadorFacturacion del ítem → tasa ITBIS de Totales (1→ITBIS1, 2→ITBIS2, 3→ITBIS3; 4/0→exento).</summary>
-    private static decimal ItbisRateFor(int indicadorFacturacion, RiTotals totals) => indicadorFacturacion switch
+    internal static decimal ItbisRateFor(int indicadorFacturacion, RiTotals totals) => indicadorFacturacion switch
     {
         1 => totals.Itbis1Rate,
         2 => totals.Itbis2Rate,
@@ -182,7 +182,7 @@ public static class EcfRiTemplateMapper
     };
 
     /// <summary>DGII e-CF type code to display title, mirroring EasyInvoice's InvoicePdf label logic.</summary>
-    private static string NcfTypeName(int ecfType) => ecfType switch
+    internal static string NcfTypeName(int ecfType) => ecfType switch
     {
         31 => "FACTURA DE CRÉDITO FISCAL ELECTRÓNICA",
         32 => "FACTURA DE CONSUMO ELECTRÓNICA",
@@ -211,7 +211,7 @@ public static class EcfRiTemplateMapper
     /// <summary>"dd-MM-yyyy" del XML -> "dd/MM/yyyy" para mostrar; vacío se preserva.</summary>
     internal static string FormatDate(string xmlDate) => xmlDate.Replace('-', '/');
 
-    private static string PaymentCondition(RiData data)
+    internal static string PaymentCondition(RiData data)
     {
         if (!string.IsNullOrEmpty(data.TerminoPago))
         {
@@ -275,7 +275,7 @@ public static class EcfRiTemplateMapper
     };
 
     /// <summary>Catálogo DGII de códigos de modificación (InformacionReferencia).</summary>
-    private static string ModificationCodeLabel(string code) => code switch
+    internal static string ModificationCodeLabel(string code) => code switch
     {
         "1" => "1 - Anula el NCF modificado",
         "2" => "2 - Corrige texto del NCF modificado",
