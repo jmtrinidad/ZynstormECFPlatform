@@ -64,6 +64,15 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             var auditEntry = new AuditEntry(entry);
             auditEntry.EntityName = entry.Entity.GetType().Name;
             auditEntry.UserId = userId;
+            // Se fija por estado y no dentro del recorrido de propiedades: una entidad cuyas
+            // columnas son todas llave (ej. AspNetUserRoles al asignar un rol) nunca llega al
+            // switch de abajo y la auditoría se insertaba con Action = null.
+            auditEntry.AuditType = entry.State switch
+            {
+                EntityState.Added => "Create",
+                EntityState.Deleted => "Delete",
+                _ => "Update"
+            };
             auditEntries.Add(auditEntry);
 
             foreach (var property in entry.Properties)
@@ -78,19 +87,16 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                 switch (entry.State)
                 {
                     case EntityState.Added:
-                        auditEntry.AuditType = "Create";
                         auditEntry.NewValues[propertyName] = property.CurrentValue;
                         break;
 
                     case EntityState.Deleted:
-                        auditEntry.AuditType = "Delete";
                         auditEntry.OldValues[propertyName] = property.OriginalValue;
                         break;
 
                     case EntityState.Modified:
                         if (property.IsModified)
                         {
-                            auditEntry.AuditType = "Update";
                             auditEntry.OldValues[propertyName] = property.OriginalValue;
                             auditEntry.NewValues[propertyName] = property.CurrentValue;
                         }
