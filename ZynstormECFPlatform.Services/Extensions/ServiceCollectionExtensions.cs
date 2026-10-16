@@ -63,6 +63,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Billing.IPaymentReminderService, Billing.PaymentReminderService>();
         services.AddTransient<Billing.IClientPaymentRegistrationService, Billing.ClientPaymentRegistrationService>();
         services.AddTransient<Credentials.IClientApiKeyService, Credentials.ClientApiKeyService>();
+        services.AddScoped<Users.IUserPageAccessManager, Users.UserPageAccessManager>();
 
         // --- XML Validation (Standalone) ---
         // Singleton because it maintains an internal ConcurrentDictionary cache for Verificaciones

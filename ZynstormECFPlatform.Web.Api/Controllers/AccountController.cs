@@ -8,6 +8,7 @@ using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Web.Api.Helpers;
 using ZynstormECFPlatform.Core.Entities;
+using ZynstormECFPlatform.Services.Users;
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
@@ -24,6 +25,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         private readonly IJwtTokenService _jwtTokenService;
         private readonly IEmailService _emailService;
         private readonly IWebHostEnvironment _env;
+        private readonly IUserPageAccessManager _pageAccessManager;
         private readonly ILogger<AccountController> _logger;
 
         public AccountController(
@@ -32,6 +34,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             IJwtTokenService jwtTokenService,
             IEmailService emailService,
             IWebHostEnvironment env,
+            IUserPageAccessManager pageAccessManager,
             ILogger<AccountController> logger)
         {
             _accountService = accountService;
@@ -39,6 +42,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             _jwtTokenService = jwtTokenService;
             _emailService = emailService;
             _env = env;
+            _pageAccessManager = pageAccessManager;
             _logger = logger;
         }
 
@@ -145,7 +149,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 // El JWT viaja SOLO en una cookie httpOnly; nunca en el cuerpo JSON.
                 SetAuthCookie(tokenDto);
 
-                return Ok(BuildLoginResponse(user, role, tokenDto));
+                var pageAccess = await _pageAccessManager.GetAsync(user, role?.Name).ConfigureAwait(false);
+                return Ok(BuildLoginResponse(user, role, tokenDto, pageAccess));
             }
             catch (Exception exception)
             {
@@ -277,7 +282,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 // El JWT viaja SOLO en una cookie httpOnly; nunca en el cuerpo JSON.
                 SetAuthCookie(tokenDto);
 
-                return Ok(BuildLoginResponse(user, role, tokenDto));
+                var pageAccess = await _pageAccessManager.GetAsync(user, role?.Name).ConfigureAwait(false);
+                return Ok(BuildLoginResponse(user, role, tokenDto, pageAccess));
             }
             catch (Exception ex)
             {
@@ -304,7 +310,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 AuthCookie.BuildSetOptions(_env, tokenDto.Expiration));
         }
 
-        private static LoginResponseDto BuildLoginResponse(User user, Role? role, TokenDto tokenDto)
+        private static LoginResponseDto BuildLoginResponse(User user, Role? role, TokenDto tokenDto, List<string>? pageAccess)
         {
             return new LoginResponseDto
             {
@@ -323,7 +329,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     PhoneNumber = user.PhoneNumber ?? "",
                     TwoFactorEnabled = user.TwoFactorEnabled,
                     IsActive = user.IsActive,
-                    RegisteredAt = user.RegisteredAt
+                    RegisteredAt = user.RegisteredAt,
+                    PageAccess = pageAccess,
+                    HomePagePath = user.HomePagePath
                 }
             };
         }

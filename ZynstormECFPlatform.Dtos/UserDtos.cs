@@ -79,6 +79,19 @@ public class UserViewDto : UserUpdateDto
     public DateTime RegisteredAt { get; set; }
 
     public bool TwoFactorEnabled { get; set; }
+
+    /// <summary>Páginas permitidas. Null = sin restricción (SA/Admin o nunca configurado).</summary>
+    public List<string>? PageAccess { get; set; }
+
+    /// <summary>Página de inicio tras el login. Null = Dashboard.</summary>
+    public string? HomePagePath { get; set; }
+}
+
+public class UserPageAccessDto
+{
+    public List<string>? PageAccess { get; set; }
+
+    public string? HomePagePath { get; set; }
 }
 
 public class UserRegisterDto : UserCreateDto

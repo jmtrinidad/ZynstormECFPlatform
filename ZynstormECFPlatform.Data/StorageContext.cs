@@ -1681,6 +1681,48 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasConstraintName("FK_SystemLog_EcfDocument");
         });
 
+        modelBuilder.Entity<UserPageAccess>(entity =>
+        {
+            entity.HasKey(e => e.UserPageAccessId);
+
+            entity.Property(e => e.UserId)
+                  .IsRequired()
+                  .HasMaxLength(450);
+
+            entity.Property(e => e.PagePath)
+                  .IsRequired()
+                  .HasMaxLength(150);
+
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasIndex(e => new { e.UserId, e.PagePath })
+                  .IsUnique();
+
+            entity.HasOne(e => e.User)
+                  .WithMany(u => u.PageAccesses)
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade)
+                  .HasConstraintName("FK_UserPageAccess_User");
+        });
+
         modelBuilder.Entity<UserClient>(entity =>
         {
             entity.HasKey(c => new { c.UserId, c.ClientId });
