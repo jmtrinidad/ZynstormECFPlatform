@@ -9,6 +9,7 @@ using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Web.Api.Helpers;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Services.Users;
+using ZynstormECFPlatform.Common;
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
@@ -26,6 +27,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         private readonly IEmailService _emailService;
         private readonly IWebHostEnvironment _env;
         private readonly IUserPageAccessManager _pageAccessManager;
+        private readonly IConfiguration _configuration;
         private readonly ILogger<AccountController> _logger;
 
         public AccountController(
@@ -35,8 +37,10 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             IEmailService emailService,
             IWebHostEnvironment env,
             IUserPageAccessManager pageAccessManager,
+            IConfiguration configuration,
             ILogger<AccountController> logger)
         {
+            _configuration = configuration;
             _accountService = accountService;
             _encryptedService = encryptedService;
             _jwtTokenService = jwtTokenService;
@@ -74,11 +78,13 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             var token = await _accountService.GeneratePasswordResetTokenAsync(user).ConfigureAwait(false);
             var encodedToken = Convert.ToBase64String(Encoding.UTF8.GetBytes(token));
 
-            var callbackUrl = Url.Action(
-                action: "ResetPassword",
-                controller: "ResetPassword",
-                values: new { token = encodedToken, identifier = user.Email ?? user.UserName },
-                protocol: Request.Scheme);
+            var identifierForLink = user.Email ?? user.UserName ?? string.Empty;
+            var callbackUrl = ResetPasswordLink.Build(_configuration["AppSettings:PlatformUrl"], encodedToken, identifierForLink)
+                ?? Url.Action(
+                    action: "ResetPassword",
+                    controller: "ResetPassword",
+                    values: new { token = encodedToken, identifier = identifierForLink },
+                    protocol: Request.Scheme);
 
             var message = ResetPasswordEmailBuilder.Build(callbackUrl!);
             var recipientEmail = user.Email ?? user.UserName ?? string.Empty;
