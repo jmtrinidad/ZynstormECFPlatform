@@ -67,4 +67,6 @@ public class CertificationStepResultDto
     public string FechaFirma { get; set; } = string.Empty;
     public string FechaEmision { get; set; } = string.Empty;
     public string BuyerRnc { get; set; } = string.Empty;
+    /// <summary>GuidId del CertificationDocument (simulación): permite reenviar ese comprobante.</summary>
+    public string? DocumentGuidId { get; set; }
 }

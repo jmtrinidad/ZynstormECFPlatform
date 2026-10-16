@@ -200,6 +200,24 @@ public class CertificationController(
         }
     }
 
+    [HttpPost("simulation/resend")]
+    public async Task<ActionResult> ResendSimulation([FromBody] ResendSimulationRequestDto dto)
+    {
+        try
+        {
+            var jobId = await oldSimulationService.EnqueueResendJobAsync(dto.BusinessTypeGuidId, dto.ClientGuidId, dto.Group, dto.DocumentGuidId, env.WebRootPath);
+            return Ok(new { JobId = jobId, Message = "Reenvío de simulación iniciado." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { Message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+    }
+
     [HttpGet("job-status/{jobId}")]
     public async Task<ActionResult<CertificationJobStatusDto>> GetJobStatus(string jobId)
     {
@@ -281,6 +299,15 @@ public class CertificationController(
         if (status.Status == "NotFound")
             status = await simulationService.GetJobStatusAsync(jobId);
 
+        // Resultados cargados desde la base ("DB_{processId}") o job perdido al reiniciar el API.
+        if (status.Status == "NotFound")
+        {
+            var zip = await oldSimulationService.BuildDatabaseSimulationZipAsync(jobId, manual: false);
+            return zip == null
+                ? BadRequest("El archivo aún no ha sido generado.")
+                : File(zip, "application/zip", $"simulacion_aprobados_{jobId}.zip");
+        }
+
         NormalizeSimulationArtifactUrls(status, jobId);
         return await DownloadSimulationZipAsync(status.ApprovedXmlZipUrl, $"simulacion_aprobados_{jobId}.zip");
     }
@@ -291,6 +318,15 @@ public class CertificationController(
         var status = await oldSimulationService.GetJobStatusAsync(jobId);
         if (status.Status == "NotFound")
             status = await simulationService.GetJobStatusAsync(jobId);
+
+        // Resultados cargados desde la base ("DB_{processId}") o job perdido al reiniciar el API.
+        if (status.Status == "NotFound")
+        {
+            var zip = await oldSimulationService.BuildDatabaseSimulationZipAsync(jobId, manual: true);
+            return zip == null
+                ? BadRequest("El archivo aún no ha sido generado.")
+                : File(zip, "application/zip", $"simulacion_subir_dgii_{jobId}.zip");
+        }
 
         NormalizeSimulationArtifactUrls(status, jobId);
         return await DownloadSimulationZipAsync(status.ManualXmlZipUrl, $"simulacion_subir_dgii_{jobId}.zip");

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ZynstormECFPlatform.Abstractions.Data;
 using ZynstormECFPlatform.Core.Entities;
+using ZynstormECFPlatform.Data.Identity;
 using ZynstormECFPlatform.Data.Seeds;
 
 namespace ZynstormECFPlatform.Data.Extensions;
@@ -33,6 +34,7 @@ public static class ServiceCollectionExtensions
             options.Password.RequiredUniqueChars = 1;
             options.Tokens.PasswordResetTokenProvider = "PasswordResetTokenProvider";
         }).AddRoles<Role>()
+          .AddErrorDescriber<SpanishIdentityErrorDescriber>()
           .AddSignInManager()
           .AddTokenProvider<PasswordResetTokenProvider<User>>("PasswordResetTokenProvider")
           .AddDefaultTokenProviders()

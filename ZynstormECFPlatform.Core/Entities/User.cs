@@ -29,6 +29,16 @@ public class User : IdentityUser, IEntityMarker
 
     public DateTime? LastAccessUtc { get; set; }
 
+    /// <summary>Ruta del frontend a la que entra al iniciar sesión. Null = Dashboard.</summary>
+    [MaxLength(150)]
+    public string? HomePagePath { get; set; }
+
+    /// <summary>
+    /// False mientras nunca se le hayan guardado permisos por página: en ese estado el usuario
+    /// ve todo lo de su rol. Una vez guardados, la lista de UserPageAccess manda aunque esté vacía.
+    /// </summary>
+    public bool PageAccessConfigured { get; set; }
+
     public string FullName => $"{FirstName} {LastName}";
 
     public virtual ICollection<UserClient> UserClients { get; set; } = [];
@@ -38,4 +48,6 @@ public class User : IdentityUser, IEntityMarker
     public virtual ICollection<UserAuditLog> UserAuditLogs { get; set; } = [];
 
     public virtual ICollection<UserNotificationConfiguration> UserNotificationConfigurations { get; set; } = [];
+
+    public virtual ICollection<UserPageAccess> PageAccesses { get; set; } = [];
 }

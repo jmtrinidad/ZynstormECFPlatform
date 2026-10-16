@@ -8,6 +8,7 @@ using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Common.Enums;
+using ZynstormECFPlatform.Services.Users;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers;
 
@@ -18,11 +19,13 @@ namespace ZynstormECFPlatform.Web.Api.Controllers;
 public class UserController(
     IAccountService accountService,
     IUserClientService userClientService,
+    IUserPageAccessManager pageAccessManager,
     IMapper mapper,
     ILogger<UserController> logger) : ControllerBase
 {
     private readonly IAccountService _accountService = accountService;
     private readonly IUserClientService _userClientService = userClientService;
+    private readonly IUserPageAccessManager _pageAccessManager = pageAccessManager;
     private readonly IMapper _mapper = mapper;
     private readonly ILogger<UserController> _logger = logger;
 
@@ -203,6 +206,70 @@ public class UserController(
             _logger.LogError(exception, exception.Message);
             return StatusCode(StatusCodes.Status503ServiceUnavailable);
         }
+    }
+
+    [HttpGet("page-access")]
+    [Authorize(Roles = "SA,Admin")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(503)]
+    public async Task<ActionResult<UserPageAccessDto>> GetPageAccess([FromQuery] string userId)
+    {
+        try
+        {
+            var user = await GetManageableUserAsync(userId);
+            if (user == null) return NotFound();
+
+            var role = await _accountService.GetRoleByUserAsync(user);
+
+            return Ok(new UserPageAccessDto
+            {
+                PageAccess = await _pageAccessManager.GetAsync(user, role?.Name),
+                HomePagePath = user.HomePagePath
+            });
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, exception.Message);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
+    }
+
+    [HttpPut("page-access")]
+    [Authorize(Roles = "SA,Admin")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(503)]
+    public async Task<ActionResult> UpdatePageAccess([FromQuery] string userId, [FromBody] UserPageAccessDto dto)
+    {
+        try
+        {
+            var user = await GetManageableUserAsync(userId);
+            if (user == null) return NotFound();
+
+            var role = await _accountService.GetRoleByUserAsync(user);
+            await _pageAccessManager.SaveAsync(user, role?.Name, dto.PageAccess, dto.HomePagePath);
+
+            return Ok();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, exception.Message);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
+    }
+
+    // Mismo alcance que el listado: SA ve a todos; Admin solo a los usuarios que creó.
+    private async Task<User?> GetManageableUserAsync(string userId)
+    {
+        var user = await _accountService.GetUserByIdAsync(userId);
+        if (user == null) return null;
+
+        var callerRole = User.FindFirst(ClaimTypes.Role)?.Value;
+        if (callerRole?.ToUpper() == "SA" || callerRole == "1") return user;
+
+        var callerId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return user.CreatedByUserId == callerId ? user : null;
     }
 
     [HttpDelete]

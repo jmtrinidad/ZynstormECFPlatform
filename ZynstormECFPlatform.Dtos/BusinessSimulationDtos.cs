@@ -20,3 +20,13 @@ public class StartSimulationRequestDto
     public string ClientGuidId { get; set; } = string.Empty;
 }
 
+public class ResendSimulationRequestDto
+{
+    public string BusinessTypeGuidId { get; set; } = string.Empty;
+    public string ClientGuidId { get; set; } = string.Empty;
+    /// <summary>Grupo a reenviar (p. ej. "34", "32-RFCE"). Excluyente con DocumentGuidId.</summary>
+    public string? Group { get; set; }
+    /// <summary>GuidId del CertificationDocument a reenviar. Excluyente con Group.</summary>
+    public string? DocumentGuidId { get; set; }
+}
+

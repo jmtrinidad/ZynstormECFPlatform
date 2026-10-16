@@ -23,6 +23,7 @@
     <ProjectReference Include="..\ZynstormECFPlatform.Common\ZynstormECFPlatform.Common.csproj" />
     <ProjectReference Include="..\ZynstormECFPlatform.Core\ZynstormECFPlatform.Core.csproj" />
     <ProjectReference Include="..\ZynstormECFPlatform.Services\ZynstormECFPlatform.Services.csproj" />
+    <ProjectReference Include="..\ZynstormECFPlatform.Data\ZynstormECFPlatform.Data.csproj" />
   </ItemGroup>
 
   <ItemGroup>

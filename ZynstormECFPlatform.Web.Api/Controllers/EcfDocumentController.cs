@@ -18,13 +18,11 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
     [ApiController]
     public class EcfDocumentController(
         IEcfDocumentService ecfDocumentService,
-        IEcfRequeueService requeueService,
         ISignedXmlExportService signedXmlExportService,
         IClientService clientService,
         ILogger<EcfDocumentController> logger) : ControllerBase
     {
         private readonly IEcfDocumentService _ecfDocumentService = ecfDocumentService;
-        private readonly IEcfRequeueService _requeueService = requeueService;
         private readonly ISignedXmlExportService _signedXmlExport = signedXmlExportService;
         private readonly IClientService _clientService = clientService;
         private readonly ILogger<EcfDocumentController> _logger = logger;
@@ -178,11 +176,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     SentAtUtc = e.EcfTransmissions.OrderByDescending(t => t.SentAtUtc).Select(t => (DateTime?)t.SentAtUtc).FirstOrDefault(),
                     RegisteredAt = e.RegisteredAt,
                     SignatureDateTime = e.SignatureDateTime,
-                    DgiiMessage = e.EcfTransmissions.OrderByDescending(t => t.SentAtUtc).Select(t => t.ResponseMessage).FirstOrDefault(),
-                    EcfStatusId = e.EcfStatusId,
-                    LastActivityUtc = e.LastUpdateUtc ?? e.RegisteredAt,
-                    HasSignedXml = e.EcfXmlDocuments.Any(x => x.XmlSigned != null && x.XmlSigned != ""),
-                    HasTrackId = e.EcfTransmissions.Any(t => t.TrackId != "")
+                    DgiiMessage = e.EcfTransmissions.OrderByDescending(t => t.SentAtUtc).Select(t => t.ResponseMessage).FirstOrDefault()
                 });
 
                 // Paginación si se especifica
@@ -211,10 +205,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     DgiiTrackId = x.DgiiTrackId,
                     SentDate = (x.SentAtUtc ?? x.RegisteredAt).ToDrTime().ToString("yyyy-MM-dd HH:mm:ss"),
                     ResponseDate = x.SignatureDateTime.HasValue ? x.SignatureDateTime.Value.ToString("yyyy-MM-dd HH:mm:ss") : null,
-                    DgiiMessage = x.DgiiMessage,
-                    RequeueAction = _requeueService
-                        .Evaluate(new EcfRequeueSnapshot(x.EcfStatusId, x.HasSignedXml, x.HasTrackId, x.LastActivityUtc))
-                        ?.ToString().ToLowerInvariant()
+                    DgiiMessage = x.DgiiMessage
                 }).ToList();
 
                 var paginatedResponse = new PaginatedResponseDto<EcfDocumentViewDto>
@@ -282,14 +273,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     SentDate = (document.EcfTransmissions.OrderByDescending(t => t.SentAtUtc).Select(t => (DateTime?)t.SentAtUtc).FirstOrDefault() ?? document.RegisteredAt).ToDrTime().ToString("yyyy-MM-dd HH:mm:ss"),
                     ResponseDate = document.SignatureDateTime.HasValue ? document.SignatureDateTime.Value.ToString("yyyy-MM-dd HH:mm:ss") : null,
                     Xml = document.EcfXmlDocuments.Select(x => !string.IsNullOrEmpty(x.XmlSigned) ? x.XmlSigned : x.XmlUnsigned).FirstOrDefault(),
-                    DgiiMessage = document.EcfTransmissions.OrderByDescending(t => t.SentAtUtc).Select(t => t.ResponseMessage).FirstOrDefault(),
-                    RequeueAction = _requeueService
-                        .Evaluate(new EcfRequeueSnapshot(
-                            document.EcfStatusId,
-                            document.EcfXmlDocuments.Any(x => !string.IsNullOrEmpty(x.XmlSigned)),
-                            document.EcfTransmissions.Any(t => !string.IsNullOrEmpty(t.TrackId)),
-                            document.LastUpdateUtc ?? document.RegisteredAt))
-                        ?.ToString().ToLowerInvariant()
+                    DgiiMessage = document.EcfTransmissions.OrderByDescending(t => t.SentAtUtc).Select(t => t.ResponseMessage).FirstOrDefault()
                 };
 
                 return Ok(dto);
@@ -298,32 +282,6 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 _logger.LogError(ex, "Error obteniendo factura por GUID {Guid}: {Message}", guid, ex.Message);
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error interno al recuperar factura." });
-            }
-        }
-
-        /// <summary>
-        /// Re-encola un comprobante atascado: lo reenvía a la DGII o vuelve a consultar su estado,
-        /// según lo que corresponda. Un SA puede sobre cualquier cliente; el resto, solo sobre los suyos.
-        /// </summary>
-        [HttpPost("guid/{guid}/requeue")]
-        public async Task<IActionResult> Requeue(string guid, CancellationToken cancellationToken = default)
-        {
-            try
-            {
-                var userName = User.Identity?.Name ?? CurrentUserId ?? "usuario";
-                var result = await _requeueService.RequeueAsync(guid, CurrentUserId, IsSA, userName, cancellationToken);
-
-                return result.Outcome switch
-                {
-                    EcfRequeueOutcome.Ok => Ok(new { action = result.Action!.Value.ToString().ToLowerInvariant(), message = result.Message }),
-                    EcfRequeueOutcome.NotFound => NotFound(new { message = result.Message }),
-                    _ => Conflict(new { message = result.Message })
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error re-encolando la factura {Guid}: {Message}", guid, ex.Message);
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error interno al re-encolar la factura." });
             }
         }
 

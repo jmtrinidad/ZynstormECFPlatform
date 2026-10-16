@@ -57,22 +57,19 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IEcfProductionService, Production.EcfProductionService>();
         services.AddTransient<Production.IReceivedEcfProductionService, Production.ReceivedEcfProductionService>();
         services.AddTransient<Production.IEcfLookupService, Production.EcfLookupService>();
-        services.AddSingleton<Production.EcfReferenceCache>();
         services.AddTransient<Production.IReceivedEcfService, Production.ReceivedEcfService>();
         services.AddTransient<Production.ISignedXmlExportService, Production.SignedXmlExportService>();
         services.AddTransient<Billing.IClientUsageService, Billing.ClientUsageService>();
         services.AddTransient<Billing.IPaymentReminderService, Billing.PaymentReminderService>();
         services.AddTransient<Billing.IClientPaymentRegistrationService, Billing.ClientPaymentRegistrationService>();
         services.AddTransient<Credentials.IClientApiKeyService, Credentials.ClientApiKeyService>();
+        services.AddScoped<Users.IUserPageAccessManager, Users.UserPageAccessManager>();
 
         // --- XML Validation (Standalone) ---
         // Singleton because it maintains an internal ConcurrentDictionary cache for Verificaciones
         services.AddSingleton<IEcfXmlValidationService, Validation.EcfXmlValidationService>();
 
         services.AddTransient<Jobs.EcfTrackingJob>();
-        services.AddTransient<Jobs.EcfTransmitJob>();
-        services.AddTransient<Jobs.EcfRetrackJob>();
-        services.AddTransient<Production.IEcfRequeueService, Production.EcfRequeueService>();
         services.AddTransient<Jobs.AutomaticReportsJob>();
         services.AddTransient<Jobs.ReceivedB2BMessagesCleanupJob>();
         services.AddTransient<Jobs.CertificateExpirationJob>();

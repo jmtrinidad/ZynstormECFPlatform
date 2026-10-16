@@ -55,7 +55,9 @@ public class UserCreateDto
 
     public string Email { get; set; } = null!;
 
-    public string PhoneNumber { get; set; } = null!;
+    // Opcional: el formulario de usuarios no lo pide. Siendo string no-nullable, ASP.NET lo
+    // marcaba [Required] implícito y rechazaba el "" que envía el frontend.
+    public string? PhoneNumber { get; set; }
 
     public int RoleId { get; set; }
 
@@ -79,6 +81,19 @@ public class UserViewDto : UserUpdateDto
     public DateTime RegisteredAt { get; set; }
 
     public bool TwoFactorEnabled { get; set; }
+
+    /// <summary>Páginas permitidas. Null = sin restricción (SA/Admin o nunca configurado).</summary>
+    public List<string>? PageAccess { get; set; }
+
+    /// <summary>Página de inicio tras el login. Null = Dashboard.</summary>
+    public string? HomePagePath { get; set; }
+}
+
+public class UserPageAccessDto
+{
+    public List<string>? PageAccess { get; set; }
+
+    public string? HomePagePath { get; set; }
 }
 
 public class UserRegisterDto : UserCreateDto

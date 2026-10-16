@@ -6514,6 +6514,10 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("HomePagePath")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -6545,6 +6549,9 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Property<string>("NormalizedUserName")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("PageAccessConfigured")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text");
@@ -6805,6 +6812,57 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("UserNotificationConfiguration");
+                });
+
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.UserPageAccess", b =>
+                {
+                    b.Property<int>("UserPageAccessId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("UserPageAccessId"));
+
+                    b.Property<DateTime?>("DeletedTimeUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("GuidId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(450)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(450)")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("LastUpdateUtc")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("PagePath")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime>("RegisteredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
+                    b.HasKey("UserPageAccessId");
+
+                    b.HasIndex("UserId", "PagePath")
+                        .IsUnique();
+
+                    b.ToTable("UserPageAccess");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -7440,6 +7498,18 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.UserPageAccess", b =>
+                {
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.User", "User")
+                        .WithMany("PageAccesses")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_UserPageAccess_User");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ApiKey", b =>
                 {
                     b.Navigation("ClientCallBacks");
@@ -7600,6 +7670,8 @@ namespace ZynstormECFPlatform.Data.Migrations
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.User", b =>
                 {
+                    b.Navigation("PageAccesses");
+
                     b.Navigation("UserAccessLogs");
 
                     b.Navigation("UserAuditLogs");
