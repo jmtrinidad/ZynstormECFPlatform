@@ -55,7 +55,9 @@ public class UserCreateDto
 
     public string Email { get; set; } = null!;
 
-    public string PhoneNumber { get; set; } = null!;
+    // Opcional: el formulario de usuarios no lo pide. Siendo string no-nullable, ASP.NET lo
+    // marcaba [Required] implícito y rechazaba el "" que envía el frontend.
+    public string? PhoneNumber { get; set; }
 
     public int RoleId { get; set; }
 
