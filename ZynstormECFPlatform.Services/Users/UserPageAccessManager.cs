@@ -12,6 +12,12 @@ public interface IUserPageAccessManager
     /// </summary>
     Task<List<string>?> GetAsync(User user, string? roleName);
 
+    /// <summary>
+    /// Si el usuario tiene el permiso indicado (una página o una sección como
+    /// <see cref="UserPageAccessManager.DashboardRecentActivity"/>). Sin permisos guardados ve todo.
+    /// </summary>
+    Task<bool> HasAccessAsync(User user, string? roleName, string key);
+
     /// <summary>Reemplaza las páginas del usuario y su página de inicio.</summary>
     Task SaveAsync(User user, string? roleName, IEnumerable<string>? pageAccess, string? homePagePath);
 }
@@ -22,6 +28,10 @@ public class UserPageAccessManager(
 {
     private readonly IUserPageAccessService _pageAccessRepository = pageAccessRepository;
     private readonly IAccountService _accountService = accountService;
+
+    // Sección del Dashboard que se asigna como un permiso más. Igual que en el frontend
+    // (constants/page-access.ts).
+    public const string DashboardRecentActivity = "dashboard:recent-activity";
 
     // SA y Admin acceden a todo, por lo que no se les persiste restricción.
     public static bool IsPageRestricted(string? roleName) =>
@@ -35,6 +45,12 @@ public class UserPageAccessManager(
 
         var rows = await _pageAccessRepository.GetManyByAsync(p => p.UserId == user.Id);
         return rows.Select(p => p.PagePath).ToList();
+    }
+
+    public async Task<bool> HasAccessAsync(User user, string? roleName, string key)
+    {
+        var granted = await GetAsync(user, roleName);
+        return granted is null || granted.Contains(key, StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task SaveAsync(User user, string? roleName, IEnumerable<string>? pageAccess, string? homePagePath)

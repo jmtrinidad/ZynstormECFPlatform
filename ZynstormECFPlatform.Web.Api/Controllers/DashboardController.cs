@@ -6,6 +6,7 @@ using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Common;
+using ZynstormECFPlatform.Services.Users;
 using System.Security.Claims;
 using Asp.Versioning;
 
@@ -19,11 +20,15 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         IClientService clientService,
         IEcfDocumentService ecfDocumentService,
         ICertificationProcessService certificationProcessService,
+        IAccountService accountService,
+        IUserPageAccessManager pageAccessManager,
         ILogger<DashboardController> logger) : ControllerBase
     {
         private readonly IClientService _clientService = clientService;
         private readonly IEcfDocumentService _ecfDocumentService = ecfDocumentService;
         private readonly ICertificationProcessService _certificationProcessService = certificationProcessService;
+        private readonly IAccountService _accountService = accountService;
+        private readonly IUserPageAccessManager _pageAccessManager = pageAccessManager;
         private readonly ILogger<DashboardController> _logger = logger;
 
         private string? CurrentUserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -80,6 +85,25 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                 double inProcessTrendVal = activeClientsCount > 0 ? ((double)inProcessClientsCount * 100.0) / activeClientsCount : 0.0;
                 string inProcessClientsTrend = $"{inProcessTrendVal:0}% del total";
+
+                var summary = new DashboardSummaryDto
+                {
+                    ActiveClientsCount = activeClientsCount,
+                    ActiveClientsTrend = activeClientsTrend,
+                    SentInvoicesCount = sentInvoicesCount,
+                    SentInvoicesTrend = sentInvoicesTrend,
+                    CertifiedClientsCount = certifiedClientsCount,
+                    CertifiedClientsTrend = certifiedClientsTrend,
+                    InProcessClientsCount = inProcessClientsCount,
+                    InProcessClientsTrend = inProcessClientsTrend,
+                };
+
+                // La actividad ya se limita a los clientes del usuario; además puede tenerla oculta.
+                if (!IsSA && !await CanViewRecentActivityAsync(userId))
+                {
+                    summary.CanViewRecentActivity = false;
+                    return Ok(summary);
+                }
 
                 // 4. Fetch recent entries for unified feed (take 5 of each first to optimize)
                 var recentDocs = await ecfQuery
@@ -151,32 +175,30 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     }));
                 }
 
-                var top5Activities = allActivities
+                summary.RecentActivities = allActivities
                     .OrderByDescending(x => x.RegisteredAt)
                     .Take(5)
                     .Select(x => x.Dto)
                     .ToList();
 
-                var response = new DashboardSummaryDto
-                {
-                    ActiveClientsCount = activeClientsCount,
-                    ActiveClientsTrend = activeClientsTrend,
-                    SentInvoicesCount = sentInvoicesCount,
-                    SentInvoicesTrend = sentInvoicesTrend,
-                    CertifiedClientsCount = certifiedClientsCount,
-                    CertifiedClientsTrend = certifiedClientsTrend,
-                    InProcessClientsCount = inProcessClientsCount,
-                    InProcessClientsTrend = inProcessClientsTrend,
-                    RecentActivities = top5Activities
-                };
-
-                return Ok(response);
+                return Ok(summary);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error fetching dashboard summary data.");
                 return StatusCode(500, "Internal server error occurred while retrieving dashboard summary.");
             }
+        }
+
+        private async Task<bool> CanViewRecentActivityAsync(string? userId)
+        {
+            if (string.IsNullOrEmpty(userId)) return false;
+
+            var user = await _accountService.GetUserByIdAsync(userId);
+            if (user is null) return false;
+
+            var role = await _accountService.GetRoleByUserAsync(user);
+            return await _pageAccessManager.HasAccessAsync(user, role?.Name, UserPageAccessManager.DashboardRecentActivity);
         }
 
         private string GetRelativeTimeSpan(DateTime registeredAtUtc)

@@ -13,6 +13,8 @@ public class DashboardSummaryDto
     public int InProcessClientsCount { get; set; }
     public string InProcessClientsTrend { get; set; } = null!;
     public List<DashboardActivityDto> RecentActivities { get; set; } = [];
+    // False si el usuario no tiene el permiso de actividad reciente: el panel se oculta.
+    public bool CanViewRecentActivity { get; set; } = true;
 }
 
 public class DashboardActivityDto

@@ -82,6 +82,37 @@ public class UserPageAccessManagerTests
     }
 
     [Fact]
+    public async Task HasAccess_is_true_when_never_configured()
+    {
+        var result = await CreateManager().HasAccessAsync(_user, "Normal", UserPageAccessManager.DashboardRecentActivity);
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task HasAccess_is_true_for_unrestricted_roles_even_if_configured()
+    {
+        _user.PageAccessConfigured = true;
+
+        var result = await CreateManager().HasAccessAsync(_user, "Admin", UserPageAccessManager.DashboardRecentActivity);
+
+        Assert.True(result);
+    }
+
+    [Theory]
+    [InlineData(UserPageAccessManager.DashboardRecentActivity, true)]
+    [InlineData("/facturas", false)]
+    public async Task HasAccess_checks_stored_keys_once_configured(string stored, bool expected)
+    {
+        _user.PageAccessConfigured = true;
+        _stored.Add(new UserPageAccess { UserId = "u1", PagePath = stored });
+
+        var result = await CreateManager().HasAccessAsync(_user, "Normal", UserPageAccessManager.DashboardRecentActivity);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
     public async Task Save_replaces_rows_normalizes_and_marks_configured()
     {
         var old = new UserPageAccess { UserId = "u1", PagePath = "/facturas" };
