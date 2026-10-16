@@ -63,11 +63,17 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 // 2. Count metrics
                 var activeClientsCount = await clientsQuery.CountAsync(cancellationToken);
                 var sentInvoicesCount = await ecfQuery.CountAsync(cancellationToken);
-                var certifiedClientsCount = await clientsQuery.CountAsync(c => c.IsCertified, cancellationToken);
-                var inProcessClientsCount = await clientsQuery.CountAsync(c => 
-                    !c.IsCertified && 
-                    c.CertificationProcesses.Any(cp => cp.Status == CertificationStatus.InProgress || cp.Status == CertificationStatus.Pending), 
-                    cancellationToken);
+                // Las métricas de certificación son solo para el SA: al resto le llegan en 0
+                // y el frontend oculta sus tarjetas.
+                var certifiedClientsCount = IsSA
+                    ? await clientsQuery.CountAsync(c => c.IsCertified, cancellationToken)
+                    : 0;
+                var inProcessClientsCount = IsSA
+                    ? await clientsQuery.CountAsync(c =>
+                        !c.IsCertified &&
+                        c.CertificationProcesses.Any(cp => cp.Status == CertificationStatus.InProgress || cp.Status == CertificationStatus.Pending),
+                        cancellationToken)
+                    : 0;
 
                 // 3. Calculate dynamic trends (based on 30-day window)
                 var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
@@ -118,12 +124,15 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     .Take(5)
                     .ToListAsync(cancellationToken);
 
-                var recentProcesses = await processQuery
-                    .Include(cp => cp.Client)
-                    .Include(cp => cp.CertificationStep)
-                    .OrderByDescending(cp => cp.RegisteredAt)
-                    .Take(5)
-                    .ToListAsync(cancellationToken);
+                // La actividad de certificación, igual que sus métricas, solo la ve el SA.
+                var recentProcesses = IsSA
+                    ? await processQuery
+                        .Include(cp => cp.Client)
+                        .Include(cp => cp.CertificationStep)
+                        .OrderByDescending(cp => cp.RegisteredAt)
+                        .Take(5)
+                        .ToListAsync(cancellationToken)
+                    : [];
 
                 // 5. Merge and format activities in memory
                 var allActivities = new List<(DateTime RegisteredAt, DashboardActivityDto Dto)>();
