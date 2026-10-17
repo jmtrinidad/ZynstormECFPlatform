@@ -12,6 +12,9 @@ namespace ZynstormECFPlatform.Services.Ri;
 /// </summary>
 public static class EcfRiTemplateMapper
 {
+    /// <summary>IndicadorFacturacion de DGII para ítems exentos.</summary>
+    private const int ExemptIndicator = 4;
+
     public static RiInvoiceModel MapInvoice(string signedXml, DgiiEnvironment environment)
     {
         var data = EcfRiDataMapper.Map(signedXml, environment);
@@ -65,9 +68,12 @@ public static class EcfRiTemplateMapper
                     : Math.Round(item.Amount * ItbisRateFor(item.IndicadorFacturacion, data.Totals) / 100m, 2),
                 Amount = item.Amount,
                 Unit = UnitAbbreviation(item.UnidadMedida),
-                Discount = item.Discount
+                Discount = item.Discount,
+                IsExempt = item.IndicadorFacturacion == ExemptIndicator
             }),
             SubTotal = data.Totals.SubTotal,
+            TaxableSubTotal = data.Totals.Gravado,
+            ExemptSubTotal = data.Totals.Exento,
             Discount = data.Items.Sum(item => item.Discount),
             Itbis = data.Totals.Itbis,
             Total = data.Totals.Total,

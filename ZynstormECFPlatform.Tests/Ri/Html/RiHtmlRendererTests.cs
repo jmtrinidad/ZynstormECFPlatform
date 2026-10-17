@@ -78,6 +78,61 @@ public class RiHtmlRendererTests
         Assert.All(rows, r => Assert.DoesNotContain("{{", r.TextContent));
     }
 
+    private const string DgiiTemplate = """
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head><body>
+  <div>{{TipoComprobante}}</div>
+  <div class="row"><span>eNCF:</span><span>{{eNCF}}</span></div>
+  <div class="row"><span>e-NCF Modificado:</span><span>{{NcfModificado}}</span></div>
+  <div class="row"><span>Modificación:</span><span>{{CodigoModificacion}}</span></div>
+  <table id="items"><tbody><tr><td>{{Cantidad}} {{Unidad}}</td><td><span>{{Exento}}</span>{{Descripcion}}</td><td>{{Precio}}</td><td>{{ITBIS}}</td><td>{{Monto}}</td></tr></tbody></table>
+  <div class="row"><b>Subtotal gravado:</b><b>{{SubtotalGravado}}</b></div>
+  <div class="row"><b>Subtotal exento:</b><b>{{SubtotalExento}}</b></div>
+  <div class="row"><b>Total:</b><b>{{Total}}</b></div>
+  <div>{{QR}}</div>
+</body></html>
+""";
+
+    [Fact]
+    public void Render_ExemptItem_ShowsEIndicator()
+    {
+        var html = RiHtmlRenderer.Render(DgiiTemplate, Load("Paso_1_E310000000402.xml"), Company, null);
+
+        var document = new AngleSharp.Html.Parser.HtmlParser().ParseDocument(html);
+        var row = document.QuerySelector("#items tbody tr")!;
+        Assert.StartsWith("E", row.QuerySelector("td:nth-child(2) span")!.TextContent);
+    }
+
+    [Fact]
+    public void Render_Type31_RemovesCreditNoteReferenceLines()
+    {
+        var html = RiHtmlRenderer.Render(DgiiTemplate, Load("Paso_1_E310000000402.xml"), Company, null);
+
+        Assert.DoesNotContain("e-NCF Modificado", html);
+        Assert.DoesNotContain("Modificación:", html);
+        Assert.DoesNotContain("{{", html);
+    }
+
+    [Fact]
+    public void Render_Type34_ShowsModifiedNcfAndModificationCodeInWords()
+    {
+        var html = RiHtmlRenderer.Render(DgiiTemplate, Load("Paso_E340000000002.xml"), Company, null);
+
+        Assert.Contains("e-NCF Modificado:", html);
+        Assert.Contains("E310000000034", html);
+        Assert.Contains("Corrige montos del NCF modificado", html);
+    }
+
+    [Fact]
+    public void Render_Subtotals_ShowOnlyTheLinesThatApply()
+    {
+        // Paso_1 solo trae monto exento: la línea de gravado se quita.
+        var html = RiHtmlRenderer.Render(DgiiTemplate, Load("Paso_1_E310000000402.xml"), Company, null);
+
+        Assert.Contains("Subtotal exento:", html);
+        Assert.DoesNotContain("Subtotal gravado:", html);
+    }
+
     [Fact]
     public void Render_UsesSampleDataForFieldsMissingInXml()
     {
