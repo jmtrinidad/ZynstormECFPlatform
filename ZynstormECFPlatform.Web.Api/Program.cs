@@ -102,6 +102,10 @@ builder.Services.AddHangfireServer(options =>
     options.WorkerCount = Math.Clamp(builder.Configuration.GetValue<int?>("EcfTransmit:WorkerCount") ?? 10, 1, 50);
 });
 
+// Baja el padron de la DGII al arrancar si no esta indexado, para no tener que lanzarlo
+// a mano despues de cada publicacion. Ver DgiiRncBootstrapService.
+builder.Services.AddHostedService<ZynstormECFPlatform.Web.Api.Services.DgiiRncBootstrapService>();
+
 builder.Services.Configure<AppSettings>(options => builder.Configuration.GetSection("AppSettings").Bind(options));
 
 var appSettingsSection = builder.Configuration.GetSection("AppSettings");
@@ -342,6 +346,16 @@ RecurringJob.AddOrUpdate<ZynstormECFPlatform.Services.Jobs.PaymentSuspensionJob>
     Cron.Daily(0, 5), // 12:05 AM every day in DR
     new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Santo_Domingo") }
 );
+
+if (app.Configuration.GetValue("Dgii:DailyRefreshEnabled", true))
+{
+    RecurringJob.AddOrUpdate<ZynstormECFPlatform.Services.Jobs.DgiiRncRefreshJob>(
+        "DgiiRncRefreshJob",
+        job => job.RunAsync(default),
+        Cron.Daily(0, 0), // 12:00 AM everyday in DR
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Santo_Domingo") }
+    );
+}
 
 app.MapControllers();
 app.MapHub<CertificationHub>("/hubs/certification");
