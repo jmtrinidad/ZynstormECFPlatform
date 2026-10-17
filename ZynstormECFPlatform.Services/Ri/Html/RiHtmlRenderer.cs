@@ -118,6 +118,12 @@ public static class RiHtmlRenderer
             ["CodigoSeguridad"] = string.IsNullOrEmpty(model.SecurityCode) ? "N/D" : model.SecurityCode,
             ["FechaFirma"] = string.IsNullOrEmpty(model.FechaFirma) ? "N/D" : model.FechaFirma,
             ["Subtotal"] = Money(model.SubTotal),
+            // Vacíos cuando no aplican, para que el renderer quite la línea.
+            ["SubtotalGravado"] = model.TaxableSubTotal > 0 ? Money(model.TaxableSubTotal) : string.Empty,
+            ["SubtotalExento"] = model.ExemptSubTotal > 0 ? Money(model.ExemptSubTotal) : string.Empty,
+            // Solo notas de crédito/débito traen referencia al e-CF modificado.
+            ["NcfModificado"] = model.AffectedNcf,
+            ["CodigoModificacion"] = model.ModificationCode,
             ["Itbis"] = Money(model.Itbis),
             ["TotalITBIS"] = Money(model.Itbis),
             ["Total"] = Money(model.Total),
@@ -143,6 +149,7 @@ public static class RiHtmlRenderer
         ["ItemItbis"] = Amount(item.Itbis),
         ["ITBIS"] = Amount(item.Itbis),
         ["Monto"] = Amount(item.Amount),
+        ["Exento"] = item.IsExempt ? "E" : string.Empty,
     };
 
     /// <summary>Monto con símbolo de moneda (totales).</summary>

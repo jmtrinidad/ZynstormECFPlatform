@@ -113,6 +113,7 @@ public class RiFormatController(IRiFormatService formatService) : ControllerBase
 </style></head>
 <body>
  <div style="border:1px dashed #000;height:60px;text-align:center">{{EmisorLogo}}</div>
+ <div style="text-align:center"><b>{{EmisorNombre}}</b></div>
  <div style="text-align:center">{{EmisorDireccion}}</div>
  <div style="text-align:center"><b>RNC: {{EmisorRNC}}</b></div>
  <div style="text-align:center"><b>Tel.: {{EmisorTelefono}}</b></div>
@@ -120,14 +121,18 @@ public class RiFormatController(IRiFormatService formatService) : ControllerBase
  <div style="text-align:center"><b>{{TipoComprobante}}</b></div>
  <div class="row"><span>eNCF:</span><span>{{eNCF}}</span></div>
  <div class="row"><span>VALIDO HASTA:</span><span>{{FechaVencimiento}}</span></div>
+ <div class="row"><span>e-NCF Modificado:</span><span>{{NcfModificado}}</span></div>
+ <div class="row"><span>Modificación:</span><span>{{CodigoModificacion}}</span></div>
  <div class="row"><span>No. Factura:</span><b>{{NoFactura}}</b></div>
  <div class="row"><span>Fecha:</span><span>{{Fecha}}</span></div>
  <div class="row"><span>Nombre:</span><b>{{Nombre}}</b></div>
  <div class="row"><span>Forma Pago:</span><b>{{FormaPago}}</b></div>
  <table style="width:100%">
-  <thead><tr><th align="left">Descripción</th><th align="right">Monto</th></tr></thead>
-  <tbody><tr><td>{{Descripcion}}</td><td align="right">{{Monto}}</td></tr></tbody>
+  <thead><tr><th align="left">Cant.</th><th align="left">Descripción</th><th align="right">Precio</th><th align="right">ITBIS</th><th align="right">Valor</th></tr></thead>
+  <tbody><tr><td>{{Cantidad}} {{Unidad}}</td><td><b>{{Exento}}</b> {{Descripcion}}</td><td align="right">{{Precio}}</td><td align="right">{{ITBIS}}</td><td align="right">{{Monto}}</td></tr></tbody>
  </table>
+ <div class="row"><b>Subtotal gravado:</b><b>{{SubtotalGravado}}</b></div>
+ <div class="row"><b>Subtotal exento:</b><b>{{SubtotalExento}}</b></div>
  <div class="row"><b>Total:</b><b>{{Total}}</b></div>
  <div class="row"><b>Total Descuento:</b><b>{{TotalDescuento}}</b></div>
  <div style="border:1px dashed #000;width:110px;height:110px;margin:12px auto">{{QR}}</div>

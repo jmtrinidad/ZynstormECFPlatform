@@ -25,6 +25,12 @@ public class RiInvoiceModel
 
     public decimal SubTotal { get; set; }
 
+    /// <summary>Monto gravado total (suma de las bases con ITBIS); 0 si no hay.</summary>
+    public decimal TaxableSubTotal { get; set; }
+
+    /// <summary>Monto exento total; 0 si no hay.</summary>
+    public decimal ExemptSubTotal { get; set; }
+
     public decimal Discount { get; set; }
 
     public decimal Itbis { get; set; }
@@ -101,6 +107,9 @@ public class RiInvoiceItem
     public decimal Amount { get; set; }
 
     public decimal Discount { get; set; }
+
+    /// <summary>IndicadorFacturacion = 4 (exento): la RI marca el ítem con una «E».</summary>
+    public bool IsExempt { get; set; }
 
     /// <summary>Abreviatura de la unidad de medida DGII ("Und", "Caja", ...); vacío si el XML no la trae.</summary>
     public string Unit { get; set; } = string.Empty;
