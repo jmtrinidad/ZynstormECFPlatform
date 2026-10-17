@@ -166,12 +166,26 @@ public class RiFormatService(StorageContext context) : IRiFormatService
             return new RiHtmlTemplateUploadResultDto(null, ["El nombre del formato es obligatorio."], validation.Warnings);
         }
 
+        var fileName = string.IsNullOrWhiteSpace(dto.FileName) ? $"{name}.html" : dto.FileName.Trim();
+
+        // Mismo nombre = misma plantilla: se reemplaza su contenido y se conservan los tipos/clientes que la usan.
+        var existing = await context.Set<RiHtmlTemplate>().FirstOrDefaultAsync(t => t.Name == name);
+        if (existing is not null)
+        {
+            existing.FileName = fileName;
+            existing.Html = validation.SanitizedHtml;
+            existing.LastUpdateUtc = DateTime.UtcNow;
+            await context.SaveChangesAsync();
+
+            return new RiHtmlTemplateUploadResultDto(await ToDtoAsync(existing), [], validation.Warnings, Replaced: true);
+        }
+
         var entity = new RiHtmlTemplate
         {
             GuidId = Guid.NewGuid().ToString(),
             RegisteredAt = DateTime.UtcNow,
             Name = name,
-            FileName = string.IsNullOrWhiteSpace(dto.FileName) ? $"{name}.html" : dto.FileName.Trim(),
+            FileName = fileName,
             Html = validation.SanitizedHtml,
         };
 

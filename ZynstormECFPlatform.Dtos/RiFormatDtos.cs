@@ -32,7 +32,8 @@ public record RiHtmlTemplateUploadDto(string Name, string FileName, string Html)
 public record RiHtmlTemplateUploadResultDto(
     RiHtmlTemplateDto? Template,
     IReadOnlyList<string> Errors,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    bool Replaced = false);
 
 /// <param name="DataUri">data:image/png|jpeg|webp;base64,... ; null/vacío = sin logo.</param>
 public record ClientLogoDto(string? DataUri);
