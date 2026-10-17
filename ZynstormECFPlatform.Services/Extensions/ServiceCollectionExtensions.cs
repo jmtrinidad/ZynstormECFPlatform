@@ -31,6 +31,10 @@ public static class ServiceCollectionExtensions
             client.DefaultRequestVersion = HttpVersion.Version11;
             client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionExact;
         });
+
+        // --- Padrón RNC de la DGII (autocompletar el nombre del cliente por RNC) ---
+        services.AddHttpClient("DGII");
+        services.AddTransient<IDgiiRncService, Dgii.DgiiRncService>();
         
 
         // --- Certification: Excel Passthrough (Data Testing) ---
@@ -75,6 +79,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Jobs.CertificateExpirationJob>();
         services.AddTransient<Jobs.PaymentReminderJob>();
         services.AddTransient<Jobs.PaymentSuspensionJob>();
+        services.AddTransient<Jobs.DgiiRncRefreshJob>();
 
         return services;
     }
