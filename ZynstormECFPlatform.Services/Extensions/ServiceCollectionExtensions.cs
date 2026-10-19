@@ -57,6 +57,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IRiFormatService>(sp => sp.GetRequiredService<Ri.RiFormatService>());
 
         // --- Production ---
+        // Singleton: no guarda estado propio, todo vive en ICacheService (también singleton).
+        services.AddSingleton<Production.EcfReferenceCache>();
         services.AddTransient<IEcfProductionGeneratorService, Production.EcfProductionGeneratorService>();
         services.AddTransient<IEcfProductionService, Production.EcfProductionService>();
         services.AddTransient<Production.IReceivedEcfProductionService, Production.ReceivedEcfProductionService>();
