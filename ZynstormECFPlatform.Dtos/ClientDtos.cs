@@ -74,6 +74,28 @@ public class ClientViewDto : ClientUpdateDto
 
     public decimal? PlanMonthlyFee { get; set; }
 
+    /// <summary>Precio mensual de oferta del plan. Null si el plan no tiene oferta.</summary>
+    public decimal? PlanOfferPrice { get; set; }
+
+    public int? PlanOfferMonths { get; set; }
+
+    /// <summary>Día en que empezó la oferta para este cliente. Null si no tiene oferta.</summary>
+    [JsonConverter(typeof(CalendarDateJsonConverter))]
+    public DateTime? OfferStartDate { get; set; }
+
+    /// <summary>Primer día en que se cobra el precio real.</summary>
+    [JsonConverter(typeof(CalendarDateJsonConverter))]
+    public DateTime? OfferEndDate { get; set; }
+
+    /// <summary>Días calendario que faltan para terminar la oferta. Null si no está activa.</summary>
+    public int? OfferDaysRemaining { get; set; }
+
+    /// <summary>Meses completos que faltan para terminar la oferta. Null si no está activa.</summary>
+    public int? OfferMonthsRemaining { get; set; }
+
+    /// <summary>0 = sin oferta, 1 = activa, 2 = finalizada.</summary>
+    public int OfferStatus { get; set; }
+
     /// <summary>1 = Comprobantes, 2 = Renta. Null si el cliente no tiene plan.</summary>
     public int? PlanTypeId { get; set; }
 

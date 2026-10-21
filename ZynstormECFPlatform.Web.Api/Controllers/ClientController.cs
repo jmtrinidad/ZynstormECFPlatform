@@ -97,6 +97,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
             foreach (var dto in list)
             {
+                var offer = FillOffer(dto);
                 dto.ActiveUsersCount = countByClient.TryGetValue(dto.ClientId, out var count) ? count : 0;
 
                 if (dto.PlanTypeId is null) continue;
@@ -105,7 +106,12 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 dto.PaymentStatus = (int)status;
                 dto.PaymentDaysToDue = days;
                 dto.PaymentCycleAmount = PaymentCalculator
-                    .Calculate(dto.PlanMonthlyFee ?? 0m, dto.PaidMonths, dto.PrepaymentDiscountPercent)
+                    .Calculate(
+                        dto.PlanMonthlyFee ?? 0m,
+                        dto.PaidMonths,
+                        dto.PrepaymentDiscountPercent,
+                        offer,
+                        dto.NextPaymentDate?.Date ?? DateTimeExtensions.DrNow.Date)
                     .Total;
             }
         }
@@ -122,7 +128,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
             return clients.Select(c =>
             {
-                var calculation = PaymentCalculator.Calculate(c.Plan!.MonthlyFee, c.PaidMonths, c.PrepaymentDiscountPercent);
+                var calculation = PaymentCalculator.CalculateCycle(c, DateTimeExtensions.DrNow.Date);
                 var feeCharged = PaymentCalculator.GetAmountForMonth(calculation, c.NextPaymentDate, year, month);
 
                 return new ClientMonthlyUsageDto
@@ -172,6 +178,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 int? pageSize = int.TryParse(Request.Query["pageSize"], out var ps) ? ps : null;
                 // Por defecto se incluyen los inactivos; includeInactive=false devuelve solo activos
                 bool includeInactive = !bool.TryParse(Request.Query["includeInactive"], out var ii) || ii;
+                bool offerExpiring = bool.TryParse(Request.Query["offerExpiring"], out var oe) && oe;
                 // Si se proporciona 'id', buscamos un único cliente por su GUID
                 if (!string.IsNullOrEmpty(id))
                 {
@@ -206,6 +213,12 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 if (!includeInactive)
                 {
                     listQuery = listQuery.Where(c => !c.ClientInactive);
+                }
+
+                if (offerExpiring)
+                {
+                    var expiringIds = await OfferExpiringClientIdsAsync(cancellationToken);
+                    listQuery = listQuery.Where(c => expiringIds.Contains(c.ClientId));
                 }
 
                 // Aplicar búsqueda si se proporciona
@@ -275,7 +288,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         {
             try
             {
-                if (!await PlanExistsAsync(dto.PlanId))
+                var plan = await FindPlanAsync(dto.PlanId);
+                if (dto.PlanId.HasValue && plan == null)
                     return BadRequest("El plan seleccionado no existe.");
 
                 if (ValidatePaymentDates(dto) is string paymentDateError)
@@ -289,6 +303,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 await unitOfWork.ExecuteInTransactionAsync(async ct =>
                 {
                     model = Mapper.Map<ClientCreateDto, Client>(dto);
+                    model.OfferStartDate = OfferPricing.ResolveStartDate(
+                        null, dto.PlanId, OfferPricing.PlanHasOffer(plan?.OfferPrice, plan?.OfferMonths), null, DateTimeExtensions.DrNow.Date);
 
                     model = await Repository.InsertAsync(model);
 
@@ -332,7 +348,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 if (model?.PlanId != null)
                     model.Plan = await planService.GetNoTrackingByAsync(p => p.PlanId == model.PlanId);
 
-                return Ok(Mapper.Map<Client, ClientViewDto>(model!));
+                var created = Mapper.Map<Client, ClientViewDto>(model!);
+                FillOffer(created);
+                return Ok(created);
             }
             catch (AutoMapperMappingException exception)
             {
@@ -374,7 +392,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 if (string.IsNullOrEmpty(guid))
                     return BadRequest("El GuidId es obligatorio para la actualización.");
 
-                if (!await PlanExistsAsync(dto.PlanId))
+                var plan = await FindPlanAsync(dto.PlanId);
+                if (dto.PlanId.HasValue && plan == null)
                     return BadRequest("El plan seleccionado no existe.");
 
                 if (ValidatePaymentDates(dto) is string paymentDateError)
@@ -394,8 +413,11 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     return NotFound("No se encontró el cliente o no tiene permisos para actualizarlo.");
 
                 var wasPaymentSuspended = model.PaymentSuspendedAtUtc != null;
+                var previousPlanId = model.PlanId;
 
                 Mapper.Map(dto, model);
+                model.OfferStartDate = OfferPricing.ResolveStartDate(
+                    previousPlanId, model.PlanId, OfferPricing.PlanHasOffer(plan?.OfferPrice, plan?.OfferMonths), model.OfferStartDate, DateTimeExtensions.DrNow.Date);
 
                 if (!model.ClientInactive)
                 {
@@ -415,7 +437,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     ? await planService.GetNoTrackingByAsync(p => p.PlanId == model.PlanId)
                     : null;
 
-                return Ok(Mapper.Map<Client, ClientViewDto>(model));
+                var updated = Mapper.Map<Client, ClientViewDto>(model);
+                FillOffer(updated);
+                return Ok(updated);
             }
             catch (Exception exception)
             {
@@ -439,7 +463,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                 var result = await query.FirstOrDefaultAsync(cancellationToken);
                 if (result == null) return NotFound();
-                return Ok(Mapper.Map<Client, ClientViewDto>(result));
+                var view = Mapper.Map<Client, ClientViewDto>(result);
+                FillOffer(view);
+                return Ok(view);
             }
             catch (Exception exception)
             {
@@ -724,7 +750,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                 var rows = clients.Select(c =>
                 {
-                    var calculation = PaymentCalculator.Calculate(c.Plan!.MonthlyFee, c.PaidMonths, c.PrepaymentDiscountPercent);
+                    var calculation = PaymentCalculator.CalculateCycle(c, DateTimeExtensions.DrNow.Date);
                     var (status, days) = PaymentCalculator.GetPaymentStatus(c.NextPaymentDate, PaymentWarningDays);
                     var due = c.NextPaymentDate?.Date;
 
@@ -967,8 +993,37 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 .ToList();
         }
 
-        private async Task<bool> PlanExistsAsync(int? planId) =>
-            !planId.HasValue || await planService.GetNoTrackingByAsync(p => p.PlanId == planId.Value) != null;
+        private async Task<Plan?> FindPlanAsync(int? planId) =>
+            planId.HasValue ? await planService.GetNoTrackingByAsync(p => p.PlanId == planId.Value) : null;
+
+        /// <summary>Completa fin, días restantes y estado de la oferta del cliente; devuelve las condiciones vigentes.</summary>
+        private static OfferTerms? FillOffer(ClientViewDto dto)
+        {
+            var terms = OfferPricing.TermsFor(dto.PlanOfferPrice, dto.PlanOfferMonths, dto.OfferStartDate);
+            var state = OfferPricing.Evaluate(terms, DateTimeExtensions.DrNow.Date);
+
+            dto.OfferStatus = (int)state.Status;
+            dto.OfferEndDate = state.EndDate;
+            dto.OfferDaysRemaining = state.DaysRemaining;
+            dto.OfferMonthsRemaining = state.MonthsRemaining;
+            return terms;
+        }
+
+        /// <summary>Ids de los clientes con oferta activa que vence dentro de la ventana de aviso.</summary>
+        private async Task<List<int>> OfferExpiringClientIdsAsync(CancellationToken cancellationToken)
+        {
+            var today = DateTimeExtensions.DrNow.Date;
+
+            var candidates = await Repository.Table.AsNoTracking()
+                .Where(c => c.OfferStartDate != null && c.Plan != null && c.Plan.OfferPrice != null && c.Plan.OfferMonths != null)
+                .Select(c => new { c.ClientId, c.OfferStartDate, c.Plan!.OfferPrice, c.Plan.OfferMonths })
+                .ToListAsync(cancellationToken);
+
+            return candidates
+                .Where(c => OfferPricing.IsExpiringSoon(OfferPricing.TermsFor(c.OfferPrice, c.OfferMonths, c.OfferStartDate), today))
+                .Select(c => c.ClientId)
+                .ToList();
+        }
 
         private static string? ValidatePaymentDates(ClientCreateDto dto) =>
             dto.LastPaymentDate is DateTime last
