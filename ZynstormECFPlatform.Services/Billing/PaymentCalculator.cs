@@ -1,4 +1,5 @@
 using ZynstormECFPlatform.Common;
+using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 
 namespace ZynstormECFPlatform.Services.Billing;
@@ -9,7 +10,9 @@ public sealed record PaymentCalculationResult(
     decimal GrossAmount,
     decimal DiscountPercent,
     decimal DiscountAmount,
-    decimal Total);
+    decimal Total,
+    int OfferMonthsCovered = 0,
+    decimal? OfferUnitPrice = null);
 
 /// <summary>
 /// Cálculo del pago por adelantado de un plan (renta o mensualidad de comprobantes).
@@ -20,10 +23,24 @@ public static class PaymentCalculator
     /// <summary>Días de anticipación para considerar un pago próximo a vencer.</summary>
     public const int DefaultWarningDays = 15;
 
-    public static PaymentCalculationResult Calculate(decimal monthlyFee, int paidMonths, decimal discountPercent)
+    /// <summary>
+    /// Con <paramref name="offer"/> y <paramref name="periodStart"/> cada mes cubierto se cobra a su precio:
+    /// el mes k empieza en <c>periodStart + k meses</c> y usa el precio de oferta si esa fecha es anterior al
+    /// fin de la oferta. Sin alguno de los dos se cobra el precio real en todos los meses.
+    /// </summary>
+    public static PaymentCalculationResult Calculate(
+        decimal monthlyFee,
+        int paidMonths,
+        decimal discountPercent,
+        OfferTerms? offer = null,
+        DateTime? periodStart = null)
     {
         var months = Math.Max(1, paidMonths);
-        var gross = monthlyFee * months;
+        var offerMonths = offer is not null && periodStart is DateTime start
+            ? CountOfferMonths(offer, start, months)
+            : 0;
+
+        var gross = offerMonths * (offer?.OfferPrice ?? 0m) + (months - offerMonths) * monthlyFee;
         var discount = Math.Round(gross * discountPercent / 100m, 2, MidpointRounding.AwayFromZero);
 
         return new PaymentCalculationResult(
@@ -32,7 +49,33 @@ public static class PaymentCalculator
             gross,
             discountPercent,
             discount,
-            gross - discount);
+            gross - discount,
+            offerMonths,
+            offerMonths > 0 ? offer!.OfferPrice : null);
+    }
+
+    /// <summary>
+    /// Ciclo de pago de un cliente con su plan y su oferta. El primer mes cubierto empieza en el próximo pago,
+    /// o en <paramref name="fallbackPeriodStart"/> si el cliente no tiene fecha.
+    /// </summary>
+    public static PaymentCalculationResult CalculateCycle(Client client, DateTime fallbackPeriodStart)
+    {
+        var plan = client.Plan ?? throw new ArgumentException("El cliente no tiene el plan cargado.", nameof(client));
+        var offer = OfferPricing.TermsFor(plan.OfferPrice, plan.OfferMonths, client.OfferStartDate);
+
+        return Calculate(
+            plan.MonthlyFee,
+            client.PaidMonths,
+            client.PrepaymentDiscountPercent,
+            offer,
+            client.NextPaymentDate?.Date ?? fallbackPeriodStart.Date);
+    }
+
+    private static int CountOfferMonths(OfferTerms offer, DateTime periodStart, int months)
+    {
+        var count = 0;
+        while (count < months && periodStart.Date.AddMonths(count) < offer.EndDate) count++;
+        return count;
     }
 
     /// <summary>
