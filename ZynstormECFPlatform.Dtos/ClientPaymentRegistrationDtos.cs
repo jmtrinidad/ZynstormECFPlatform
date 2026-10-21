@@ -29,6 +29,12 @@ public class PlanFeePreviewDto
     public decimal DiscountAmount { get; set; }
     public decimal Total { get; set; }
 
+    /// <summary>Meses del pago cobrados a precio de oferta (0 si no aplica).</summary>
+    public int OfferMonthsCovered { get; set; }
+
+    /// <summary>Precio mensual de oferta aplicado; null si ningún mes fue de oferta.</summary>
+    public decimal? OfferUnitPrice { get; set; }
+
     [JsonConverter(typeof(CalendarDateJsonConverter))]
     public DateTime? CurrentNextPaymentDate { get; set; }
 
@@ -71,6 +77,16 @@ public class PaymentReceiptItemDto
     public decimal Amount { get; set; }
     public int? MonthsCovered { get; set; }
     public decimal? DiscountAmount { get; set; }
+
+    /// <summary>Meses cobrados a precio de oferta; null si el pago no tuvo oferta.</summary>
+    public int? OfferMonthsCovered { get; set; }
+
+    public decimal? OfferUnitPrice { get; set; }
+
+    /// <summary>Meses cobrados a precio real cuando el pago mezcló oferta y precio real.</summary>
+    public int? FullPriceMonthsCovered { get; set; }
+
+    public decimal? FullPriceUnitPrice { get; set; }
 
     [JsonConverter(typeof(CalendarDateJsonConverter))]
     public DateTime? PreviousNextPaymentDate { get; set; }

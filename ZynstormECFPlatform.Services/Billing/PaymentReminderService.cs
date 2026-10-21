@@ -40,12 +40,12 @@ public class PaymentReminderService(
     private static PaymentReminderEmailData EmailData(Client client)
     {
         var due = client.NextPaymentDate!.Value.Date;
-        var amount = PaymentCalculator.Calculate(client.Plan!.MonthlyFee, client.PaidMonths, client.PrepaymentDiscountPercent).Total;
+        var amount = PaymentCalculator.CalculateCycle(client, due).Total;
 
         return new PaymentReminderEmailData(
             client.Name,
-            client.Plan.Name,
-            client.Plan.PlanTypeId,
+            client.Plan!.Name,
+            client.Plan!.PlanTypeId,
             amount,
             Math.Max(1, client.PaidMonths),
             due,

@@ -86,7 +86,7 @@ public class ClientPaymentRegistrationService(
 
         if (request.IncludePlanFee)
         {
-            var calculation = PaymentCalculator.Calculate(client.Plan.MonthlyFee, client.PaidMonths, client.PrepaymentDiscountPercent);
+            var calculation = PaymentCalculator.CalculateCycle(client, paymentDate);
             var previousNext = client.NextPaymentDate?.Date;
             var newNext = PaymentRegistrationPolicy.CalculateNewNextPaymentDate(previousNext, paymentDate, calculation.MonthsCovered);
 
@@ -100,6 +100,8 @@ public class ClientPaymentRegistrationService(
                 GrossAmount = calculation.GrossAmount,
                 DiscountPercent = calculation.DiscountPercent,
                 DiscountAmount = calculation.DiscountAmount,
+                OfferMonthsCovered = calculation.OfferMonthsCovered > 0 ? calculation.OfferMonthsCovered : null,
+                OfferUnitPrice = calculation.OfferUnitPrice,
                 PreviousNextPaymentDate = previousNext,
                 NewNextPaymentDate = newNext
             });
@@ -233,7 +235,7 @@ public class ClientPaymentRegistrationService(
 
     private static PlanFeePreviewDto BuildPlanFeePreview(Client client, DateTime today)
     {
-        var calculation = PaymentCalculator.Calculate(client.Plan!.MonthlyFee, client.PaidMonths, client.PrepaymentDiscountPercent);
+        var calculation = PaymentCalculator.CalculateCycle(client, today);
 
         return new PlanFeePreviewDto
         {
@@ -245,6 +247,8 @@ public class ClientPaymentRegistrationService(
             DiscountPercent = calculation.DiscountPercent,
             DiscountAmount = calculation.DiscountAmount,
             Total = calculation.Total,
+            OfferMonthsCovered = calculation.OfferMonthsCovered,
+            OfferUnitPrice = calculation.OfferUnitPrice,
             CurrentNextPaymentDate = client.NextPaymentDate?.Date,
             NewNextPaymentDate = PaymentRegistrationPolicy.CalculateNewNextPaymentDate(client.NextPaymentDate, today, calculation.MonthsCovered)
         };
@@ -274,6 +278,12 @@ public class ClientPaymentRegistrationService(
                 Amount = i.Amount,
                 MonthsCovered = i.MonthsCovered,
                 DiscountAmount = i.DiscountAmount,
+                OfferMonthsCovered = HasOffer(i) ? i.OfferMonthsCovered : null,
+                OfferUnitPrice = HasOffer(i) ? i.OfferUnitPrice : null,
+                FullPriceMonthsCovered = HasOffer(i) ? i.MonthsCovered - i.OfferMonthsCovered : null,
+                FullPriceUnitPrice = HasOffer(i)
+                    ? OfferPricing.GetFullPriceUnit(i.GrossAmount ?? i.Amount, i.MonthsCovered!.Value, i.OfferMonthsCovered!.Value, i.OfferUnitPrice!.Value)
+                    : null,
                 PreviousNextPaymentDate = i.PreviousNextPaymentDate,
                 NewNextPaymentDate = i.NewNextPaymentDate,
                 Year = i.Year,
@@ -282,6 +292,9 @@ public class ClientPaymentRegistrationService(
             })
             .ToList()
     };
+
+    private static bool HasOffer(ClientPaymentItem item) =>
+        item is { ItemType: (int)ClientPaymentItemType.PlanFee, OfferMonthsCovered: > 0, OfferUnitPrice: not null, MonthsCovered: not null };
 
     private static string DescribeItem(ClientPaymentItem item)
     {
