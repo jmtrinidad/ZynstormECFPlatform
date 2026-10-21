@@ -514,6 +514,9 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.NextPaymentDate)
                   .HasColumnType(DateTimeColumnType);
 
+            entity.Property(e => e.OfferStartDate)
+                  .HasColumnType(DateTimeColumnType);
+
             entity.Property(e => e.PaidMonths)
                   .HasDefaultValue(1)
                   .IsRequired();

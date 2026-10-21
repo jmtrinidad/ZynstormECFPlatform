@@ -26,6 +26,12 @@ public partial class ClientPaymentItem : BaseEntity
 
     public decimal? DiscountAmount { get; set; }
 
+    /// <summary>Meses de este pago cobrados al precio de oferta.</summary>
+    public int? OfferMonthsCovered { get; set; }
+
+    /// <summary>Precio mensual de oferta aplicado en este pago.</summary>
+    public decimal? OfferUnitPrice { get; set; }
+
     public DateTime? PreviousNextPaymentDate { get; set; }
 
     public DateTime? NewNextPaymentDate { get; set; }

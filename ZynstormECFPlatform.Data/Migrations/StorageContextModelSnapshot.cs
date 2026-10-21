@@ -2626,6 +2626,9 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Property<DateTime?>("NextPaymentDate")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<DateTime?>("OfferStartDate")
+                        .HasColumnType("timestamp without time zone");
+
                     b.Property<int>("PaidMonths")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -3148,6 +3151,13 @@ namespace ZynstormECFPlatform.Data.Migrations
 
                     b.Property<DateTime?>("NewNextPaymentDate")
                         .HasColumnType("timestamp without time zone");
+
+                    b.Property<int?>("OfferMonthsCovered")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("OfferUnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<int?>("OverageDocuments")
                         .HasColumnType("integer");
@@ -6116,6 +6126,13 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasMaxLength(100)
                         .IsUnicode(false)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<int?>("OfferMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("OfferPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<int>("PlanTypeId")
                         .ValueGeneratedOnAdd()

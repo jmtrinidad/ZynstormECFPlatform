@@ -89,3 +89,11 @@ En `ZynstormECFPlatform.Tests/Billing`, junto a `BillingCalculatorTests`:
 - `PaymentCalculator`: pago dentro de la oferta, pago que cruza el fin, un solo mes, descuento de prepago combinado, sin oferta (regresión).
 - Reglas de asignación de plan: cuándo se fija, se limpia o se reinicia `OfferStartDate`.
 - Validación de plan: combinaciones inválidas de `OfferPrice`/`OfferMonths`.
+
+## 5. Ajustes tomados al planificar
+
+- **Desglose en el recibo.** `ClientPaymentItem` agrega `OfferMonthsCovered` (meses cobrados a precio de oferta) y `OfferUnitPrice`, para que el historial de recibos pueda mostrar el desglose oferta/real. Son 2 columnas nuevas además de las 3 del apartado 1.
+- **`PaymentCalculator.CalculateCycle(Client, fallbackPeriodStart)`.** Un solo punto que arma el ciclo de un cliente con su plan y su oferta. El primer mes cubierto empieza en `NextPaymentDate`, o en `fallbackPeriodStart` si no hay fecha. Lo usan el registro y la previsualización de pago, el aviso de pago y los dos puntos de `ClientController` (renta mensual y `payments`).
+- **Campos calculados.** Los calcula `ClientController` (no AutoMapper, porque `ZynstormECFPlatform.Mappings` no referencia `Services`). `ClientViewDto` también lleva `PlanOfferPrice` y `PlanOfferMonths`.
+- **Filtro "Ofertas por vencer".** El listado de clientes está paginado en el servidor, así que el filtro es el parámetro `offerExpiring=true` de `GET /Client`: se buscan en memoria los clientes con oferta activa que vencen en 30 días o menos y se restringe la consulta a esos ids.
+- **Fuera de alcance, sin cambio.** `BuildUsageDtosAsync` (consumo de planes por comprobantes) sigue calculando la mensualidad con el precio real del snapshot `ClientMonthlyUsage.MonthlyFee`.

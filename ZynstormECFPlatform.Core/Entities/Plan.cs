@@ -19,6 +19,12 @@ public partial class Plan : BaseEntity
     /// <summary>Usuarios permitidos al mismo tiempo. Solo planes de renta. -1 = ilimitado.</summary>
     public int? MaxUsers { get; set; }
 
+    /// <summary>Precio mensual promocional durante la oferta. Null = el plan no tiene oferta.</summary>
+    public decimal? OfferPrice { get; set; }
+
+    /// <summary>Duración de la oferta en meses, contados desde que se asigna el plan al cliente.</summary>
+    public int? OfferMonths { get; set; }
+
     public int StatusId { get; set; }
 
     public virtual Status Status { get; set; } = null!;
