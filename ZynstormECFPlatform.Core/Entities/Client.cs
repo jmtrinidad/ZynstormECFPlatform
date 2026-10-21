@@ -33,6 +33,9 @@ public partial class Client : BaseEntity
     /// <summary>Fecha calendario en que empezó la oferta del plan para este cliente. Null = sin oferta.</summary>
     public DateTime? OfferStartDate { get; set; }
 
+    /// <summary>Precio mensual pactado con este cliente. Reemplaza el precio del plan y su oferta. Null = usa el precio del plan.</summary>
+    public decimal? CustomMonthlyFee { get; set; }
+
     /// <summary>Tipo de cliente (define el formato HTML de RI y datos de muestra). Null = formato por defecto.</summary>
     public int? ClientTypeId { get; set; }
 

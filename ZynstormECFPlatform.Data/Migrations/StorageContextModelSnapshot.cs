@@ -2572,6 +2572,10 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Property<int?>("ClientTypeId")
                         .HasColumnType("integer");
 
+                    b.Property<decimal?>("CustomMonthlyFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<string>("DailyReportEmails")
                         .HasMaxLength(500)
                         .IsUnicode(false)
