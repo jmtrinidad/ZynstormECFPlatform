@@ -35,6 +35,14 @@ public class PlanCreateDto
     /// <summary>Usuarios permitidos al mismo tiempo. Solo planes de renta. -1 = ilimitado.</summary>
     public int? MaxUsers { get; set; }
 
+    /// <summary>Precio mensual promocional. Va junto con <see cref="OfferMonths"/>; null = sin oferta.</summary>
+    [Range(0, 99999999)]
+    public decimal? OfferPrice { get; set; }
+
+    /// <summary>Meses que dura la oferta desde que se asigna el plan al cliente.</summary>
+    [Range(1, 120)]
+    public int? OfferMonths { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     public List<PlanOverageTierDto> OverageTiers { get; set; } = [];

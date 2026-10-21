@@ -115,13 +115,18 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             }
         }
 
-        private static List<string> Validate(PlanCreateDto dto) =>
-            BillingCalculator.ValidatePlan(
+        private static List<string> Validate(PlanCreateDto dto)
+        {
+            var errors = BillingCalculator.ValidatePlan(
                 (PlanTypeEnum)dto.PlanTypeId,
                 dto.MonthlyDocumentLimit,
                 dto.MonthlyFee,
                 dto.MaxUsers,
                 dto.OverageTiers.Select(t => new OverageTier(t.FromUnit, t.ToUnit, t.UnitPrice)));
+
+            errors.AddRange(OfferPricing.ValidateOffer(dto.MonthlyFee, dto.OfferPrice, dto.OfferMonths));
+            return errors;
+        }
 
         /// <summary>
         /// Un plan de renta no tiene límite de comprobantes ni tramos: se fuerzan, no se validan.
