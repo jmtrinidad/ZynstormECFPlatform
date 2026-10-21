@@ -107,7 +107,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 dto.PaymentDaysToDue = days;
                 dto.PaymentCycleAmount = PaymentCalculator
                     .Calculate(
-                        dto.PlanMonthlyFee ?? 0m,
+                        dto.EffectiveMonthlyFee ?? 0m,
                         dto.PaidMonths,
                         dto.PrepaymentDiscountPercent,
                         offer,
@@ -141,7 +141,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     Month = month,
                     PlanName = c.Plan.Name,
                     PlanTypeId = (int)PlanTypeEnum.Rent,
-                    MonthlyFee = c.Plan.MonthlyFee,
+                    MonthlyFee = PaymentCalculator.GetMonthlyFee(c),
                     MonthlyDocumentLimit = BillingCalculator.UnlimitedDocuments,
                     AcceptedDocuments = 0,
                     OverageDocuments = 0,
@@ -305,6 +305,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     model = Mapper.Map<ClientCreateDto, Client>(dto);
                     model.OfferStartDate = OfferPricing.ResolveStartDate(
                         null, dto.PlanId, OfferPricing.PlanHasOffer(plan?.OfferPrice, plan?.OfferMonths), null, DateTimeExtensions.DrNow.Date);
+                    model.CustomMonthlyFee = ClientPricing.ResolveCustomFee(IsSA, dto.CustomMonthlyFee, null);
 
                     model = await Repository.InsertAsync(model);
 
@@ -414,10 +415,12 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
                 var wasPaymentSuspended = model.PaymentSuspendedAtUtc != null;
                 var previousPlanId = model.PlanId;
+                var previousCustomFee = model.CustomMonthlyFee;
 
                 Mapper.Map(dto, model);
                 model.OfferStartDate = OfferPricing.ResolveStartDate(
                     previousPlanId, model.PlanId, OfferPricing.PlanHasOffer(plan?.OfferPrice, plan?.OfferMonths), model.OfferStartDate, DateTimeExtensions.DrNow.Date);
+                model.CustomMonthlyFee = ClientPricing.ResolveCustomFee(IsSA, dto.CustomMonthlyFee, previousCustomFee);
 
                 if (!model.ClientInactive)
                 {
@@ -762,7 +765,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                         ClientInactive = c.ClientInactive,
                         PlanName = c.Plan.Name,
                         PlanTypeId = c.Plan.PlanTypeId,
-                        MonthlyFee = c.Plan.MonthlyFee,
+                        MonthlyFee = PaymentCalculator.GetMonthlyFee(c),
                         MaxUsers = c.Plan.MaxUsers,
                         ActiveUsersCount = countByClient.TryGetValue(c.ClientId, out var count) ? count : 0,
                         PaidMonths = c.PaidMonths,
@@ -951,14 +954,17 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             return usages
                 .Select(u =>
                 {
+                    // El precio propio del cliente reemplaza la copia del precio del plan guardada al crear el mes.
+                    var fee = u.Client.CustomMonthlyFee ?? u.MonthlyFee;
+
                     var calculation = BillingCalculator.Calculate(
-                        u.MonthlyFee,
+                        fee,
                         u.MonthlyDocumentLimit,
                         tiers.Where(t => t.PlanId == u.PlanId).Select(t => new OverageTier(t.FromUnit, t.ToUnit, t.UnitPrice)),
                         u.AcceptedDocuments);
 
                     // El pago adelantado cubre solo la mensualidad; el excedente se cobra siempre.
-                    var payment = PaymentCalculator.Calculate(u.MonthlyFee, u.Client.PaidMonths, u.Client.PrepaymentDiscountPercent);
+                    var payment = PaymentCalculator.Calculate(fee, u.Client.PaidMonths, u.Client.PrepaymentDiscountPercent);
                     var feeCharged = PaymentCalculator.GetAmountForMonth(payment, u.Client.NextPaymentDate, u.Year, u.Month);
 
                     return new ClientMonthlyUsageDto
@@ -996,10 +1002,18 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         private async Task<Plan?> FindPlanAsync(int? planId) =>
             planId.HasValue ? await planService.GetNoTrackingByAsync(p => p.PlanId == planId.Value) : null;
 
-        /// <summary>Completa fin, días restantes y estado de la oferta del cliente; devuelve las condiciones vigentes.</summary>
+        /// <summary>
+        /// Completa el precio vigente y los datos de la oferta del cliente; devuelve las condiciones de oferta vigentes.
+        /// El precio propio reemplaza la oferta del plan: con él el cliente se muestra sin oferta.
+        /// </summary>
         private static OfferTerms? FillOffer(ClientViewDto dto)
         {
-            var terms = OfferPricing.TermsFor(dto.PlanOfferPrice, dto.PlanOfferMonths, dto.OfferStartDate);
+            dto.HasCustomPrice = dto.CustomMonthlyFee.HasValue;
+            dto.EffectiveMonthlyFee = dto.PlanMonthlyFee is null ? null : dto.CustomMonthlyFee ?? dto.PlanMonthlyFee;
+
+            var terms = dto.HasCustomPrice
+                ? null
+                : OfferPricing.TermsFor(dto.PlanOfferPrice, dto.PlanOfferMonths, dto.OfferStartDate);
             var state = OfferPricing.Evaluate(terms, DateTimeExtensions.DrNow.Date);
 
             dto.OfferStatus = (int)state.Status;
@@ -1015,7 +1029,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             var today = DateTimeExtensions.DrNow.Date;
 
             var candidates = await Repository.Table.AsNoTracking()
-                .Where(c => c.OfferStartDate != null && c.Plan != null && c.Plan.OfferPrice != null && c.Plan.OfferMonths != null)
+                .Where(c => c.CustomMonthlyFee == null && c.OfferStartDate != null && c.Plan != null && c.Plan.OfferPrice != null && c.Plan.OfferMonths != null)
                 .Select(c => new { c.ClientId, c.OfferStartDate, c.Plan!.OfferPrice, c.Plan.OfferMonths })
                 .ToListAsync(cancellationToken);
 

@@ -31,6 +31,10 @@ public class ClientCreateDto
 
     public int? PlanId { get; set; }
 
+    /// <summary>Precio mensual pactado con el cliente; reemplaza el del plan y su oferta. Solo lo fija el rol SA. Null = usa el del plan.</summary>
+    [Range(0, 99999999)]
+    public decimal? CustomMonthlyFee { get; set; }
+
     public bool ClientInactive { get; set; }
 
     [JsonConverter(typeof(CalendarDateJsonConverter))]
@@ -73,6 +77,11 @@ public class ClientViewDto : ClientUpdateDto
     public string? PlanName { get; set; }
 
     public decimal? PlanMonthlyFee { get; set; }
+
+    /// <summary>Precio mensual que se cobra: el propio del cliente o, si no tiene, el de su plan. Null si no tiene plan.</summary>
+    public decimal? EffectiveMonthlyFee { get; set; }
+
+    public bool HasCustomPrice { get; set; }
 
     /// <summary>Precio mensual de oferta del plan. Null si el plan no tiene oferta.</summary>
     public decimal? PlanOfferPrice { get; set; }
