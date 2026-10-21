@@ -55,16 +55,28 @@ public static class PaymentCalculator
     }
 
     /// <summary>
-    /// Ciclo de pago de un cliente con su plan y su oferta. El primer mes cubierto empieza en el próximo pago,
-    /// o en <paramref name="fallbackPeriodStart"/> si el cliente no tiene fecha.
+    /// Precio mensual vigente del cliente: el propio si tiene uno y, si no, el de su plan.
+    /// </summary>
+    public static decimal GetMonthlyFee(Client client)
+    {
+        var plan = client.Plan ?? throw new ArgumentException("El cliente no tiene el plan cargado.", nameof(client));
+        return client.CustomMonthlyFee ?? plan.MonthlyFee;
+    }
+
+    /// <summary>
+    /// Ciclo de pago de un cliente con su precio vigente y su oferta. El primer mes cubierto empieza en el
+    /// próximo pago, o en <paramref name="fallbackPeriodStart"/> si el cliente no tiene fecha. El precio
+    /// propio reemplaza al del plan y también a su oferta.
     /// </summary>
     public static PaymentCalculationResult CalculateCycle(Client client, DateTime fallbackPeriodStart)
     {
-        var plan = client.Plan ?? throw new ArgumentException("El cliente no tiene el plan cargado.", nameof(client));
-        var offer = OfferPricing.TermsFor(plan.OfferPrice, plan.OfferMonths, client.OfferStartDate);
+        var monthlyFee = GetMonthlyFee(client);
+        var offer = client.CustomMonthlyFee.HasValue
+            ? null
+            : OfferPricing.TermsFor(client.Plan!.OfferPrice, client.Plan.OfferMonths, client.OfferStartDate);
 
         return Calculate(
-            plan.MonthlyFee,
+            monthlyFee,
             client.PaidMonths,
             client.PrepaymentDiscountPercent,
             offer,
