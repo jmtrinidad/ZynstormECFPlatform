@@ -39,7 +39,7 @@ public class ClientPaymentRegistrationService(
             ClientName = client.Name,
             ClientRnc = client.Rnc,
             PaymentSuspended = client.PaymentSuspendedAtUtc != null,
-            PlanFee = client.Plan.MonthlyFee > 0 ? BuildPlanFeePreview(client, today) : null,
+            PlanFee = PaymentCalculator.GetMonthlyFee(client) > 0 ? BuildPlanFeePreview(client, today) : null,
             PendingOverages = pending.GetValueOrDefault(client.ClientId) ?? []
         });
     }
@@ -61,7 +61,7 @@ public class ClientPaymentRegistrationService(
 
         if (client == null) return PaymentRegistrationResult<PaymentReceiptDto>.NotFound(ClientNotFound);
         if (client.Plan == null) return PaymentRegistrationResult<PaymentReceiptDto>.Invalid(NoPlan);
-        if (request.IncludePlanFee && client.Plan.MonthlyFee <= 0)
+        if (request.IncludePlanFee && PaymentCalculator.GetMonthlyFee(client) <= 0)
             return PaymentRegistrationResult<PaymentReceiptDto>.Invalid("El plan del cliente no tiene mensualidad a pagar.");
 
         var pending = (await GetPendingOveragesAsync([client.ClientId], cancellationToken))
