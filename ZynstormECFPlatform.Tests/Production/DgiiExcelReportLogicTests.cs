@@ -6,7 +6,7 @@ namespace ZynstormECFPlatform.Tests.Production;
 
 public class DgiiExcelReportLogicTests
 {
-    private static DgiiExcelReportCandidate Candidate(int id, int clientId, string encf, EcfLookupState state, int day = 1) =>
+    private static DgiiExcelReportCandidate Candidate(int id, int clientId, string encf, DgiiExcelReportState state, int day = 1) =>
         new(id, clientId, encf, state, new DateTime(2026, 9, day, 12, 0, 0, DateTimeKind.Utc));
 
     [Fact]
@@ -14,13 +14,10 @@ public class DgiiExcelReportLogicTests
     {
         var picked = DgiiExcelReportLogic.SelectAccepted(
         [
-            Candidate(1, 10, "E310000002232", EcfLookupState.Rejected, day: 1),
-            Candidate(2, 10, "E310000002232", EcfLookupState.Accepted, day: 2),
-            Candidate(3, 10, "E410000000217", EcfLookupState.AcceptedConditional, day: 1),
-            Candidate(4, 10, "E310000002233", EcfLookupState.Pending, day: 1),
-            Candidate(5, 10, "E310000002234", EcfLookupState.Rejected, day: 1),
-            Candidate(6, 10, "E310000002235", EcfLookupState.Error, day: 1),
-            Candidate(7, 10, "E310000002236", EcfLookupState.NotSent, day: 1)
+            Candidate(1, 10, "E310000002232", DgiiExcelReportState.Excluded, day: 1),
+            Candidate(2, 10, "E310000002232", DgiiExcelReportState.Accepted, day: 2),
+            Candidate(3, 10, "E410000000217", DgiiExcelReportState.ConditionallyAccepted, day: 1),
+            Candidate(4, 10, "E310000002233", DgiiExcelReportState.Excluded, day: 1)
         ]);
 
         Assert.Equal(["E410000000217", "E310000002232"], picked.Select(c => c.ENcf).ToArray());
@@ -31,11 +28,11 @@ public class DgiiExcelReportLogicTests
     public void ResolveReportState_HandlesAcceptedAndConditionalVariants()
     {
         Assert.Equal(
-            EcfLookupState.Accepted,
+            DgiiExcelReportState.Accepted,
             DgiiExcelReportLogic.ResolveReportState(10, null, null, null));
 
         Assert.Equal(
-            EcfLookupState.AcceptedConditional,
+            DgiiExcelReportState.ConditionallyAccepted,
             DgiiExcelReportLogic.ResolveReportState(
                 11,
                 "{\"status\":{\"Codigo\":\"4\",\"Estado\":\"Aceptado Condicional\"}}",
@@ -43,7 +40,7 @@ public class DgiiExcelReportLogicTests
                 null));
 
         Assert.Equal(
-            EcfLookupState.AcceptedConditional,
+            DgiiExcelReportState.ConditionallyAccepted,
             DgiiExcelReportLogic.ResolveReportState(
                 11,
                 "{\"statusResponse\":{\"Codigo\":\"4\",\"Estado\":\"Aceptado Condicionalmente\"}}",
@@ -51,7 +48,7 @@ public class DgiiExcelReportLogicTests
                 null));
 
         Assert.Equal(
-            EcfLookupState.AcceptedConditional,
+            DgiiExcelReportState.ConditionallyAccepted,
             DgiiExcelReportLogic.ResolveReportState(
                 11,
                 null,
@@ -59,7 +56,7 @@ public class DgiiExcelReportLogicTests
                 "2"));
 
         Assert.Equal(
-            EcfLookupState.Rejected,
+            DgiiExcelReportState.Excluded,
             DgiiExcelReportLogic.ResolveReportState(
                 11,
                 "{\"status\":{\"Codigo\":\"2\",\"Estado\":\"Rechazado\"}}",
@@ -106,7 +103,7 @@ public class DgiiExcelReportLogicTests
             ResponsePayload: null,
             SubTotal: 94014m,
             ItbisTotal: 0m,
-            State: EcfLookupState.Accepted,
+            State: DgiiExcelReportState.Accepted,
             Xml: exemptXml));
 
         Assert.Equal("101000002", row.RncReceptor);
@@ -167,7 +164,7 @@ public class DgiiExcelReportLogicTests
             ResponsePayload: "{\"status\":{\"FechaRecepcion\":\"02/09/2026 12:04:58 P.M.\"}}",
             SubTotal: 1906.78m,
             ItbisTotal: 343.22m,
-            State: EcfLookupState.AcceptedConditional,
+            State: DgiiExcelReportState.ConditionallyAccepted,
             Xml: creditNoteXml));
 
         Assert.Equal("131880600", row.RncReceptor);
@@ -183,7 +180,7 @@ public class DgiiExcelReportLogicTests
     }
 
     [Fact]
-    public void BuildExcelFile_GeneratesValidXlsxPackageWithExpectedHeadersAndCells()
+    public void BuildExcelFile_GeneratesValidXlsxPackageWithTitleClientHeadersAndCells()
     {
         var rows = new[]
         {
@@ -217,6 +214,7 @@ public class DgiiExcelReportLogicTests
 
         var file = DgiiExcelReportLogic.BuildExcelFile(
             rows,
+            "FARMACIA CARIBE SRL",
             "1-32-29389-4",
             new DateTime(2026, 9, 1),
             new DateTime(2026, 9, 3));
@@ -233,6 +231,9 @@ public class DgiiExcelReportLogicTests
         var sstDoc = XDocument.Load(sstStream);
         var sharedStrings = sstDoc.Descendants().Where(e => e.Name.LocalName == "t").Select(e => e.Value).ToList();
 
+        Assert.Contains(DgiiExcelReportLogic.ReportTitle, sharedStrings);
+        Assert.Contains(sharedStrings, s => s.Contains("FARMACIA CARIBE SRL") && s.Contains("1-32-29389-4"));
+
         foreach (var header in DgiiExcelReportLogic.Headers)
         {
             Assert.Contains(header, sharedStrings);
@@ -248,13 +249,11 @@ public class DgiiExcelReportLogicTests
             c => c.Attribute("r")!.Value,
             c => c);
 
-        // K2 = Monto Exento 94014
-        Assert.Equal("94014", cells["K2"].Elements().First(e => e.Name.LocalName == "v").Value);
-        // I3 = ITBIS Facturado 742.27
-        Assert.Equal("742.27", cells["I3"].Elements().First(e => e.Name.LocalName == "v").Value);
-        // J3 = Monto Total Gravado 4123.71
-        Assert.Equal("4123.71", cells["J3"].Elements().First(e => e.Name.LocalName == "v").Value);
-        // K3 = Monto Exento 0
-        Assert.Equal("0", cells["K3"].Elements().First(e => e.Name.LocalName == "v").Value);
+        // Fila 6 (primera fila de datos): K6 = Monto Exento 94014
+        Assert.Equal("94014", cells["K6"].Elements().First(e => e.Name.LocalName == "v").Value);
+        // Fila 7 (segunda fila de datos): I7 = ITBIS Facturado 742.27, J7 = 4123.71, K7 = 0
+        Assert.Equal("742.27", cells["I7"].Elements().First(e => e.Name.LocalName == "v").Value);
+        Assert.Equal("4123.71", cells["J7"].Elements().First(e => e.Name.LocalName == "v").Value);
+        Assert.Equal("0", cells["K7"].Elements().First(e => e.Name.LocalName == "v").Value);
     }
 }

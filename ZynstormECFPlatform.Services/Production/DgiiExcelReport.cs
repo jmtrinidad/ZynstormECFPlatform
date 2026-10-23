@@ -7,17 +7,32 @@ using System.Xml.Linq;
 using Microsoft.EntityFrameworkCore;
 using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Common;
-using ZynstormECFPlatform.Dtos;
 
 namespace ZynstormECFPlatform.Services.Production;
 
+/// <summary>
+/// Estado del comprobante dentro del reporte Excel DGII.
+/// </summary>
+public enum DgiiExcelReportState
+{
+    Excluded = 0,
+    Accepted = 1,
+    ConditionallyAccepted = 2
+}
+
+/// <summary>
+/// Candidato liviano para filtrar y deduplicar comprobantes aceptados antes de cargar los XML.
+/// </summary>
 public sealed record DgiiExcelReportCandidate(
     int EcfDocumentId,
     int ClientId,
     string ENcf,
-    EcfLookupState State,
+    DgiiExcelReportState State,
     DateTime RegisteredAt);
 
+/// <summary>
+/// Datos de entrada de un comprobante aceptado para construir su fila en el Excel DGII.
+/// </summary>
 public sealed record DgiiExcelReportSource(
     int EcfDocumentId,
     int ClientId,
@@ -30,9 +45,12 @@ public sealed record DgiiExcelReportSource(
     string? ResponsePayload,
     decimal SubTotal,
     decimal ItbisTotal,
-    EcfLookupState State,
+    DgiiExcelReportState State,
     string? Xml);
 
+/// <summary>
+/// Fila ya resuelta del reporte Excel DGII (12 columnas A–L).
+/// </summary>
 public sealed record DgiiExcelReportRow(
     string? RncReceptor,
     string ENcf,
@@ -47,12 +65,22 @@ public sealed record DgiiExcelReportRow(
     decimal? MontoExento,
     decimal? MontoNoFacturable);
 
+/// <summary>
+/// Lógica pura para extraer los datos del XML de cada e-CF y generar el archivo .xlsx
+/// con el formato del reporte DGII de comprobantes exentos y gravados.
+/// </summary>
 public static class DgiiExcelReportLogic
 {
     public const int MaxItems = 5000;
     public const string ExcelContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    public const string ReportTitle = "REPORTE DE COMPROBANTES FISCALES ELECTRÓNICOS (e-CF) — EXENTOS Y GRAVADOS DGII";
+    public const int HeaderRowIndex = 5;
+    public const int FirstDataRowIndex = 6;
 
-    private static readonly UTF8Encoding Utf8NoBom = new(false);
+    private const int AcceptedStatusId = 10;
+    private const int RejectedOrConditionalStatusId = 11;
+
+    private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
     public static readonly string[] Headers =
     [
@@ -85,97 +113,104 @@ public static class DgiiExcelReportLogic
         "dd/MM/yyyy h:mm:ss tt",
         "d/M/yyyy hh:mm:ss tt",
         "d/M/yyyy h:mm:ss tt",
-        "dd-MM-yyyy HH:mm:ss",
+        "dd-MM-yyyy hh:mm:ss tt",
+        "dd-MM-yyyy h:mm:ss tt",
         "dd/MM/yyyy HH:mm:ss",
+        "dd-MM-yyyy HH:mm:ss",
         "yyyy-MM-dd HH:mm:ss",
-        "dd-MM-yyyy hh:mm:ss tt"
+        "yyyy-MM-ddTHH:mm:ss",
+        "yyyy-MM-ddTHH:mm:ss.fff",
+        "yyyy-MM-ddTHH:mm:ssZ"
     ];
 
     /// <summary>
-    /// Filtra únicamente comprobantes aceptados (incluyendo Aceptado Condicional),
-    /// eligiendo el mejor intento por (ClientId, eNCF).
+    /// Determina si un comprobante debe incluirse en el reporte como "Aceptado" o "Aceptado Condicional".
     /// </summary>
-    public static IReadOnlyList<DgiiExcelReportCandidate> SelectAccepted(IEnumerable<DgiiExcelReportCandidate> candidates) =>
-        candidates
-            .Where(c => c.State is EcfLookupState.Accepted or EcfLookupState.AcceptedConditional)
-            .GroupBy(c => (c.ClientId, c.ENcf))
-            .Select(group =>
-            {
-                var best = EcfLookupLogic.PickBest(
-                    group.Select(c => new EcfLookupCandidate(c.EcfDocumentId, c.State, c.RegisteredAt)))!;
-
-                return group.First(c => c.EcfDocumentId == best.EcfDocumentId);
-            })
-            .OrderBy(c => c.RegisteredAt)
-            .ThenBy(c => c.ENcf, StringComparer.Ordinal)
-            .ToList();
-
-    public static EcfLookupState ResolveReportState(int ecfStatusId, string? lastResponsePayload, string? lastResponseMessage, string? lastResponseCode)
+    public static DgiiExcelReportState ResolveReportState(
+        int ecfStatusId,
+        string? responsePayload,
+        string? responseMessage,
+        string? responseCode = null)
     {
-        var resolved = EcfLookupLogic.ResolveState(ecfStatusId, lastResponsePayload);
-        if (resolved != EcfLookupState.Rejected || ecfStatusId != 11)
+        var state = EcfLookupLogic.ResolveState(ecfStatusId, responsePayload);
+        if (state == EcfLookupState.AcceptedConditional)
         {
-            return resolved;
+            return DgiiExcelReportState.ConditionallyAccepted;
         }
 
-        if (string.Equals(lastResponseCode?.Trim(), "4", StringComparison.OrdinalIgnoreCase))
+        var messageIndicatesConditional = !string.IsNullOrWhiteSpace(responseMessage)
+            && (responseMessage.Contains("condicional", StringComparison.OrdinalIgnoreCase)
+                || responseMessage.Contains("conditional", StringComparison.OrdinalIgnoreCase));
+
+        if (ecfStatusId == AcceptedStatusId)
         {
-            return EcfLookupState.AcceptedConditional;
+            return messageIndicatesConditional
+                ? DgiiExcelReportState.ConditionallyAccepted
+                : DgiiExcelReportState.Accepted;
         }
 
-        if (!string.IsNullOrWhiteSpace(lastResponseMessage)
-            && (lastResponseMessage.Contains("condicional", StringComparison.OrdinalIgnoreCase)
-                || lastResponseMessage.Contains("conditional", StringComparison.OrdinalIgnoreCase)))
+        if (ecfStatusId == RejectedOrConditionalStatusId && messageIndicatesConditional)
         {
-            return EcfLookupState.AcceptedConditional;
+            return DgiiExcelReportState.ConditionallyAccepted;
         }
 
-        return EcfLookupState.Rejected;
+        return DgiiExcelReportState.Excluded;
     }
 
+    /// <summary>
+    /// Filtra los comprobantes aceptados (incluyendo Aceptado Condicional) y deduplica
+    /// reintentos por (ClientId, ENcf) priorizando el intento aceptado más reciente.
+    /// </summary>
+    public static IReadOnlyList<DgiiExcelReportCandidate> SelectAccepted(
+        IEnumerable<DgiiExcelReportCandidate> candidates)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+
+        return candidates
+            .Where(c => c.State != DgiiExcelReportState.Excluded && !string.IsNullOrWhiteSpace(c.ENcf))
+            .GroupBy(c => (c.ClientId, ENcf: c.ENcf.Trim().ToUpperInvariant()))
+            .Select(group => group
+                .OrderBy(c => c.State == DgiiExcelReportState.Accepted ? 0 : 1)
+                .ThenByDescending(c => c.RegisteredAt)
+                .ThenByDescending(c => c.EcfDocumentId)
+                .First())
+            .OrderBy(c => c.RegisteredAt)
+            .ThenBy(c => c.EcfDocumentId)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Construye la fila del reporte combinando los datos del XML firmado con los metadatos de recepción.
+    /// </summary>
     public static DgiiExcelReportRow BuildRow(DgiiExcelReportSource source)
     {
-        XDocument? doc = null;
-        if (!string.IsNullOrWhiteSpace(source.Xml))
-        {
-            try
-            {
-                doc = XDocument.Parse(source.Xml);
-            }
-            catch (XmlException)
-            {
-                doc = null;
-            }
-        }
+        ArgumentNullException.ThrowIfNull(source);
 
-        var idDoc = FirstElement(doc, "IdDoc");
-        var emisor = FirstElement(doc, "Emisor");
-        var comprador = FirstElement(doc, "Comprador");
-        var totales = FirstElement(doc, "Totales");
-        var infoRef = FirstElement(doc, "InformacionReferencia");
+        var xmlDoc = TryParseXml(source.Xml);
+
+        var idDoc = FirstElement(xmlDoc, "IdDoc");
+        var emisor = FirstElement(xmlDoc, "Emisor");
+        var comprador = FirstElement(xmlDoc, "Comprador");
+        var totales = FirstElement(xmlDoc, "Totales");
+        var infoRef = FirstElement(xmlDoc, "InformacionReferencia");
 
         var rncReceptor = FirstNonEmptyOrNull(
             ElementValue(comprador, "RNCComprador"),
             source.CustomerRnc);
 
-        var encf = FirstNonEmptyOrNull(
+        var eNcf = FirstNonEmptyOrNull(
             ElementValue(idDoc, "eNCF"),
-            source.ENcf) ?? source.ENcf;
+            source.ENcf) ?? string.Empty;
 
-        var encfModificado = FirstNonEmptyOrNull(
+        var eNcfModificado = FirstNonEmptyOrNull(
             ElementValue(infoRef, "NCFModificado"),
             source.ModifiedNcf);
 
-        var issueDate = TryParseIssueDate(ElementValue(emisor, "FechaEmision")) ?? source.IssueDateUtc.Date;
-        var fechaComprobante = FormatDgiiDateTime(issueDate.Date);
+        var issueDate = TryParseIssueDate(ElementValue(emisor, "FechaEmision"))
+                        ?? source.IssueDateUtc.Date;
 
         var receptionDate = TryExtractDgiiReceptionDate(source.ResponsePayload)
-            ?? (source.SentAtUtc ?? source.RegisteredAt).ToDrTime();
-        var fechaRecepcion = FormatDgiiDateTime(receptionDate);
-
-        var estado = source.State == EcfLookupState.AcceptedConditional
-            ? "Aceptado Condicional"
-            : "Aceptado";
+                            ?? (source.SentAtUtc ?? source.RegisteredAt).ToDrTime();
 
         decimal? itbisFacturado;
         decimal? montoTotalGravado;
@@ -191,18 +226,22 @@ public static class DgiiExcelReportLogic
         }
         else
         {
-            itbisFacturado = source.ItbisTotal > 0m ? source.ItbisTotal : null;
-            montoTotalGravado = source.ItbisTotal > 0m ? source.SubTotal : null;
-            montoExento = source.ItbisTotal == 0m && source.SubTotal > 0m ? source.SubTotal : null;
+            itbisFacturado = source.ItbisTotal;
+            montoTotalGravado = source.SubTotal > 0 ? source.SubTotal : null;
+            montoExento = null;
             montoNoFacturable = null;
         }
 
+        var estado = source.State == DgiiExcelReportState.ConditionallyAccepted
+            ? "Aceptado Condicional"
+            : "Aceptado";
+
         return new DgiiExcelReportRow(
             RncReceptor: rncReceptor,
-            ENcf: encf,
-            ENcfModificado: encfModificado,
-            FechaComprobante: fechaComprobante,
-            FechaRecepcion: fechaRecepcion,
+            ENcf: eNcf,
+            ENcfModificado: eNcfModificado,
+            FechaComprobante: FormatDrDateTime(issueDate.Date),
+            FechaRecepcion: FormatDrDateTime(receptionDate),
             AprobacionComercial: string.Empty,
             FechaAprobacionComercial: null,
             Estado: estado,
@@ -212,10 +251,30 @@ public static class DgiiExcelReportLogic
             MontoNoFacturable: montoNoFacturable);
     }
 
-    public static string FormatDgiiDateTime(DateTime dateTime)
+    /// <summary>
+    /// Formatea una fecha/hora con el formato exacto del reporte DGII: "dd/MM/yyyy hh:mm:ss A.M./P.M.".
+    /// </summary>
+    public static string FormatDrDateTime(DateTime dt)
     {
-        var period = dateTime.Hour < 12 ? "A.M." : "P.M.";
-        return $"{dateTime.ToString("dd/MM/yyyy hh:mm:ss", CultureInfo.InvariantCulture)} {period}";
+        var datePart = dt.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+        var timePart = dt.ToString("hh:mm:ss", CultureInfo.InvariantCulture);
+        var amPm = dt.Hour < 12 ? "A.M." : "P.M.";
+        return $"{datePart} {timePart} {amPm}";
+    }
+
+    public static XDocument? TryParseXml(string? xml)
+    {
+        if (string.IsNullOrWhiteSpace(xml))
+            return null;
+
+        try
+        {
+            return XDocument.Parse(xml, LoadOptions.None);
+        }
+        catch (XmlException)
+        {
+            return null;
+        }
     }
 
     public static DateTime? TryParseIssueDate(string? raw)
@@ -223,8 +282,9 @@ public static class DgiiExcelReportLogic
         if (string.IsNullOrWhiteSpace(raw))
             return null;
 
+        var trimmed = raw.Trim();
         if (DateTime.TryParseExact(
-                raw.Trim(),
+                trimmed,
                 IssueDateFormats,
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.None,
@@ -287,6 +347,7 @@ public static class DgiiExcelReportLogic
 
     public static SignedXmlFile BuildExcelFile(
         IReadOnlyList<DgiiExcelReportRow> rows,
+        string? clientName,
         string? issuerRnc,
         DateTime fromDate,
         DateTime toDate)
@@ -296,11 +357,16 @@ public static class DgiiExcelReportLogic
             ? $"Reporte_DGII_{fromDate:yyyyMMdd}_{toDate:yyyyMMdd}.xlsx"
             : $"Reporte_DGII_{digits}_{fromDate:yyyyMMdd}_{toDate:yyyyMMdd}.xlsx";
 
-        var bytes = RenderWorkbookBytes(rows);
+        var bytes = RenderWorkbookBytes(rows, clientName, issuerRnc, fromDate, toDate);
         return new SignedXmlFile(bytes, fileName, ExcelContentType, rows.Count);
     }
 
-    public static byte[] RenderWorkbookBytes(IReadOnlyList<DgiiExcelReportRow> rows)
+    public static byte[] RenderWorkbookBytes(
+        IReadOnlyList<DgiiExcelReportRow> rows,
+        string? clientName = null,
+        string? issuerRnc = null,
+        DateTime? fromDate = null,
+        DateTime? toDate = null)
     {
         var sharedStrings = new List<string>();
         var sharedStringIndex = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -326,7 +392,10 @@ public static class DgiiExcelReportLogic
             WriteXmlEntry(archive, "xl/workbook.xml", BuildWorkbookXml());
             WriteXmlEntry(archive, "xl/_rels/workbook.xml.rels", BuildWorkbookRelsXml());
             WriteXmlEntry(archive, "xl/styles.xml", BuildStylesXml());
-            WriteXmlEntry(archive, "xl/worksheets/sheet1.xml", BuildWorksheetXml(rows, InternString));
+            WriteXmlEntry(
+                archive,
+                "xl/worksheets/sheet1.xml",
+                BuildWorksheetXml(rows, clientName, issuerRnc, fromDate, toDate, InternString));
             WriteXmlEntry(archive, "xl/sharedStrings.xml", BuildSharedStringsXml(sharedStrings, totalStringOccurrences));
         }
 
@@ -376,22 +445,51 @@ public static class DgiiExcelReportLogic
         """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>""" +
         """<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">""" +
         """<numFmts count="1"><numFmt numFmtId="43" formatCode="_(* #,##0.00_);_(* \(#,##0.00\);_(* &quot;-&quot;??_);_(@_)"/></numFmts>""" +
-        """<fonts count="3">""" +
-        """<font><sz val="11"/><name val="Aptos Narrow"/><family val="2"/></font>""" +
-        """<font><sz val="11"/><name val="Aptos Narrow"/><family val="2"/></font>""" +
-        """<font><b/><sz val="11"/><name val="Calibri"/></font>""" +
+        """<fonts count="5">""" +
+        """<font><sz val="11"/><color rgb="FF1F2937"/><name val="Calibri"/><family val="2"/></font>""" +
+        """<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>""" +
+        """<font><b/><sz val="13"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>""" +
+        """<font><b/><sz val="11"/><color rgb="FF1F4E78"/><name val="Calibri"/><family val="2"/></font>""" +
+        """<font><sz val="10"/><color rgb="FF374151"/><name val="Calibri"/><family val="2"/></font>""" +
         """</fonts>""" +
-        """<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>""" +
-        """<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>""" +
+        """<fills count="6">""" +
+        """<fill><patternFill patternType="none"/></fill>""" +
+        """<fill><patternFill patternType="gray125"/></fill>""" +
+        """<fill><patternFill patternType="solid"><fgColor rgb="FF1F4E78"/><bgColor indexed="64"/></patternFill></fill>""" +
+        """<fill><patternFill patternType="solid"><fgColor rgb="FFD9E1F2"/><bgColor indexed="64"/></patternFill></fill>""" +
+        """<fill><patternFill patternType="solid"><fgColor rgb="FFEDF2F8"/><bgColor indexed="64"/></patternFill></fill>""" +
+        """<fill><patternFill patternType="solid"><fgColor rgb="FF2F5597"/><bgColor indexed="64"/></patternFill></fill>""" +
+        """</fills>""" +
+        """<borders count="3">""" +
+        """<border><left/><right/><top/><bottom/><diagonal/></border>""" +
+        """<border>""" +
+        """<left style="thin"><color rgb="FF1F4E78"/></left>""" +
+        """<right style="thin"><color rgb="FF1F4E78"/></right>""" +
+        """<top style="thin"><color rgb="FF1F4E78"/></top>""" +
+        """<bottom style="medium"><color rgb="FF1F4E78"/></bottom>""" +
+        """<diagonal/>""" +
+        """</border>""" +
+        """<border>""" +
+        """<left style="thin"><color rgb="FFD9D9D9"/></left>""" +
+        """<right style="thin"><color rgb="FFD9D9D9"/></right>""" +
+        """<top style="thin"><color rgb="FFD9D9D9"/></top>""" +
+        """<bottom style="thin"><color rgb="FFD9D9D9"/></bottom>""" +
+        """<diagonal/>""" +
+        """</border>""" +
+        """</borders>""" +
         """<cellStyleXfs count="2">""" +
         """<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>""" +
-        """<xf numFmtId="43" fontId="1" fillId="0" borderId="0" applyFont="0" applyFill="0" applyBorder="0" applyAlignment="0" applyProtection="0"/>""" +
+        """<xf numFmtId="43" fontId="0" fillId="0" borderId="0" applyFont="0" applyFill="0" applyBorder="0" applyAlignment="0" applyProtection="0"/>""" +
         """</cellStyleXfs>""" +
-        """<cellXfs count="4">""" +
+        """<cellXfs count="8">""" +
         """<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>""" +
-        """<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>""" +
-        """<xf numFmtId="43" fontId="2" fillId="0" borderId="0" xfId="1" applyFont="1"/>""" +
-        """<xf numFmtId="43" fontId="0" fillId="0" borderId="0" xfId="1" applyFont="1"/>""" +
+        """<xf numFmtId="0" fontId="1" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>""" +
+        """<xf numFmtId="43" fontId="1" fillId="5" borderId="1" xfId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>""" +
+        """<xf numFmtId="43" fontId="0" fillId="0" borderId="2" xfId="1" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>""" +
+        """<xf numFmtId="0" fontId="0" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>""" +
+        """<xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>""" +
+        """<xf numFmtId="0" fontId="3" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>""" +
+        """<xf numFmtId="0" fontId="4" fillId="4" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>""" +
         """</cellXfs>""" +
         """<cellStyles count="2">""" +
         """<cellStyle name="Millares" xfId="1" builtinId="3"/>""" +
@@ -399,9 +497,15 @@ public static class DgiiExcelReportLogic
         """</cellStyles>""" +
         """</styleSheet>""";
 
-    private static string BuildWorksheetXml(IReadOnlyList<DgiiExcelReportRow> rows, Func<string, int> internString)
+    private static string BuildWorksheetXml(
+        IReadOnlyList<DgiiExcelReportRow> rows,
+        string? clientName,
+        string? issuerRnc,
+        DateTime? fromDate,
+        DateTime? toDate,
+        Func<string, int> internString)
     {
-        var lastRow = rows.Count + 1;
+        var lastRow = Math.Max(HeaderRowIndex, HeaderRowIndex + rows.Count);
         var sb = new StringBuilder(4096);
         using (var writer = XmlWriter.Create(sb, new XmlWriterSettings { OmitXmlDeclaration = true, Indent = false }))
         {
@@ -425,69 +529,118 @@ public static class DgiiExcelReportLogic
             writer.WriteEndElement();
 
             writer.WriteStartElement("cols");
-            WriteCol(writer, 1, 1, "15");
-            WriteCol(writer, 2, 2, "14");
-            WriteCol(writer, 3, 3, "16.28515625");
-            WriteCol(writer, 4, 5, "22.5703125");
-            WriteCol(writer, 6, 6, "20.5703125");
-            WriteCol(writer, 7, 7, "26.42578125");
-            WriteCol(writer, 8, 8, "20.5703125");
-            WriteCol(writer, 9, 9, "15.85546875");
-            WriteCol(writer, 10, 10, "21.42578125");
-            WriteCol(writer, 11, 11, "15");
-            WriteCol(writer, 12, 12, "19.85546875");
+            WriteCol(writer, 1, 1, "16");
+            WriteCol(writer, 2, 2, "16");
+            WriteCol(writer, 3, 3, "18");
+            WriteCol(writer, 4, 5, "24");
+            WriteCol(writer, 6, 6, "22");
+            WriteCol(writer, 7, 7, "27");
+            WriteCol(writer, 8, 8, "21");
+            WriteCol(writer, 9, 9, "17");
+            WriteCol(writer, 10, 10, "22");
+            WriteCol(writer, 11, 11, "17");
+            WriteCol(writer, 12, 12, "21");
             writer.WriteEndElement();
 
             writer.WriteStartElement("sheetData");
 
-            // Row 1: Headers
+            // Fila 1: Título del reporte (A1:L1 combinadas, estilo s="5")
             writer.WriteStartElement("row");
             writer.WriteAttributeString("r", "1");
             writer.WriteAttributeString("spans", "1:12");
+            writer.WriteAttributeString("ht", "28");
+            writer.WriteAttributeString("customHeight", "1");
+            WriteBannerRowCells(writer, rowNumber: 1, textIdx: internString(ReportTitle), styleIndex: "5");
+            writer.WriteEndElement();
+
+            // Fila 2: Cliente y RNC (A2:L2 combinadas, estilo s="6")
+            var resolvedClientName = string.IsNullOrWhiteSpace(clientName) ? "No especificado" : clientName.Trim();
+            var clientLine = string.IsNullOrWhiteSpace(issuerRnc)
+                ? $"Cliente: {resolvedClientName}"
+                : $"Cliente: {resolvedClientName}   |   RNC: {issuerRnc.Trim()}";
+
+            writer.WriteStartElement("row");
+            writer.WriteAttributeString("r", "2");
+            writer.WriteAttributeString("spans", "1:12");
+            writer.WriteAttributeString("ht", "22");
+            writer.WriteAttributeString("customHeight", "1");
+            WriteBannerRowCells(writer, rowNumber: 2, textIdx: internString(clientLine), styleIndex: "6");
+            writer.WriteEndElement();
+
+            // Fila 3: Período y total de comprobantes (A3:L3 combinadas, estilo s="7")
+            var periodPart = fromDate.HasValue && toDate.HasValue
+                ? $"Período: {fromDate.Value:dd/MM/yyyy} al {toDate.Value:dd/MM/yyyy}   |   "
+                : string.Empty;
+            var metaLine = $"{periodPart}Total de comprobantes aceptados: {rows.Count}";
+
+            writer.WriteStartElement("row");
+            writer.WriteAttributeString("r", "3");
+            writer.WriteAttributeString("spans", "1:12");
+            writer.WriteAttributeString("ht", "20");
+            writer.WriteAttributeString("customHeight", "1");
+            WriteBannerRowCells(writer, rowNumber: 3, textIdx: internString(metaLine), styleIndex: "7");
+            writer.WriteEndElement();
+
+            // Fila 4: Separador visual vacío
+            writer.WriteStartElement("row");
+            writer.WriteAttributeString("r", "4");
+            writer.WriteAttributeString("ht", "10");
+            writer.WriteAttributeString("customHeight", "1");
+            writer.WriteEndElement();
+
+            // Fila 5: Encabezados de la tabla (A5:L5, estilo s="1" texto / s="2" montos)
+            writer.WriteStartElement("row");
+            writer.WriteAttributeString("r", HeaderRowIndex.ToString(CultureInfo.InvariantCulture));
+            writer.WriteAttributeString("spans", "1:12");
+            writer.WriteAttributeString("ht", "24");
+            writer.WriteAttributeString("customHeight", "1");
             for (var col = 0; col < Headers.Length; col++)
             {
-                var cellRef = $"{ (char)('A' + col) }1";
-                var styleIndex = col is 8 or 9 or 10 ? "2" : "1";
+                var cellRef = $"{(char)('A' + col)}{HeaderRowIndex}";
+                var styleIndex = col >= 8 ? "2" : "1";
                 WriteStringCell(writer, cellRef, internString(Headers[col]), styleIndex);
             }
             writer.WriteEndElement();
 
-            // Data rows
+            // Filas 6+: Datos de comprobantes
             for (var i = 0; i < rows.Count; i++)
             {
-                var r = i + 2;
+                var r = FirstDataRowIndex + i;
                 var row = rows[i];
 
                 writer.WriteStartElement("row");
                 writer.WriteAttributeString("r", r.ToString(CultureInfo.InvariantCulture));
                 writer.WriteAttributeString("spans", "1:12");
+                writer.WriteAttributeString("ht", "19");
+                writer.WriteAttributeString("customHeight", "1");
 
-                if (row.RncReceptor is not null)
-                    WriteStringCell(writer, $"A{r}", internString(row.RncReceptor));
-
-                WriteStringCell(writer, $"B{r}", internString(row.ENcf));
-
-                if (row.ENcfModificado is not null)
-                    WriteStringCell(writer, $"C{r}", internString(row.ENcfModificado));
-
-                WriteStringCell(writer, $"D{r}", internString(row.FechaComprobante));
-                WriteStringCell(writer, $"E{r}", internString(row.FechaRecepcion));
-                WriteStringCell(writer, $"F{r}", internString(row.AprobacionComercial));
-
-                if (row.FechaAprobacionComercial is not null)
-                    WriteStringCell(writer, $"G{r}", internString(row.FechaAprobacionComercial));
-
-                WriteStringCell(writer, $"H{r}", internString(row.Estado));
+                WriteOptionalStringCell(writer, $"A{r}", row.RncReceptor, internString, styleIndex: "4");
+                WriteStringCell(writer, $"B{r}", internString(row.ENcf), styleIndex: "4");
+                WriteOptionalStringCell(writer, $"C{r}", row.ENcfModificado, internString, styleIndex: "4");
+                WriteStringCell(writer, $"D{r}", internString(row.FechaComprobante), styleIndex: "4");
+                WriteStringCell(writer, $"E{r}", internString(row.FechaRecepcion), styleIndex: "4");
+                WriteStringCell(writer, $"F{r}", internString(row.AprobacionComercial), styleIndex: "4");
+                WriteOptionalStringCell(writer, $"G{r}", row.FechaAprobacionComercial, internString, styleIndex: "4");
+                WriteStringCell(writer, $"H{r}", internString(row.Estado), styleIndex: "4");
 
                 WriteDecimalCell(writer, $"I{r}", row.ItbisFacturado, includeEmptyStyle: true);
                 WriteDecimalCell(writer, $"J{r}", row.MontoTotalGravado, includeEmptyStyle: true);
                 WriteDecimalCell(writer, $"K{r}", row.MontoExento, includeEmptyStyle: true);
-                WriteDecimalCell(writer, $"L{r}", row.MontoNoFacturable, includeEmptyStyle: false);
+                WriteDecimalCell(writer, $"L{r}", row.MontoNoFacturable, includeEmptyStyle: true);
 
                 writer.WriteEndElement();
             }
 
             writer.WriteEndElement(); // sheetData
+
+            // Celdas combinadas para el encabezado del reporte
+            writer.WriteStartElement("mergeCells");
+            writer.WriteAttributeString("count", "3");
+            WriteMergeCell(writer, "A1:L1");
+            WriteMergeCell(writer, "A2:L2");
+            WriteMergeCell(writer, "A3:L3");
+            writer.WriteEndElement();
+
             writer.WriteEndElement(); // worksheet
         }
 
@@ -525,6 +678,45 @@ public static class DgiiExcelReportLogic
         writer.WriteAttributeString("width", width);
         writer.WriteAttributeString("bestFit", "1");
         writer.WriteAttributeString("customWidth", "1");
+        writer.WriteEndElement();
+    }
+
+    private static void WriteMergeCell(XmlWriter writer, string reference)
+    {
+        writer.WriteStartElement("mergeCell");
+        writer.WriteAttributeString("ref", reference);
+        writer.WriteEndElement();
+    }
+
+    private static void WriteBannerRowCells(XmlWriter writer, int rowNumber, int textIdx, string styleIndex)
+    {
+        WriteStringCell(writer, $"A{rowNumber}", textIdx, styleIndex);
+        for (var col = 1; col < Headers.Length; col++)
+        {
+            var cellRef = $"{(char)('A' + col)}{rowNumber}";
+            writer.WriteStartElement("c");
+            writer.WriteAttributeString("r", cellRef);
+            writer.WriteAttributeString("s", styleIndex);
+            writer.WriteEndElement();
+        }
+    }
+
+    private static void WriteOptionalStringCell(
+        XmlWriter writer,
+        string cellRef,
+        string? value,
+        Func<string, int> internString,
+        string styleIndex)
+    {
+        if (value is not null)
+        {
+            WriteStringCell(writer, cellRef, internString(value), styleIndex);
+            return;
+        }
+
+        writer.WriteStartElement("c");
+        writer.WriteAttributeString("r", cellRef);
+        writer.WriteAttributeString("s", styleIndex);
         writer.WriteEndElement();
     }
 
@@ -618,9 +810,7 @@ public static class DgiiExcelReportLogic
 public interface IDgiiExcelReportService
 {
     Task<SignedXmlExportResult> GetRangeExcelAsync(
-        int? clientId,
-        string? userId,
-        bool isSuperAdmin,
+        int clientId,
         DateTime fromDate,
         DateTime toDate,
         CancellationToken cancellationToken = default);
@@ -653,32 +843,30 @@ public class DgiiExcelReportService(
         string? ResponseCode);
 
     public async Task<SignedXmlExportResult> GetRangeExcelAsync(
-        int? clientId,
-        string? userId,
-        bool isSuperAdmin,
+        int clientId,
         DateTime fromDate,
         DateTime toDate,
         CancellationToken cancellationToken = default)
     {
+        var clientInfo = await clients.Table
+            .AsNoTracking()
+            .Where(c => c.ClientId == clientId)
+            .Select(c => new { c.Name, c.Rnc })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (clientInfo is null)
+        {
+            return SignedXmlExportResult.Missing("No se encontró el cliente especificado.");
+        }
+
         var (fromUtc, toUtcExclusive) = SignedXmlExportLogic.ToUtcRange(fromDate, toDate);
 
-        var query = documents.Table
+        var rows = await documents.Table
             .AsNoTracking()
             .Where(d => !d.IsDeleted
+                        && d.ClientId == clientId
                         && d.RegisteredAt >= fromUtc
-                        && d.RegisteredAt < toUtcExclusive);
-
-        if (!isSuperAdmin)
-        {
-            query = query.Where(d => d.Client.UserClients.Any(uc => uc.UserId == userId));
-        }
-
-        if (clientId is > 0)
-        {
-            query = query.Where(d => d.ClientId == clientId.Value);
-        }
-
-        var rows = await query
+                        && d.RegisteredAt < toUtcExclusive)
             .Select(d => new DocRow(
                 d.EcfDocumentId,
                 d.ClientId,
@@ -694,7 +882,7 @@ public class DgiiExcelReportService(
 
         if (rows.Count == 0)
         {
-            return SignedXmlExportResult.Missing("No hay comprobantes aceptados en ese rango de fechas.");
+            return SignedXmlExportResult.Missing("No hay comprobantes aceptados para este cliente en ese rango de fechas.");
         }
 
         // Para distinguir Rechazado de Aceptado Condicional en EcfStatusId == 11, leemos la última transmisión
@@ -723,7 +911,7 @@ public class DgiiExcelReportService(
 
         if (selected.Count == 0)
         {
-            return SignedXmlExportResult.Missing("No hay comprobantes aceptados en ese rango de fechas.");
+            return SignedXmlExportResult.Missing("No hay comprobantes aceptados para este cliente en ese rango de fechas.");
         }
 
         if (selected.Count > DgiiExcelReportLogic.MaxItems)
@@ -762,18 +950,8 @@ public class DgiiExcelReportService(
             })
             .ToList();
 
-        string? issuerRnc = null;
-        if (clientId is > 0)
-        {
-            issuerRnc = await clients.Table
-                .AsNoTracking()
-                .Where(c => c.ClientId == clientId.Value)
-                .Select(c => c.Rnc)
-                .FirstOrDefaultAsync(cancellationToken);
-        }
-
         return SignedXmlExportResult.Success(
-            DgiiExcelReportLogic.BuildExcelFile(reportRows, issuerRnc, fromDate, toDate));
+            DgiiExcelReportLogic.BuildExcelFile(reportRows, clientInfo.Name, clientInfo.Rnc, fromDate, toDate));
     }
 
     private async Task<Dictionary<int, TransmissionSummary>> LoadLatestTransmissionsAsync(

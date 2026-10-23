@@ -380,9 +380,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             [FromQuery] DateTime? toDate,
             CancellationToken cancellationToken = default)
         {
-            if (fromDate is null || toDate is null)
+            if (clientId is null or <= 0 || fromDate is null || toDate is null)
             {
-                return BadRequest(new { message = "Indique el rango de fechas (fromDate y toDate)." });
+                return BadRequest(new { message = "Indique el cliente y el rango de fechas (fromDate y toDate)." });
             }
 
             if (toDate.Value.Date < fromDate.Value.Date)
@@ -392,7 +392,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
             try
             {
-                if (!IsSA && clientId is > 0)
+                if (!IsSA)
                 {
                     var userId = CurrentUserId;
                     var owns = await _clientService.Table
@@ -405,13 +405,13 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     }
                 }
 
-                return SignedXmlResult(await _dgiiExcelReport.GetRangeExcelAsync(
-                    clientId,
-                    CurrentUserId,
-                    IsSA,
-                    fromDate.Value,
-                    toDate.Value,
-                    cancellationToken));
+                return SignedXmlResult(await _dgiiExcelReport.GetRangeExcelAsync(clientId.Value, fromDate.Value, toDate.Value, cancellationToken));
+
+
+
+
+
+
             }
             catch (Exception ex)
             {
