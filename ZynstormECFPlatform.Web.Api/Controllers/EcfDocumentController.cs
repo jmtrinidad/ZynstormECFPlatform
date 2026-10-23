@@ -19,11 +19,13 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
     public class EcfDocumentController(
         IEcfDocumentService ecfDocumentService,
         ISignedXmlExportService signedXmlExportService,
+        IDgiiExcelReportService dgiiExcelReportService,
         IClientService clientService,
         ILogger<EcfDocumentController> logger) : ControllerBase
     {
         private readonly IEcfDocumentService _ecfDocumentService = ecfDocumentService;
         private readonly ISignedXmlExportService _signedXmlExport = signedXmlExportService;
+        private readonly IDgiiExcelReportService _dgiiExcelReport = dgiiExcelReportService;
         private readonly IClientService _clientService = clientService;
         private readonly ILogger<EcfDocumentController> _logger = logger;
 
@@ -364,6 +366,57 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             {
                 _logger.LogError(ex, "Error descargando los XML firmados del cliente {ClientId}", clientId);
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error interno al descargar los XML firmados." });
+            }
+        }
+
+        /// <summary>
+        /// Genera y descarga el reporte Excel DGII (exentos y gravados) con todos los comprobantes
+        /// aceptados (incluyendo Aceptado Condicional) en el rango de fechas (días de RD, inclusivos).
+        /// </summary>
+        [HttpGet("dgii-report-excel")]
+        public async Task<IActionResult> DownloadDgiiReportExcel(
+            [FromQuery] int? clientId,
+            [FromQuery] DateTime? fromDate,
+            [FromQuery] DateTime? toDate,
+            CancellationToken cancellationToken = default)
+        {
+            if (fromDate is null || toDate is null)
+            {
+                return BadRequest(new { message = "Indique el rango de fechas (fromDate y toDate)." });
+            }
+
+            if (toDate.Value.Date < fromDate.Value.Date)
+            {
+                return BadRequest(new { message = "La fecha final no puede ser anterior a la inicial." });
+            }
+
+            try
+            {
+                if (!IsSA && clientId is > 0)
+                {
+                    var userId = CurrentUserId;
+                    var owns = await _clientService.Table
+                        .AsNoTracking()
+                        .AnyAsync(c => c.ClientId == clientId.Value && c.UserClients.Any(uc => uc.UserId == userId), cancellationToken);
+
+                    if (!owns)
+                    {
+                        return NotFound(new { message = "No se encontró el cliente o no tiene permisos para verlo." });
+                    }
+                }
+
+                return SignedXmlResult(await _dgiiExcelReport.GetRangeExcelAsync(
+                    clientId,
+                    CurrentUserId,
+                    IsSA,
+                    fromDate.Value,
+                    toDate.Value,
+                    cancellationToken));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generando el reporte Excel DGII para el cliente {ClientId}", clientId);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error interno al generar el reporte Excel." });
             }
         }
 

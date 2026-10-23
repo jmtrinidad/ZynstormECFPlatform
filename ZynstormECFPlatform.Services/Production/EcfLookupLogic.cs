@@ -163,7 +163,8 @@ public static class EcfLookupLogic
         {
             using var document = JsonDocument.Parse(payload);
 
-            if (!document.RootElement.TryGetProperty("status", out var statusElement)
+            if ((!document.RootElement.TryGetProperty("status", out var statusElement)
+                && !document.RootElement.TryGetProperty("statusResponse", out statusElement))
                 || statusElement.ValueKind != JsonValueKind.Object)
                 return false;
 
