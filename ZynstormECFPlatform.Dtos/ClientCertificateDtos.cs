@@ -18,6 +18,7 @@ public class ClientCertificateCreateDto
 public class ClientCertificateViewDto
 {
     public int ClientCertificateId { get; set; }
+    public string GuidId { get; set; } = string.Empty;
     public int ClientId { get; set; }
     public string? Thumbprint { get; set; }
     public DateTime? ExpirationDateUtc { get; set; }
