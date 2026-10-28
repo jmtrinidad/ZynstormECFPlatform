@@ -18,6 +18,7 @@ using System.Security.Claims;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers
 {
+    [Authorize]
     public class ClientController(
         IClientService clientService,
         IApiKeyService apiKeyService,

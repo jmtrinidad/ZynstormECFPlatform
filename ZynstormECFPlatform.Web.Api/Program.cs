@@ -15,6 +15,7 @@ using ZynstormECFPlatform.Services.Extensions;
 using ZynstormECFPlatform.Web.Api.Converters;
 using ZynstormECFPlatform.Abstractions.DataServices;
 using Hangfire;
+using Hangfire.Dashboard;
 using Hangfire.PostgreSql;
 using ZynstormECFPlatform.Data;
 using ZynstormECFPlatform.Data.Seeds;
@@ -107,9 +108,44 @@ builder.Services.AddHangfireServer(options =>
 builder.Services.AddHostedService<ZynstormECFPlatform.Web.Api.Services.DgiiRncBootstrapService>();
 
 builder.Services.Configure<AppSettings>(options => builder.Configuration.GetSection("AppSettings").Bind(options));
+builder.Services.Configure<JwtOptions>(options => builder.Configuration.GetSection("Jwt").Bind(options));
 
 var appSettingsSection = builder.Configuration.GetSection("AppSettings");
 var appSettings = appSettingsSection.Get<AppSettings>() ?? throw new InvalidOperationException("Missing AppSettings configuration.");
+
+var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
+var effectiveJwtSecret = !string.IsNullOrEmpty(jwtOptions.Secret) ? jwtOptions.Secret : appSettings.Secret;
+
+var tokenValidationParams = new TokenValidationParameters
+{
+    ValidateIssuerSigningKey = true,
+    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(effectiveJwtSecret)),
+    ValidateIssuer = !string.IsNullOrEmpty(jwtOptions.Issuer),
+    ValidIssuer = !string.IsNullOrEmpty(jwtOptions.Issuer) ? jwtOptions.Issuer : null,
+    ValidateAudience = !string.IsNullOrEmpty(jwtOptions.Audience),
+    ValidAudience = !string.IsNullOrEmpty(jwtOptions.Audience) ? jwtOptions.Audience : null,
+    ValidateLifetime = true,
+    ClockSkew = TimeSpan.Zero,
+};
+
+Task OnTokenValidatedHandler(TokenValidatedContext context)
+{
+    var accountService = context.HttpContext.RequestServices.GetRequiredService<IAccountService>();
+    var userId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    if (string.IsNullOrEmpty(userId))
+    {
+        context.Fail("User ID claim is missing.");
+        return Task.CompletedTask;
+    }
+    return Task.Run(async () =>
+    {
+        var user = await accountService.GetUserByIdAsync(userId).ConfigureAwait(false);
+        if (user == null || !user.IsActive || user.IsDeleted)
+        {
+            context.Fail("User does not exist, is inactive or has been deleted.");
+        }
+    });
+}
 
 if (builder.Environment.IsDevelopment())
 {
@@ -147,18 +183,9 @@ if (builder.Environment.IsDevelopment())
         {
             x.RequireHttpsMetadata = false;
             x.SaveToken = true;
-            x.TokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuerSigningKey = true,
-                ValidateIssuer = false,
-                ValidateAudience = false,
-                ValidateLifetime = true,
-                ClockSkew = TimeSpan.Zero,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(appSettings!.Secret)),
-            };
+            x.TokenValidationParameters = tokenValidationParams;
             x.Events = new JwtBearerEvents
             {
-                // Si no viene el header Authorization, toma el JWT de la cookie httpOnly.
                 OnMessageReceived = context =>
                 {
                     if (string.IsNullOrEmpty(context.Token))
@@ -167,21 +194,7 @@ if (builder.Environment.IsDevelopment())
                     }
                     return Task.CompletedTask;
                 },
-                OnTokenValidated = async context =>
-                {
-                    var accountService = context.HttpContext.RequestServices.GetRequiredService<IAccountService>();
-                    var userId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                    if (string.IsNullOrEmpty(userId))
-                    {
-                        context.Fail("User ID claim is missing.");
-                        return;
-                    }
-                    var user = await accountService.GetUserByIdAsync(userId).ConfigureAwait(false);
-                    if (user == null || !user.IsActive || user.IsDeleted)
-                    {
-                        context.Fail("User does not exist, is inactive or has been deleted.");
-                    }
-                }
+                OnTokenValidated = OnTokenValidatedHandler
             };
         }).AddIdentityCookies();
 }
@@ -202,18 +215,9 @@ else
      {
          x.RequireHttpsMetadata = false;
          x.SaveToken = true;
-         x.TokenValidationParameters = new TokenValidationParameters
-         {
-             ValidateIssuerSigningKey = true,
-             ValidateIssuer = false,
-             ValidateAudience = false,
-             ValidateLifetime = true,
-             ClockSkew = TimeSpan.Zero,
-             IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(appSettings.Secret)),
-         };
+         x.TokenValidationParameters = tokenValidationParams;
          x.Events = new JwtBearerEvents
          {
-             // Si no viene el header Authorization, toma el JWT de la cookie httpOnly.
              OnMessageReceived = context =>
              {
                  if (string.IsNullOrEmpty(context.Token))
@@ -222,21 +226,7 @@ else
                  }
                  return Task.CompletedTask;
              },
-             OnTokenValidated = async context =>
-             {
-                 var accountService = context.HttpContext.RequestServices.GetRequiredService<IAccountService>();
-                 var userId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                 if (string.IsNullOrEmpty(userId))
-                 {
-                     context.Fail("User ID claim is missing.");
-                     return;
-                 }
-                 var user = await accountService.GetUserByIdAsync(userId).ConfigureAwait(false);
-                 if (user == null || !user.IsActive || user.IsDeleted)
-                 {
-                     context.Fail("User does not exist, is inactive or has been deleted.");
-                 }
-             }
+             OnTokenValidated = OnTokenValidatedHandler
          };
      }).AddIdentityCookies();
 }
@@ -245,15 +235,15 @@ builder.Services.AddCors(c =>
 {
     c.AddPolicy("corsGlobalPolicy", builder =>
         builder.SetIsOriginAllowed(origin => true) // Permite peticiones desde CUALQUIER URL
-                        .AllowAnyHeader()
-                        .AllowAnyMethod()
-                        .AllowCredentials());
+               .AllowAnyHeader()
+               .AllowAnyMethod()
+               .AllowCredentials());
 
     c.AddPolicy("corsPolicy", builder =>
         builder.SetIsOriginAllowed(origin => true) // Permite peticiones desde CUALQUIER URL
-                        .AllowAnyHeader()
-                        .AllowAnyMethod()
-                        .AllowCredentials());
+               .AllowAnyHeader()
+               .AllowAnyMethod()
+               .AllowCredentials());
 });
 
 var app = builder.Build();
@@ -270,24 +260,17 @@ app.Use(async (context, next) =>
     await next().ConfigureAwait(false);
 });
 
-// Configure the HTTP request pipeline.
-// Temporalmente expuesto en producción para pruebas
-// if (app.Environment.IsDevelopment())
-// {
-app.UseSwagger();
-
-app.UseSwaggerUI(options =>
+if (app.Environment.IsDevelopment() || app.Environment.IsStaging() || app.Configuration.GetValue<bool>("Swagger:Enabled", false))
 {
-    // Se utiliza ruta relativa './v1/swagger.json' para evitar problemas con reverse proxies (como Dokploy/Nginx)
-    options.SwaggerEndpoint("./v1/swagger.json", "Zynstorm ECF Platform API v1");
-    options.EnablePersistAuthorization();
-});
-// }
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("./v1/swagger.json", "Zynstorm ECF Platform API v1");
+        options.EnablePersistAuthorization();
+    });
+}
 
 app.UseWebSockets();
-// En Development NO se fuerza el redirect HTTP->HTTPS: el proxy de dev de Next reenvía al
-// puerto HTTP del backend (mismo origen para la cookie httpOnly) y un 307 hacia el HTTPS
-// autofirmado rompería el login. En Staging/Producción (detrás de Nginx con TLS) sí se aplica.
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
@@ -301,7 +284,10 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseHangfireDashboard();
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = [new HangfireAdminAuthorizationFilter()]
+});
 
 // Register Automatic Reports Recurring Jobs
 RecurringJob.AddOrUpdate<ZynstormECFPlatform.Services.Jobs.AutomaticReportsJob>(
@@ -339,7 +325,6 @@ RecurringJob.AddOrUpdate<ZynstormECFPlatform.Services.Jobs.PaymentReminderJob>(
     new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Santo_Domingo") }
 );
 
-// El acceso se corta al comenzar el día posterior a la fecha límite; no se espera al envío de avisos de las 8:00 AM.
 RecurringJob.AddOrUpdate<ZynstormECFPlatform.Services.Jobs.PaymentSuspensionJob>(
     "PaymentSuspensionJob",
     job => job.RunAsync(default),
@@ -373,4 +358,14 @@ static async Task SeedData(WebApplication app)
 
     if (service is not null)
         await service.SeedAsync();
+}
+
+public class HangfireAdminAuthorizationFilter : Hangfire.Dashboard.IDashboardAuthorizationFilter
+{
+    public bool Authorize(Hangfire.Dashboard.DashboardContext context)
+    {
+        var httpContext = context.GetHttpContext();
+        return httpContext.User.Identity?.IsAuthenticated == true &&
+               (httpContext.User.IsInRole("SA") || httpContext.User.IsInRole("Admin"));
+    }
 }

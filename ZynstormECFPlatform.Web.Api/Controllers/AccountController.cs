@@ -192,7 +192,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     return BadRequest(result.Errors);
                 }
 
-                await _accountService.AddUserToRoleAsync(user, Common.Enums.UserType.Admin.ToString()).ConfigureAwait(false);
+                await _accountService.AddUserToRoleAsync(user, Common.Enums.UserType.Normal.ToString()).ConfigureAwait(false);
 
                 // Generar link de activación
                 var token = await _accountService.GenerateEmailConfirmationTokenAsync(user).ConfigureAwait(false);

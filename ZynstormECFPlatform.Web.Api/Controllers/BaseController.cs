@@ -11,7 +11,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers;
 
 //[JsonConverter(typeof(JsonInheritanceConverter), "discriminator")]
 //[KnownType(typeof(UserController))]
-//[Authorize]
+[Authorize]
 [ApiVersion("1.0")]
 [Route("v{version:apiVersion}/[controller]")]
 [ApiController]

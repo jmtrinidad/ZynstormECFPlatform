@@ -68,6 +68,8 @@ public class FeController : ControllerBase
     /// Autenticación B2B - Paso 1: Proveedor solicita semilla para firmarla.
     /// </summary>
 
+    [AllowAnonymous]
+
     [HttpGet("autenticacion/api/Semilla")]
     public IActionResult ObtenerSemilla()
     {
@@ -91,6 +93,7 @@ public class FeController : ControllerBase
     /// <summary>
     /// Autenticación B2B - Paso 2: El proveedor envía la semilla firmada para obtener el JWT.
     /// </summary>
+    [AllowAnonymous]
     [HttpPost("autenticacion/api/validacioncertificado")]
     public async Task<IActionResult> ValidarCertificado()
     {
@@ -121,6 +124,7 @@ public class FeController : ControllerBase
     /// <summary>
     /// Receptor B2B - Recibe el archivo de la factura.
     /// </summary>
+    [AllowAnonymous]
     [HttpPost("recepcion/api/ecf")]
     [ZynstormECFPlatform.Web.Api.Filters.B2BTokenAuth]
     public async Task<IActionResult> RecepcionEcf()
@@ -255,6 +259,7 @@ public class FeController : ControllerBase
     /// <summary>
     /// Aprobación Comercial B2B.
     /// </summary>
+    [AllowAnonymous]
     [HttpPost("aprobacioncomercial/api/ecf")]
     [ZynstormECFPlatform.Web.Api.Filters.B2BTokenAuth]
     public async Task<IActionResult> AprobacionComercial()
@@ -613,6 +618,7 @@ public class FeController : ControllerBase
     /// <summary>
     /// Lista los comprobantes XML recibidos y guardados en base de datos para un cliente.
     /// </summary>
+    
     [HttpGet("client/{clientId}/received-files")]
     public async Task<IActionResult> ListReceivedFiles(int clientId)
     {
@@ -652,6 +658,7 @@ public class FeController : ControllerBase
     /// <summary>
     /// Descarga el XML de un comprobante específico desde la base de datos.
     /// </summary>
+    
     [HttpGet("client/{clientId}/received-files/{id:int}")]
     public async Task<IActionResult> DownloadReceivedFile(int clientId, int id)
     {
@@ -681,7 +688,7 @@ public class FeController : ControllerBase
     /// Descarga como PDF un e-CF recibido, generado a partir del XML guardado. Solo e-CF: las
     /// aprobaciones comerciales no tienen representación impresa.
     /// </summary>
-    [Authorize]
+    
     [HttpGet("client/{clientId}/received-files/{id:int}/pdf")]
     public async Task<IActionResult> DownloadReceivedFilePdf(int clientId, int id)
     {
@@ -724,6 +731,7 @@ public class FeController : ControllerBase
     /// <summary>
     /// Envía por correo electrónico el XML del comprobante desde la base de datos a la dirección de correo del cliente.
     /// </summary>
+    
     [HttpPost("client/{clientId}/received-files/{id:int}/send-email")]
     public async Task<IActionResult> SendReceivedFileByEmail(int clientId, int id)
     {
@@ -792,4 +800,5 @@ public class FeController : ControllerBase
     }
 
     private sealed record FeValidatedClient(int ClientId, string Rnc);
+
 }

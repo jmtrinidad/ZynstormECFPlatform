@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using System.Text;
 using System.Xml;
 using ZynstormECFPlatform.Abstractions.DataServices;
@@ -11,13 +13,14 @@ namespace ZynstormECFPlatform.Web.Api.Controllers;
 /// Recibe un XML de postulación DGII, lo firma digitalmente usando el certificado
 /// del cliente identificado por el RNC del contribuyente y devuelve el XML firmado.
 /// </summary>
-//[Authorize]
+[Authorize]
 [Route("[controller]")]
 [ApiController]
 public class XmlSignController(
     IClientService clientService,
     IApiKeyService apiKeyService,
     IClientCertificateService clientCertificateService,
+    IUserClientService userClientService,
     IEncryptedService encryptedService,
     IXmlSignatureService xmlSignatureService,
     ILoggerFactory loggerFactory) : ControllerBase
@@ -32,6 +35,7 @@ public class XmlSignController(
     [ProducesResponseType(typeof(FileContentResult), 200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
     [ProducesResponseType(404)]
     [ProducesResponseType(422)]
     [ProducesResponseType(503)]
@@ -49,11 +53,11 @@ public class XmlSignController(
                 xmlContent = await streamReader.ReadToEndAsync(cancellationToken);
             }
 
-            // 2. Parseamos el XML y extraemos el RNC del contribuyente
+            // 2. Parseamos el XML de forma segura (sin DTD) y extraemos el RNC del contribuyente
             string rnc;
             try
             {
-                var xmlDoc = new XmlDocument();
+                var xmlDoc = new XmlDocument { XmlResolver = null };
                 xmlDoc.LoadXml(xmlContent);
 
                 var rncNode = xmlDoc.SelectSingleNode("//Contribuyente/RNCContribuyente")
@@ -75,6 +79,19 @@ public class XmlSignController(
 
             if (client == null)
                 return NotFound($"No se encontró ningún cliente registrado con el RNC '{rnc}'.");
+
+            // 3.1 Validar autorización sobre el cliente (si no es SuperAdmin)
+            if (!User.IsInRole("SA"))
+            {
+                var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var hasAccess = await userClientService.Table
+                    .AnyAsync(uc => uc.ClientId == client.ClientId && uc.UserId == currentUserId, cancellationToken);
+
+                if (!hasAccess)
+                {
+                    return Forbid();
+                }
+            }
 
             // 4. Obtenemos la ApiKey activa del cliente para acceder a la SecretKey
             var apiKey = await apiKeyService.GetByAsync(x => x.ClientId == client.ClientId, cancellationToken);

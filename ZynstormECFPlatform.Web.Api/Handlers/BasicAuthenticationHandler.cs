@@ -46,27 +46,43 @@ public class BasicAuthenticationHandler : AuthenticationHandler<AuthenticationSc
                 switch (authHeader.Scheme)
                 {
                     case "Basic":
-                        var credentials = Encoding.UTF8.GetString(Convert.FromBase64String(authHeader.Parameter!)).Split(':');
-                        var login = new UserLoginDto
+                        var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(authHeader.Parameter ?? string.Empty));
+                        var separatorIdx = decoded.IndexOf(':');
+                        if (separatorIdx < 0)
                         {
-                            UserName = credentials.FirstOrDefault()!,
-                            Password = credentials.LastOrDefault()!
-                        };
-
-                        if (login.UserName.Equals("admin") && login.Password.Equals("admin"))
-                        {
-                            var claims = new[] {
-                                new Claim( ClaimTypes.Name, login.UserName)
-                                };
-
-                            var identity = new ClaimsIdentity(claims, Scheme.Name);
-                            var principal = new ClaimsPrincipal(identity);
-                            var ticket = new AuthenticationTicket(principal, Scheme.Name);
-
-                            return AuthenticateResult.Success(ticket);
+                            return AuthenticateResult.Fail("Formato de autenticación Basic inválido.");
                         }
 
-                        throw new ArgumentException("Invalid credentials");
+                        var userName = decoded[..separatorIdx];
+                        var password = decoded[(separatorIdx + 1)..];
+
+                        var accountService = Context.RequestServices.GetRequiredService<IAccountService>();
+                        var user = await accountService.GetUserByUserNameAsync(userName).ConfigureAwait(false)
+                                   ?? await accountService.GetUserByEmailAsync(userName).ConfigureAwait(false);
+
+                        if (user != null && user.IsActive && !user.IsDeleted)
+                        {
+                            var passValidation = await accountService.ValidatePasswordAsync(user, password).ConfigureAwait(false);
+                            if (passValidation.Succeeded)
+                            {
+                                var role = await accountService.GetRoleByUserAsync(user).ConfigureAwait(false);
+                                var claims = new List<Claim>
+                                {
+                                    new(ClaimTypes.NameIdentifier, user.Id),
+                                    new(ClaimTypes.Name, user.UserName ?? string.Empty),
+                                    new(ClaimTypes.Email, user.Email ?? string.Empty),
+                                    new(ClaimTypes.Role, role?.Name ?? "Normal")
+                                };
+
+                                var identity = new ClaimsIdentity(claims, Scheme.Name);
+                                var principal = new ClaimsPrincipal(identity);
+                                var ticket = new AuthenticationTicket(principal, Scheme.Name);
+
+                                return AuthenticateResult.Success(ticket);
+                            }
+                        }
+
+                        return AuthenticateResult.Fail("Usuario o contraseña incorrectos.");
 
                     case "Bearer":
                         return await AuthenticateWithJwtAsync(authHeader.Parameter!).ConfigureAwait(false);
@@ -77,8 +93,6 @@ public class BasicAuthenticationHandler : AuthenticationHandler<AuthenticationSc
             }
 
             // Sin header Authorization: el JWT puede venir en la cookie httpOnly.
-            // Este handler es el esquema DEFAULT en Development, así que necesita el mismo
-            // fallback que el middleware JwtBearer estándar.
             var cookieToken = Helpers.AuthCookie.ReadToken(Request);
             if (!string.IsNullOrEmpty(cookieToken))
             {
@@ -90,7 +104,7 @@ public class BasicAuthenticationHandler : AuthenticationHandler<AuthenticationSc
         catch (Exception exception)
         {
             _logger.LogError(exception, message: exception.Message);
-            return AuthenticateResult.Fail($"Authentication failed");
+            return AuthenticateResult.Fail("Authentication failed");
         }
     }
 

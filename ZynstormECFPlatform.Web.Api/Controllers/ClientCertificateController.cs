@@ -1,4 +1,5 @@
 using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -11,6 +12,7 @@ using ZynstormECFPlatform.Dtos;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers
 {
+    [Authorize(Roles = "SA,Admin")]
     public class ClientCertificateController(
         IClientCertificateService certificateService,
         IClientService clientService,
