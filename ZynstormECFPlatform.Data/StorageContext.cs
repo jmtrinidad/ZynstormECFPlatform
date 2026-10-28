@@ -910,6 +910,15 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
             entity.Property(e => e.ExpirationDateUtc).HasColumnType(DateTimeColumnType);
             entity.Property(e => e.Password).IsUnicode(false);
             entity.Property(e => e.Thumbprint).IsUnicode(false);
+            entity.Property(e => e.NotBeforeUtc).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.SerialNumber).HasMaxLength(100).IsUnicode(false);
+            entity.Property(e => e.SubjectName).HasMaxLength(250);
+            entity.Property(e => e.SubjectIdentification).HasMaxLength(50);
+            entity.Property(e => e.SubjectEmail).HasMaxLength(250);
+            entity.Property(e => e.SubjectAddress).HasMaxLength(500);
+            entity.Property(e => e.OrganizationName).HasMaxLength(250);
+            entity.Property(e => e.OrganizationIdentifier).HasMaxLength(50);
+            entity.Property(e => e.IssuerName).HasMaxLength(250);
 
             entity.Property(c => c.LastUpdateUtc)
                   .HasColumnType(DateTimeColumnType);

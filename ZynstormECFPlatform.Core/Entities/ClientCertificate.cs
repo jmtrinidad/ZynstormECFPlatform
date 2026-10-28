@@ -18,6 +18,23 @@ public partial class ClientCertificate : BaseEntity
 
     public DateTime? ExpirationDateUtc { get; set; }
 
+    public DateTime? NotBeforeUtc { get; set; }
+
+    public string? SerialNumber { get; set; }
+
+    public string? SubjectName { get; set; }
+
+    public string? SubjectIdentification { get; set; }
+
+    public string? SubjectEmail { get; set; }
+
+    public string? SubjectAddress { get; set; }
+
+    public string? OrganizationName { get; set; }
+
+    public string? OrganizationIdentifier { get; set; }
+
+    public string? IssuerName { get; set; }
 
     public virtual Client Client { get; set; } = null!;
 }

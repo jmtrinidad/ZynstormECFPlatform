@@ -9,6 +9,7 @@ using ZynstormECFPlatform.Abstractions.DataServices;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Dtos;
+using ZynstormECFPlatform.Services.Certificates;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers
 {
@@ -100,14 +101,12 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 await dto.Certificate.CopyToAsync(ms);
                 var certificateBytes = ms.ToArray();
 
-                // 5. Validamos el certificado y extraemos metadatos
-                string thumbprint;
-                DateTime expirationDate;
+                // 5. Validamos el certificado y extraemos metadatos (titular, emisor, vigencia)
+                var model = new ClientCertificate { ClientId = client.ClientId };
                 try
                 {
                     using var x509 = new X509Certificate2(certificateBytes, dto.Password, X509KeyStorageFlags.Exportable);
-                    thumbprint = x509.Thumbprint;
-                    expirationDate = x509.NotAfter;
+                    CertificateDetailsReader.Apply(x509, model);
                 }
                 catch (CryptographicException ex)
                 {
@@ -120,23 +119,85 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 var encryptedCertificate = encryptedService.EncryptWithSecret(certificateBytes, decryptedSecretKey);
                 var encryptedPassword = encryptedService.EncryptWithSecret(Encoding.UTF8.GetBytes(dto.Password), decryptedSecretKey);
 
-                ClientCertificate? model = null;
+                model.Certificate = encryptedCertificate;
+                model.Password = encryptedPassword;
 
                 await unitOfWork.ExecuteInTransactionAsync(async ct =>
                 {
-                    model = new ClientCertificate
-                    {
-                        ClientId = client.ClientId,
-                        Certificate = encryptedCertificate,
-                        Password = encryptedPassword,
-                        Thumbprint = thumbprint,
-                        ExpirationDateUtc = expirationDate.ToUniversalTime()
-                    };
-
                     await Repository.InsertAsync(model);
                 });
 
-                return Ok(Mapper.Map<ClientCertificate, ClientCertificateViewDto>(model!));
+                return Ok(Mapper.Map<ClientCertificate, ClientCertificateViewDto>(model));
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, exception.Message);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+        }
+
+        /// <summary>
+        /// Relee los certificados ya registrados para completar los datos del titular y del emisor.
+        /// Con guidId (cliente) solo procesa los de ese cliente; sin él, todos.
+        /// </summary>
+        [HttpPost]
+        [Route("refresh-details", Order = 1)]
+        [ProducesResponseType(200)]
+        [ProducesResponseType(404)]
+        [ProducesResponseType(503)]
+        public async Task<ActionResult<ClientCertificateRefreshDetailsResultDto>> RefreshDetails([FromQuery] string? guidId, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                IEnumerable<ClientCertificate> certificates;
+                if (!string.IsNullOrEmpty(guidId))
+                {
+                    var client = await clientService.GetByAsync(x => x.GuidId == guidId, cancellationToken);
+
+                    if (client == null)
+                        return NotFound("No se encontró un cliente con el GuidId proporcionado.");
+
+                    certificates = await certificateService.GetManyByAsync(x => x.ClientId == client.ClientId, cancellationToken);
+                }
+                else
+                {
+                    certificates = await certificateService.GetAllAsync(cancellationToken);
+                }
+
+                var result = new ClientCertificateRefreshDetailsResultDto();
+
+                foreach (var group in certificates.GroupBy(c => c.ClientId))
+                {
+                    var apiKeyEntity = await apiKeyService.GetByAsync(x => x.ClientId == group.Key, cancellationToken);
+                    var secretKey = apiKeyEntity == null || string.IsNullOrEmpty(apiKeyEntity.SecretKey)
+                        ? null
+                        : encryptedService.DecryptString(apiKeyEntity.SecretKey);
+
+                    foreach (var certificate in group)
+                    {
+                        try
+                        {
+                            if (string.IsNullOrEmpty(secretKey))
+                                throw new InvalidOperationException($"El cliente {group.Key} no tiene una SecretKey válida.");
+
+                            var certificateBytes = encryptedService.DecryptWithSecret(certificate.Certificate, secretKey);
+                            var password = Encoding.UTF8.GetString(encryptedService.DecryptWithSecret(certificate.Password, secretKey));
+
+                            using var x509 = new X509Certificate2(certificateBytes, password, X509KeyStorageFlags.Exportable);
+                            CertificateDetailsReader.Apply(x509, certificate);
+
+                            await Repository.UpdateAsync(certificate);
+                            result.Updated++;
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.LogWarning(ex, "No se pudieron leer los datos del certificado {CertificateId}", certificate.ClientCertificateId);
+                            result.Failed++;
+                        }
+                    }
+                }
+
+                return Ok(result);
             }
             catch (Exception exception)
             {

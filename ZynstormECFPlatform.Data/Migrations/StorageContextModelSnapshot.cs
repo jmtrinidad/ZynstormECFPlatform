@@ -2878,9 +2878,24 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<string>("IssuerName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
                     b.Property<DateTime?>("LastUpdateUtc")
                         .IsConcurrencyToken()
                         .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("NotBeforeUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("OrganizationIdentifier")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("OrganizationName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.Property<string>("Password")
                         .IsRequired()
@@ -2891,6 +2906,27 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("SerialNumber")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SubjectAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("SubjectEmail")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<string>("SubjectIdentification")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("SubjectName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.Property<string>("Thumbprint")
                         .IsUnicode(false)
