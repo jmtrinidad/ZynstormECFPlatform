@@ -497,6 +497,38 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         bool earlierAttemptsWithoutTrackId,
         CancellationToken cancellationToken)
     {
+        // Segunda barrera en el punto de salida: también cubre jobs diferidos y registros
+        // históricos cuyo estado actual fue reemplazado por un rechazo de reenvío.
+        var priorAcceptance = (await _lookupService.ListExistingAsync(clientId, eNcf, cancellationToken))
+            .Where(document => document.State is EcfLookupState.Accepted or EcfLookupState.AcceptedConditional)
+            .OrderBy(document => document.State == EcfLookupState.Accepted ? 0 : 1)
+            .ThenBy(document => document.EcfDocumentId)
+            .FirstOrDefault();
+
+        if (priorAcceptance is not null)
+        {
+            var lookup = await _lookupService.DescribeDocumentAsync(
+                clientId, priorAcceptance.EcfDocumentId, priorAcceptance.State, 1, cancellationToken);
+            var replay = EcfEmitReplay.ToResult(lookup, 1);
+            resultDto.Replayed = true;
+            resultDto.Success = replay.Success;
+            resultDto.IsAcceptedConditional = replay.IsAcceptedConditional;
+            resultDto.RequiresCorrection = replay.IsAcceptedConditional;
+            resultDto.IsPending = false;
+            resultDto.EcfDocumentId = replay.EcfDocumentId;
+            resultDto.TrackId = replay.TrackId;
+            resultDto.SecurityCode = replay.SecurityCode;
+            resultDto.SignatureDate = replay.SignatureDate;
+            resultDto.QrUrl = replay.QrUrl;
+            resultDto.Message = replay.Message;
+
+            if (priorAcceptance.EcfDocumentId != ecfDocument.EcfDocumentId)
+                await MarkDocumentAsync(ecfDocument, 13, $"Envío omitido: {eNcf} ya fue aceptado por la DGII en el documento {priorAcceptance.EcfDocumentId}.");
+
+            await AddLogAsync(ecfDocument, clientId, "Information", resultDto.Message);
+            return TransmitStep.Completed;
+        }
+
         if (ShouldUseStagingXmlValidation())
         {
             await ProcessWithStagingValidationAsync(
@@ -560,15 +592,24 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
             return TransmitStep.Completed;
         }
 
-        resultDto.Success = string.Equals(transmission.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase) || transmission.Codigo is 0 or 1;
-        resultDto.Message = resultDto.Success ? $"DGII: {transmission.Estado ?? "Aceptado"}" : BuildDgiiTransmissionError(transmission);
-        var finalStatusId = resultDto.Success ? 10 : 12;
+        resultDto.IsAcceptedConditional = transmission.IsAcceptedConditional;
+        resultDto.RequiresCorrection = resultDto.IsAcceptedConditional;
+        resultDto.Success = !resultDto.IsAcceptedConditional
+            && (string.Equals(transmission.Estado, "Aceptado", StringComparison.OrdinalIgnoreCase) || transmission.Codigo is 0 or 1);
+        resultDto.Message = resultDto.Success
+            ? $"DGII: {transmission.Estado ?? "Aceptado"}"
+            : resultDto.IsAcceptedConditional && string.IsNullOrWhiteSpace(transmission.Estado)
+                ? $"DGII: Aceptado Condicional | {BuildDgiiTransmissionError(transmission)}"
+                : BuildDgiiTransmissionError(transmission);
+        var finalStatusId = resultDto.IsAcceptedConditional ? 11 : resultDto.Success ? 10 : 12;
 
         await SaveTransmissionAsync(ecfDocument, transmission, finalStatusId, signedXml);
         await MarkDocumentAsync(ecfDocument, finalStatusId, resultDto.Message);
-        await AddLogAsync(ecfDocument, clientId, resultDto.Success ? "Information" : "Error", resultDto.Message, JsonSerializer.Serialize(transmission));
+        await AddLogAsync(ecfDocument, clientId,
+            resultDto.Success ? "Information" : resultDto.IsAcceptedConditional ? "Warning" : "Error",
+            resultDto.Message, JsonSerializer.Serialize(transmission));
 
-        if (resultDto.Success)
+        if (resultDto.Success || resultDto.IsAcceptedConditional)
         {
             await AddLogAsync(ecfDocument, clientId, "Information", $"e-CF aprobado. CodigoSeguridad: {resultDto.SecurityCode}. FechaFirma: {resultDto.SignatureDate}. QR: {resultDto.QrUrl}.");
             await _clientUsageService.RegisterAcceptedAsync(ecfDocument.EcfDocumentId, clientId, cancellationToken);

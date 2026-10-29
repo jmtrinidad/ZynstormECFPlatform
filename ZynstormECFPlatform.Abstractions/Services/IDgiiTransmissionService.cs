@@ -23,7 +23,12 @@ public class DgiiTransmissionResult
     /// </summary>
     public bool TransportFailure { get; set; }
 
-    public bool Success => (!string.IsNullOrEmpty(TrackId) || string.Equals(Estado, "Aceptado", StringComparison.OrdinalIgnoreCase) || Codigo == 0) && string.IsNullOrEmpty(Error);
+    public bool IsAcceptedConditional =>
+        (Estado?.Contains("Aceptado Condicional", StringComparison.OrdinalIgnoreCase) ?? false) || Codigo == 4;
+
+    public bool Success => IsAcceptedConditional ||
+        ((!string.IsNullOrEmpty(TrackId) || string.Equals(Estado, "Aceptado", StringComparison.OrdinalIgnoreCase) || Codigo is 0 or 1)
+         && string.IsNullOrEmpty(Error));
 }
 
 /// <summary>Un TrackId que la DGII devolvió para un eNCF recibido (servicio «Consulta de TrackId e-CF»).</summary>

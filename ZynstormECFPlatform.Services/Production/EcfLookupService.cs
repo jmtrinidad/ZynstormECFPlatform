@@ -37,7 +37,7 @@ public class EcfLookupService(
     IClientService clients,
     IConfiguration configuration) : IEcfLookupService
 {
-    private sealed record TransmissionRow(int EcfDocumentId, string TrackId, string? ResponsePayload, DateTime SentAtUtc);
+    private sealed record TransmissionRow(int EcfDocumentId, string TrackId, int EcfStatusId, string? ResponsePayload, DateTime SentAtUtc);
 
     public async Task<EcfLookupResponse?> FindByNcfAsync(
         int clientId,
@@ -58,7 +58,7 @@ public class EcfLookupService(
         var candidates = found
             .Select(document => new EcfLookupCandidate(
                 document.EcfDocumentId,
-                EcfLookupLogic.ResolveState(document.EcfStatusId, LastPayload(byDocument, document.EcfDocumentId)),
+                ResolveHistoricalState(document.EcfStatusId, byDocument, document.EcfDocumentId),
                 document.RegisteredAt))
             .ToList();
 
@@ -93,7 +93,7 @@ public class EcfLookupService(
             .Select(document => new EcfEmitExisting(
                 document.EcfDocumentId,
                 document.EcfStatusId,
-                EcfLookupLogic.ResolveState(document.EcfStatusId, LastPayload(byDocument, document.EcfDocumentId)),
+                ResolveHistoricalState(document.EcfStatusId, byDocument, document.EcfDocumentId),
                 document.LastUpdateUtc ?? document.RegisteredAt,
                 byDocument.TryGetValue(document.EcfDocumentId, out var list)
                     && list.Any(transmission => !string.IsNullOrWhiteSpace(transmission.TrackId))))
@@ -166,6 +166,7 @@ public class EcfLookupService(
             .Select(transmission => new TransmissionRow(
                 transmission.EcfDocumentId,
                 transmission.TrackId,
+                transmission.EcfStatusId,
                 transmission.ResponsePayload,
                 transmission.SentAtUtc))
             .ToListAsync(cancellationToken);
@@ -177,6 +178,13 @@ public class EcfLookupService(
                 group => group.OrderByDescending(row => row.SentAtUtc).ToList());
     }
 
-    private static string? LastPayload(Dictionary<int, List<TransmissionRow>> byDocument, int documentId) =>
-        byDocument.TryGetValue(documentId, out var list) ? list[0].ResponsePayload : null;
+    private static EcfLookupState ResolveHistoricalState(
+        int statusId,
+        Dictionary<int, List<TransmissionRow>> byDocument,
+        int documentId) =>
+        EcfLookupLogic.ResolveStateFromHistory(
+            statusId,
+            byDocument.TryGetValue(documentId, out var rows)
+                ? rows.Select(row => (row.EcfStatusId, row.ResponsePayload)).ToList()
+                : []);
 }

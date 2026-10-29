@@ -38,6 +38,9 @@ public class EcfLookupLogicTests
     private const string RejectedPayload =
         "{\"transmission\":{},\"status\":{\"Codigo\":\"2\",\"Estado\":\"Rechazado\"}}";
 
+    private const string DirectConditionalPayload =
+        "{\"transmission\":{\"Codigo\":4,\"Estado\":\"Aceptado Condicional\"},\"status\":null}";
+
     [Theory]
     [InlineData(10, EcfLookupState.Accepted)]
     [InlineData(7, EcfLookupState.Pending)]
@@ -60,6 +63,49 @@ public class EcfLookupLogicTests
     public void ResolveState_Id11WithConditionalPayload_IsAcceptedConditional()
     {
         Assert.Equal(EcfLookupState.AcceptedConditional, EcfLookupLogic.ResolveState(11, ConditionalPayload));
+    }
+
+    [Fact]
+    public void ResolveState_Id11WithDirectRfceConditional_IsAcceptedConditional()
+    {
+        Assert.Equal(EcfLookupState.AcceptedConditional, EcfLookupLogic.ResolveState(11, DirectConditionalPayload));
+    }
+
+    [Fact]
+    public void ResolveStateFromHistory_PriorConditionalBeatsLaterRejectedDuplicate()
+    {
+        var state = EcfLookupLogic.ResolveStateFromHistory(11,
+        [
+            (11, RejectedPayload),
+            (11, ConditionalPayload)
+        ]);
+
+        Assert.Equal(EcfLookupState.AcceptedConditional, state);
+    }
+
+    [Fact]
+    public void ResolveStateFromHistory_RecognizesDirectConditionalEvenWhenDocumentWasMarkedError()
+    {
+        var state = EcfLookupLogic.ResolveStateFromHistory(12, [(12, DirectConditionalPayload)]);
+
+        Assert.Equal(EcfLookupState.AcceptedConditional, state);
+    }
+
+    [Fact]
+    public void ResolveStateFromHistory_DoesNotProtectOnlyRejectedAttempts()
+    {
+        var state = EcfLookupLogic.ResolveStateFromHistory(11, [(11, RejectedPayload)]);
+
+        Assert.Equal(EcfLookupState.Rejected, state);
+    }
+
+    [Fact]
+    public void ResolveStateFromHistory_FinalRejectionOverridesConditionalReceptionOfSameAttempt()
+    {
+        const string payload = "{\"transmission\":{\"Codigo\":4,\"Estado\":\"Aceptado Condicional\"},\"status\":{\"Codigo\":\"2\",\"Estado\":\"Rechazado\"}}";
+
+        Assert.Equal(EcfLookupState.Rejected,
+            EcfLookupLogic.ResolveStateFromHistory(11, [(11, payload)]));
     }
 
     [Theory]

@@ -39,6 +39,20 @@ public static class EcfLookupLogic
         _ => EcfLookupState.NotSent
     };
 
+    /// <summary>Una aceptación previa sigue protegiendo el eNCF aunque un reenvío posterior haya sido rechazado.</summary>
+    public static EcfLookupState ResolveStateFromHistory(
+        int ecfStatusId,
+        IReadOnlyList<(int StatusId, string? ResponsePayload)> transmissions)
+    {
+        if (ecfStatusId == 10 || transmissions.Any(row => row.StatusId == 10))
+            return EcfLookupState.Accepted;
+
+        if (transmissions.Any(row => IsConditional(row.ResponsePayload)))
+            return EcfLookupState.AcceptedConditional;
+
+        return ResolveState(ecfStatusId, transmissions.FirstOrDefault().ResponsePayload);
+    }
+
     public static bool IsUsable(EcfLookupState state) =>
         state is EcfLookupState.Accepted or EcfLookupState.AcceptedConditional or EcfLookupState.Pending;
 
@@ -163,15 +177,27 @@ public static class EcfLookupLogic
         {
             using var document = JsonDocument.Parse(payload);
 
-            if ((!document.RootElement.TryGetProperty("status", out var statusElement)
-                && !document.RootElement.TryGetProperty("statusResponse", out statusElement))
-                || statusElement.ValueKind != JsonValueKind.Object)
-                return false;
+            if ((document.RootElement.TryGetProperty("status", out var statusElement)
+                || document.RootElement.TryGetProperty("statusResponse", out statusElement))
+                && statusElement.ValueKind == JsonValueKind.Object)
+            {
+                var status = statusElement.Deserialize<DgiiStatusResponse>(
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            var status = statusElement.Deserialize<DgiiStatusResponse>(
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (status is not null)
+                    return ReceivedEcfProductionService.IsAcceptedConditionalDgiiStatus(status);
+            }
 
-            return status is not null && ReceivedEcfProductionService.IsAcceptedConditionalDgiiStatus(status);
+            if (document.RootElement.TryGetProperty("transmission", out var transmissionElement)
+                && transmissionElement.ValueKind == JsonValueKind.Object)
+            {
+                var transmission = transmissionElement.Deserialize<ZynstormECFPlatform.Abstractions.Services.DgiiTransmissionResult>(
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                return transmission?.IsAcceptedConditional == true;
+            }
+
+            return false;
         }
         catch (JsonException)
         {
