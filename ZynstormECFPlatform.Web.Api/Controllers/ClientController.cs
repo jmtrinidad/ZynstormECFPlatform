@@ -689,6 +689,51 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             }
         }
 
+
+        [HttpPost]
+        [Route("guid/{guid}/api-key/regenerate", Order = 1)]
+        public async Task<IActionResult> RegenerateApiKey(string guid, [FromBody] ClientRegenerateApiKeyDto? dto, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var query = Repository.Table.AsNoTracking().Where(c => c.GuidId == guid);
+                if (!IsSA)
+                {
+                    var userId = CurrentUserId;
+                    query = query.Where(c => c.UserClients.Any(uc => uc.UserId == userId));
+                }
+
+                var client = await query.FirstOrDefaultAsync(cancellationToken);
+                if (client == null)
+                    return NotFound(new { message = "No se encontró el cliente." });
+
+                var email = dto?.Email?.Trim();
+                var result = await clientApiKeyService.RegenerateAsync(client.ClientId, email, cancellationToken);
+
+                return result.Outcome switch
+                {
+                    ClientApiKeySendOutcome.Sent => Ok(new ClientSendApiKeyResultDto
+                    {
+                        Message = !string.IsNullOrWhiteSpace(email)
+                            ? $"Se regeneró la API Key y se envió a {email}."
+                            : "Se regeneró la API Key exitosamente.",
+                        ApiKey = result.ApiKey!,
+                        Generated = true
+                    }),
+                    ClientApiKeySendOutcome.InvalidEmail => BadRequest(new { message = result.Error }),
+                    _ => UnprocessableEntity(new { message = result.Error })
+                };
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, "Error regenerando la API Key del cliente {Guid}", guid);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+                {
+                    message = "No se pudo regenerar la API Key. Intente nuevamente."
+                });
+            }
+        }
+
         [HttpGet]
         [Route("usage", Order = 1)]
         public async Task<IActionResult> GetMonthlyUsage([FromQuery] int year, [FromQuery] int month, CancellationToken cancellationToken = default)

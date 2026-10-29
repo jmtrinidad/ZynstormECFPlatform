@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System.Net.Mail;
 using ZynstormECFPlatform.Abstractions.Data;
 using ZynstormECFPlatform.Abstractions.DataServices;
@@ -34,6 +35,12 @@ public interface IClientApiKeyService
     /// la genera y la guarda antes de enviarla. Los errores de envío (SMTP) se propagan como excepción.
     /// </summary>
     Task<ClientApiKeySendResult> SendAsync(int clientId, string email, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Invalida las API Keys activas existentes del cliente, genera una nueva API Key y Secret Key,
+    /// y opcionalmente las envía por correo si se proporciona un email.
+    /// </summary>
+    Task<ClientApiKeySendResult> RegenerateAsync(int clientId, string? email = null, CancellationToken cancellationToken = default);
 }
 
 public class ClientApiKeyService(
@@ -97,6 +104,52 @@ public class ClientApiKeyService(
         await emailService.SendApiKeyEmailAsync(recipient!, apiKey, secretKey);
 
         return ClientApiKeySendResult.Sent(apiKey, generated);
+    }
+
+    public async Task<ClientApiKeySendResult> RegenerateAsync(int clientId, string? email = null, CancellationToken cancellationToken = default)
+    {
+        var recipient = email?.Trim();
+        var hasEmail = !string.IsNullOrWhiteSpace(recipient);
+        if (hasEmail && !IsValidEmail(recipient))
+            return ClientApiKeySendResult.InvalidEmail(InvalidEmailMessage);
+
+        var apiKey = Tools.GenerateSecureRandomString(32);
+        var secretKey = Tools.GenerateSecureRandomString(64);
+
+        var encryptedSecret = encryptedService.EncryptString(secretKey);
+        if (string.IsNullOrEmpty(encryptedSecret))
+            throw new InvalidOperationException("No se pudo cifrar el Secret Key del cliente.");
+
+        await unitOfWork.ExecuteInTransactionAsync(async _ =>
+        {
+            var activeKeys = (await apiKeyService.GetManyByAsync(k => k.ClientId == clientId && k.StatusId == (int)StatusEnum.Active, cancellationToken)).ToList();
+
+            foreach (var key in activeKeys)
+            {
+                key.StatusId = (int)StatusEnum.Inactive;
+                key.LastUpdateUtc = DateTime.UtcNow;
+            }
+
+            if (activeKeys.Count > 0)
+            {
+                await apiKeyService.UpdateAsync(activeKeys);
+            }
+
+            await apiKeyService.InsertAsync(new ApiKey
+            {
+                ClientId = clientId,
+                Apikey = apiKey,
+                SecretKey = encryptedSecret,
+                StatusId = (int)StatusEnum.Active
+            });
+        }, cancellationToken);
+
+        if (hasEmail)
+        {
+            await emailService.SendApiKeyEmailAsync(recipient!, apiKey, secretKey);
+        }
+
+        return ClientApiKeySendResult.Sent(apiKey, generated: true);
     }
 
     private static bool IsValidEmail(string? value) =>

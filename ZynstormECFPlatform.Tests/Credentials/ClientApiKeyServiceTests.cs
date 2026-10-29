@@ -197,4 +197,78 @@ public class ClientApiKeyServiceTests
 
         _email.Verify(e => e.SendApiKeyEmailAsync("cliente@empresa.com", "EXISTING-API-KEY", "PLAIN-SECRET"), Times.Once);
     }
+
+    [Fact]
+    public async Task Regenerate_WhenExistingActiveKeys_DeactivatesOldKeysAndInsertsNewActiveKey()
+    {
+        var oldKey = ExistingKey();
+        var service = CreateService(oldKey);
+        _encryption.Setup(e => e.EncryptString(It.IsAny<string>())).Returns("ENCRYPTED-NEW");
+
+        _apiKeys
+            .Setup(s => s.GetManyByAsync(It.IsAny<Expression<Func<ApiKey, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([oldKey]);
+
+        IEnumerable<ApiKey>? updatedList = null;
+        _apiKeys
+            .Setup(s => s.UpdateAsync(It.IsAny<IEnumerable<ApiKey>>()))
+            .Returns((IEnumerable<ApiKey> list) =>
+            {
+                updatedList = list;
+                return Task.CompletedTask;
+            });
+
+        var result = await service.RegenerateAsync(ClientId, "cliente@empresa.com");
+
+        Assert.Equal(ClientApiKeySendOutcome.Sent, result.Outcome);
+        Assert.True(result.Generated);
+        Assert.NotNull(result.ApiKey);
+        Assert.NotEqual("EXISTING-API-KEY", result.ApiKey);
+
+        // Verifica que la anterior se haya desactivado
+        Assert.NotNull(updatedList);
+        var deactivated = updatedList!.First();
+        Assert.Equal((int)StatusEnum.Inactive, deactivated.StatusId);
+
+        // Verifica que la nueva sea activa
+        Assert.NotNull(_inserted);
+        Assert.Equal((int)StatusEnum.Active, _inserted!.StatusId);
+        Assert.Equal("ENCRYPTED-NEW", _inserted.SecretKey);
+        Assert.Equal(result.ApiKey, _inserted.Apikey);
+
+        _email.Verify(e => e.SendApiKeyEmailAsync("cliente@empresa.com", result.ApiKey!, It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Regenerate_WithoutEmail_DoesNotSendEmail()
+    {
+        var oldKey = ExistingKey();
+        var service = CreateService(oldKey);
+        _encryption.Setup(e => e.EncryptString(It.IsAny<string>())).Returns("ENCRYPTED-NEW");
+
+        _apiKeys
+            .Setup(s => s.GetManyByAsync(It.IsAny<Expression<Func<ApiKey, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([oldKey]);
+
+        var result = await service.RegenerateAsync(ClientId, null);
+
+        Assert.Equal(ClientApiKeySendOutcome.Sent, result.Outcome);
+        Assert.True(result.Generated);
+        Assert.NotNull(result.ApiKey);
+        _email.Verify(e => e.SendApiKeyEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("invalido")]
+    [InlineData("sin-punto@dominio")]
+    public async Task Regenerate_InvalidEmail_ReturnsInvalidEmail_WithoutTouchingDatabase(string invalidEmail)
+    {
+        var service = CreateService(ExistingKey());
+
+        var result = await service.RegenerateAsync(ClientId, invalidEmail);
+
+        Assert.Equal(ClientApiKeySendOutcome.InvalidEmail, result.Outcome);
+        _apiKeys.Verify(s => s.InsertAsync(It.IsAny<ApiKey>()), Times.Never);
+        _email.Verify(e => e.SendApiKeyEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
 }

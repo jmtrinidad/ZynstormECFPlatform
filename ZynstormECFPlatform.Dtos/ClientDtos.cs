@@ -173,3 +173,8 @@ public class ClientSendApiKeyResultDto
 
     public bool Generated { get; set; }
 }
+
+public class ClientRegenerateApiKeyDto
+{
+    public string? Email { get; set; }
+}
