@@ -56,9 +56,19 @@ public class UserController(
 
             var viewDtos = _mapper.Map<IEnumerable<User>, List<UserViewDto>>(usersToShow);
 
-            // Populate UserType for each DTO
+            // Clientes asignados a cada usuario (una sola consulta). Sin esto el formulario
+            // de edición los recibía vacíos y, al guardar, el PUT borraba todas las asignaciones.
+            var shownUserIds = viewDtos.Select(d => d.UserId).ToList();
+            var userClients = await _userClientService.GetManyByAsync(x => shownUserIds.Contains(x.UserId));
+            var clientIdsByUser = userClients
+                .GroupBy(x => x.UserId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.ClientId).Distinct().ToList());
+
+            // Populate UserType and ClientIds for each DTO
             foreach (var dto in viewDtos)
             {
+                dto.ClientIds = clientIdsByUser.TryGetValue(dto.UserId, out var assignedClientIds) ? assignedClientIds : [];
+
                 var userEntity = allUsers.First(u => u.Id == dto.UserId);
                 var userRole = await _accountService.GetRoleByUserAsync(userEntity);
                 if (Enum.TryParse<UserType>(userRole?.Name, out var type))
@@ -192,6 +202,7 @@ public class UserController(
             }
 
             var viewDto = _mapper.Map<User, UserViewDto>(user);
+            viewDto.ClientIds = dto.ClientIds ?? [];
             // Re-populate UserType
             var userRole = await _accountService.GetRoleByUserAsync(user);
             if (Enum.TryParse<UserType>(userRole?.Name, out var type))
