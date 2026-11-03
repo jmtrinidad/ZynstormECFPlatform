@@ -1940,6 +1940,136 @@ namespace ZynstormECFPlatform.Data.Migrations
                             JsonData = "{\"ncf\":\"E470000000001\",\"customerForeignId\":\"533445888\",\"customerName\":\"ALEJA FERMIN SANTOS\",\"currencyTipoMoneda\":\"USD\",\"currencyTipoCambio\":60.0,\"items\":[{\"name\":\"SERVICIO PROFESIONAL EXTERIOR\",\"quantity\":1,\"unitPrice\":3000.0,\"billingIndicator\":4}]}",
                             Name = "Mueblería - Tipo 47",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
+                        },
+                        new
+                        {
+                            BusinessSimulationSampleId = 132,
+                            BusinessTypeId = 14,
+                            Description = "Muestra generada (plantilla validada) para Tipo 31.",
+                            EcfType = "31",
+                            GuidId = "00000000-0000-0000-0014-000000000031",
+                            IsDeleted = false,
+                            IsDgiiApproved = false,
+                            JsonData = "{\"ncf\":\"E310000000001\",\"customerRnc\":\"130862346\",\"customerName\":\"IT SOLUCLICK SRL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"CONSULTA MEDICA GENERAL\",\"quantity\":1,\"unitPrice\":244.00,\"billingIndicator\":4}]}",
+                            Name = "Clínica/Servicio Ambulatorio - Tipo 31",
+                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
+                        },
+                        new
+                        {
+                            BusinessSimulationSampleId = 133,
+                            BusinessTypeId = 14,
+                            Description = "Muestra generada (plantilla validada) para Tipo 32.",
+                            EcfType = "32",
+                            GuidId = "00000000-0000-0000-0014-000000000032",
+                            IsDeleted = false,
+                            IsDgiiApproved = false,
+                            JsonData = "{\"ncf\":\"E320000000001\",\"customerRnc\":\"40208719662\",\"customerName\":\"BRYAN TORRES\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"PROCEDIMIENTO AMBULATORIO\",\"quantity\":2,\"unitPrice\":300000.00,\"billingIndicator\":4}]}",
+                            Name = "Clínica/Servicio Ambulatorio - Tipo 32",
+                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
+                        },
+                        new
+                        {
+                            BusinessSimulationSampleId = 134,
+                            BusinessTypeId = 14,
+                            Description = "Muestra generada (plantilla validada) para Tipo 33.",
+                            EcfType = "33",
+                            GuidId = "00000000-0000-0000-0014-000000000033",
+                            IsDeleted = false,
+                            IsDgiiApproved = false,
+                            JsonData = "{\"ncf\":\"E330000000001\",\"customerRnc\":\"131880657\",\"customerName\":\"CLIENTES DE LA ADMINISTRACION\",\"incomeType\":\"01\",\"paymentType\":1,\"referenceNcf\":\"E310000000002\",\"referenceReasonCode\":3,\"items\":[{\"name\":\"AJUSTE SERVICIOS MEDICOS\",\"quantity\":1,\"unitPrice\":203898.31,\"billingIndicator\":4}]}",
+                            Name = "Clínica/Servicio Ambulatorio - Tipo 33",
+                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
+                        },
+                        new
+                        {
+                            BusinessSimulationSampleId = 135,
+                            BusinessTypeId = 14,
+                            Description = "Muestra generada (plantilla validada) para Tipo 34.",
+                            EcfType = "34",
+                            GuidId = "00000000-0000-0000-0014-000000000034",
+                            IsDeleted = false,
+                            IsDgiiApproved = false,
+                            JsonData = "{\"ncf\":\"E340000000001\",\"customerRnc\":\"131880657\",\"customerName\":\"CLIENTES DE LA ADMINISTRACION\",\"incomeType\":\"01\",\"paymentType\":2,\"referenceNcf\":\"E310000000002\",\"referenceReasonCode\":3,\"items\":[{\"name\":\"CARGO ADICIONAL LABORATORIO\",\"quantity\":5,\"unitPrice\":601.00,\"billingIndicator\":4}]}",
+                            Name = "Clínica/Servicio Ambulatorio - Tipo 34",
+                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
+                        },
+                        new
+                        {
+                            BusinessSimulationSampleId = 136,
+                            BusinessTypeId = 14,
+                            Description = "Muestra generada (plantilla validada) para Tipo 41.",
+                            EcfType = "41",
+                            GuidId = "00000000-0000-0000-0014-000000000041",
+                            IsDeleted = false,
+                            IsDgiiApproved = false,
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"SERVICIO DE LIMPIEZA CLINICA\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            Name = "Clínica/Servicio Ambulatorio - Tipo 41",
+                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
+                        },
+                        new
+                        {
+                            BusinessSimulationSampleId = 137,
+                            BusinessTypeId = 14,
+                            Description = "Muestra generada (plantilla validada) para Tipo 43.",
+                            EcfType = "43",
+                            GuidId = "00000000-0000-0000-0014-000000000043",
+                            IsDeleted = false,
+                            IsDgiiApproved = false,
+                            JsonData = "{\"ncf\":\"E430000000001\",\"customerRnc\":\"\",\"customerName\":\"\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"REEMBOLSO CAJA CHICA INSUMOS MEDICOS\",\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
+                            Name = "Clínica/Servicio Ambulatorio - Tipo 43",
+                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
+                        },
+                        new
+                        {
+                            BusinessSimulationSampleId = 138,
+                            BusinessTypeId = 14,
+                            Description = "Muestra generada (plantilla validada) para Tipo 44.",
+                            EcfType = "44",
+                            GuidId = "00000000-0000-0000-0014-000000000044",
+                            IsDeleted = false,
+                            IsDgiiApproved = false,
+                            JsonData = "{\"ncf\":\"E440000000001\",\"customerRnc\":\"131098843\",\"customerName\":\"ZONA FRANCA 6 DE NOVIEMBRE SRL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"CONSULTA ESPECIALIZADA\",\"quantity\":1,\"unitPrice\":29.50,\"billingIndicator\":4}]}",
+                            Name = "Clínica/Servicio Ambulatorio - Tipo 44",
+                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
+                        },
+                        new
+                        {
+                            BusinessSimulationSampleId = 139,
+                            BusinessTypeId = 14,
+                            Description = "Muestra generada (plantilla validada) para Tipo 45.",
+                            EcfType = "45",
+                            GuidId = "00000000-0000-0000-0014-000000000045",
+                            IsDeleted = false,
+                            IsDgiiApproved = false,
+                            JsonData = "{\"ncf\":\"E450000000001\",\"customerRnc\":\"401506459\",\"customerName\":\"PLAN DE ASISTENCIA SOCIAL DE LA PRESIDENCIA\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"SERVICIOS DE EMERGENCIA AMBULATORIA\",\"quantity\":1,\"unitPrice\":1197.00,\"billingIndicator\":4}]}",
+                            Name = "Clínica/Servicio Ambulatorio - Tipo 45",
+                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
+                        },
+                        new
+                        {
+                            BusinessSimulationSampleId = 140,
+                            BusinessTypeId = 14,
+                            Description = "Muestra generada (plantilla validada) para Tipo 46.",
+                            EcfType = "46",
+                            GuidId = "00000000-0000-0000-0014-000000000046",
+                            IsDeleted = false,
+                            IsDgiiApproved = false,
+                            JsonData = "{\"ncf\":\"E460000000001\",\"customerRnc\":\"131880681\",\"customerName\":\"ZONA FRANCA LOI\",\"customerForeignId\":\"533445888\",\"customerCountry\":\"PUERTO RICO\",\"incomeType\":\"01\",\"paymentType\":2,\"items\":[{\"name\":\"SERVICIOS MEDICOS A PACIENTES EXTRANJEROS\",\"quantity\":100,\"unitPrice\":18000.00,\"billingIndicator\":3}],\"exportRegimenAduanero\":\"EXPORTACION NACIONAL\",\"transpViaTransporte\":\"02\",\"transpPaisDestino\":\"PUERTO RICO\"}",
+                            Name = "Clínica/Servicio Ambulatorio - Tipo 46",
+                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
+                        },
+                        new
+                        {
+                            BusinessSimulationSampleId = 141,
+                            BusinessTypeId = 14,
+                            Description = "Muestra generada (plantilla validada) para Tipo 47.",
+                            EcfType = "47",
+                            GuidId = "00000000-0000-0000-0014-000000000047",
+                            IsDeleted = false,
+                            IsDgiiApproved = false,
+                            JsonData = "{\"ncf\":\"E470000000001\",\"customerForeignId\":\"533445888\",\"customerName\":\"ALEJA FERMIN SANTOS\",\"currencyTipoMoneda\":\"USD\",\"currencyTipoCambio\":60.0,\"items\":[{\"name\":\"HONORARIOS MEDICOS EXTERIOR\",\"quantity\":1,\"unitPrice\":3000.0,\"billingIndicator\":4}]}",
+                            Name = "Clínica/Servicio Ambulatorio - Tipo 47",
+                            RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         });
                 });
 
@@ -2107,6 +2237,15 @@ namespace ZynstormECFPlatform.Data.Migrations
                             IsDeleted = false,
                             Name = "Mueblería",
                             RegisteredAt = new DateTime(2026, 5, 7, 20, 0, 0, 0, DateTimeKind.Local)
+                        },
+                        new
+                        {
+                            BusinessTypeId = 14,
+                            Description = "Consultas, procedimientos y servicios de salud ambulatorios (mayormente exentos de ITBIS).",
+                            GuidId = "0c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f",
+                            IsDeleted = false,
+                            Name = "Clínica/Servicio Ambulatorio",
+                            RegisteredAt = new DateTime(2026, 11, 2, 20, 0, 0, 0, DateTimeKind.Local)
                         });
                 });
 

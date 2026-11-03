@@ -17,6 +17,13 @@ public static class SimulationSampleGenerator
                 new() { NombreItem = "Vitaminas Complejo B", CantidadItem = 2, PrecioUnitarioItem = 450, MontoItem = 900, IndicadorFacturacion = "0" },
                 new() { NombreItem = "Jabón Antibacterial", CantidadItem = 3, PrecioUnitarioItem = 125, MontoItem = 375, IndicadorFacturacion = "1" } // Gravado
             },
+            "Clínica/Servicio Ambulatorio" => new List<EcfItemRequestDto>
+            {
+                new() { NombreItem = "Consulta Médica General", CantidadItem = 1, PrecioUnitarioItem = 1500, MontoItem = 1500, IndicadorFacturacion = "0" }, // Exento
+                new() { NombreItem = "Procedimiento Ambulatorio (Curación)", CantidadItem = 1, PrecioUnitarioItem = 2200, MontoItem = 2200, IndicadorFacturacion = "0" },
+                new() { NombreItem = "Pruebas de Laboratorio", CantidadItem = 2, PrecioUnitarioItem = 650, MontoItem = 1300, IndicadorFacturacion = "0" },
+                new() { NombreItem = "Mascarillas y Material Descartable", CantidadItem = 3, PrecioUnitarioItem = 125, MontoItem = 375, IndicadorFacturacion = "1" } // Gravado
+            },
             "Repuesto" => new List<EcfItemRequestDto>
             {
                 new() { NombreItem = "Pastillas de Freno Delanteras", CantidadItem = 1, PrecioUnitarioItem = 2500, MontoItem = 2500, IndicadorFacturacion = "1" },

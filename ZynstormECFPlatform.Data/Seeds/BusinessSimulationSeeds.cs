@@ -24,7 +24,8 @@ public static class BusinessSimulationSeeds
             new BusinessType { BusinessTypeId = 10, Name = "Restaurante", Description = "Servicios de comida y bebidas preparadas.", GuidId = "6a7b8c9d-0e1f-2g3h-4i5j-6k7l8m9n0o1p", RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z") },
             new BusinessType { BusinessTypeId = 11, Name = "Cafeteria", Description = "Venta de café, postres y comidas ligeras.", GuidId = "7a8b9c0d-1e2f-3g4h-5i6j-7k8l9m0n1o2p", RegisteredAt = DateTime.Parse("2026-05-07T00:00:00Z") },
             new BusinessType { BusinessTypeId = 12, Name = "Tienda de electrodomésticos", Description = "Venta de equipos para el hogar y dispositivos electrónicos.", GuidId = "8a9b0c1d-1e2f-3g4h-5i6j-8k9l0m1n2o3q", RegisteredAt = DateTime.Parse("2026-05-08T00:00:00Z") },
-            new BusinessType { BusinessTypeId = 13, Name = "Mueblería", Description = "Venta de muebles, decoración y artículos para el hogar.", GuidId = "9b0c1d2e-3f4g-5h6i-7j8k-9l0m1n2o3p4r", RegisteredAt = DateTime.Parse("2026-05-08T00:00:00Z") }
+            new BusinessType { BusinessTypeId = 13, Name = "Mueblería", Description = "Venta de muebles, decoración y artículos para el hogar.", GuidId = "9b0c1d2e-3f4g-5h6i-7j8k-9l0m1n2o3p4r", RegisteredAt = DateTime.Parse("2026-05-08T00:00:00Z") },
+            new BusinessType { BusinessTypeId = 14, Name = "Clínica/Servicio Ambulatorio", Description = "Consultas, procedimientos y servicios de salud ambulatorios (mayormente exentos de ITBIS).", GuidId = "0c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f", RegisteredAt = DateTime.Parse("2026-11-03T00:00:00Z") }
         };
 
         modelBuilder.Entity<BusinessType>().HasData(businessTypes);
@@ -280,6 +281,23 @@ public static class BusinessSimulationSeeds
             .Select(s => (s.BusinessTypeId, s.EcfType))
             .ToHashSet();
 
+        // Clínica/Servicio Ambulatorio (Id 14): mismas plantillas validadas de Transporte,
+        // solo se temátican los nombres de los ítems (los montos, RNC e indicadores de
+        // facturación se conservan; 4 = Exento, como en los servicios de salud).
+        var clinicItemNames = new Dictionary<string, (string From, string To)>
+        {
+            ["31"] = ("CEDEBRAL 5000 JARABE", "CONSULTA MEDICA GENERAL"),
+            ["32"] = ("GREEN PIGEON PEAS CARIDOM 24/15 OZ.", "PROCEDIMIENTO AMBULATORIO"),
+            ["33"] = ("GENERAL", "AJUSTE SERVICIOS MEDICOS"),
+            ["34"] = ("CORACOR A C/30 TABS.", "CARGO ADICIONAL LABORATORIO"),
+            ["41"] = ("COMISION VERIFON TARJETAS", "SERVICIO DE LIMPIEZA CLINICA"),
+            ["43"] = ("PROPIETARIO COMPANIA DE TRANSPORTE DIVER", "REEMBOLSO CAJA CHICA INSUMOS MEDICOS"),
+            ["44"] = ("GREEN PIGEON PEAS CARIDOM 24/15 OZ.", "CONSULTA ESPECIALIZADA"),
+            ["45"] = ("OXIGEN 200 C/30 TABS.", "SERVICIOS DE EMERGENCIA AMBULATORIA"),
+            ["46"] = ("AGUACATE CRIOLLO", "SERVICIOS MEDICOS A PACIENTES EXTRANJEROS"),
+            ["47"] = ("SERVICIO PROFESIONAL EXTERIOR", "HONORARIOS MEDICOS EXTERIOR"),
+        };
+
         var nextId = samples.Max(s => s.BusinessSimulationSampleId) + 1;
 
         foreach (var businessType in businessTypes.Where(b => b.BusinessTypeId != 1))
@@ -288,6 +306,9 @@ public static class BusinessSimulationSeeds
             {
                 if (existingPairs.Contains((businessType.BusinessTypeId, ecfType))) continue;
                 if (!templatesByType.TryGetValue(ecfType, out var json)) continue;
+
+                if (businessType.BusinessTypeId == 14 && clinicItemNames.TryGetValue(ecfType, out var clinicName))
+                    json = json.Replace($"\"name\":\"{clinicName.From}\"", $"\"name\":\"{clinicName.To}\"");
 
                 samples.Add(new BusinessSimulationSample
                 {
