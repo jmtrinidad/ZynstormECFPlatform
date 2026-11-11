@@ -45,6 +45,23 @@ public class BillingAccountController(
         }
     }
 
+    [HttpGet("usage")]
+    public async Task<IActionResult> GetMonthlyUsage([FromQuery] int year, [FromQuery] int month, CancellationToken cancellationToken = default)
+    {
+        if (year < 2000 || month is < 1 or > 12)
+            return BadRequest("Año o mes inválido.");
+
+        try
+        {
+            return Ok(await viewService.GetMonthlyUsageAsync(year, month, cancellationToken));
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Error consultando el consumo mensual de las cuentas");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
+    }
+
     [HttpGet("guid/{guid}")]
     public async Task<IActionResult> GetByGuid(string guid, CancellationToken cancellationToken = default)
     {

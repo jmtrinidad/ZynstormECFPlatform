@@ -762,8 +762,10 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
 
             try
             {
+                // Las filas de detalle de los miembros de una cuenta (sin plan) no se cobran: el cobro sale de la cuenta.
                 var query = clientMonthlyUsageRepository.Table.AsNoTracking()
-                    .Where(u => u.Year == year && u.Month == month);
+                    .Where(u => u.Year == year && u.Month == month)
+                    .Where(u => u.Client.BillingAccountId == null || u.PlanId != null);
 
                 var documentRows = await BuildUsageDtosAsync(query, cancellationToken);
                 var rentRows = await BuildRentUsageRowsAsync(year, month, clientGuid: null, cancellationToken);

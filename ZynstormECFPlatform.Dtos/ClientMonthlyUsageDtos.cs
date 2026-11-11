@@ -15,6 +15,8 @@ public class ClientMonthlyUsageDto
     public string ClientName { get; set; } = string.Empty;
     public string ClientRnc { get; set; } = string.Empty;
     public bool ClientInactive { get; set; }
+    /// <summary>True si la fila es una cuenta de facturación: entonces los campos Client* son los de la cuenta (RNC = nombre del dueño).</summary>
+    public bool IsAccount { get; set; }
     public int Year { get; set; }
     public int Month { get; set; }
     public string PlanName { get; set; } = string.Empty;

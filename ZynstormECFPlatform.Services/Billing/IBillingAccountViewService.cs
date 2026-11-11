@@ -8,6 +8,9 @@ public interface IBillingAccountViewService
 
     Task<BillingAccountDetailDto?> GetDetailAsync(string accountGuid, CancellationToken cancellationToken = default);
 
+    /// <summary>Consumo del mes de todas las cuentas, en el formato del reporte de clientes.</summary>
+    Task<List<ClientMonthlyUsageDto>> GetMonthlyUsageAsync(int year, int month, CancellationToken cancellationToken = default);
+
     /// <summary>GUID de la cuenta de la que el usuario es dueño; null si no tiene.</summary>
     Task<string?> FindGuidByOwnerAsync(string ownerUserId, CancellationToken cancellationToken = default);
 

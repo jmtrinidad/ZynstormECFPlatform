@@ -70,6 +70,9 @@ public class ClientViewDto : ClientUpdateDto
 {
     public bool IsCertified { get; set; }
 
+    /// <summary>Cuenta de facturación a la que pertenece. Null = cliente suelto.</summary>
+    public int? BillingAccountId { get; set; }
+
     public DateTime RegisteredAt { get; set; }
 
     public string? ApiKey { get; set; }

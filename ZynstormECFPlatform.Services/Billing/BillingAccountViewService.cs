@@ -23,6 +23,31 @@ public class BillingAccountViewService(
         return await BuildViewsAsync(accounts, cancellationToken);
     }
 
+    public async Task<List<ClientMonthlyUsageDto>> GetMonthlyUsageAsync(int year, int month, CancellationToken cancellationToken = default)
+    {
+        var usages = await usageService.Table.AsNoTracking()
+            .Where(u => u.Year == year && u.Month == month)
+            .ToListAsync(cancellationToken);
+        if (usages.Count == 0) return [];
+
+        var accountIds = usages.Select(u => u.BillingAccountId).Distinct().ToList();
+        var accounts = await accountService.Table.AsNoTracking()
+            .Include(a => a.OwnerUser)
+            .Where(a => accountIds.Contains(a.BillingAccountId))
+            .ToDictionaryAsync(a => a.BillingAccountId, cancellationToken);
+
+        var planIds = usages.Where(u => u.PlanId.HasValue).Select(u => u.PlanId!.Value).Distinct().ToList();
+        var tiers = await tierService.Table.AsNoTracking()
+            .Where(t => planIds.Contains(t.PlanId))
+            .ToListAsync(cancellationToken);
+
+        return usages
+            .Where(u => accounts.ContainsKey(u.BillingAccountId))
+            .Select(u => AccountUsageReportBuilder.Build(accounts[u.BillingAccountId], u, tiers))
+            .OrderBy(r => r.ClientName)
+            .ToList();
+    }
+
     public async Task<string?> FindGuidByOwnerAsync(string ownerUserId, CancellationToken cancellationToken = default) =>
         await accountService.Table.AsNoTracking()
             .Where(a => a.OwnerUserId == ownerUserId)
