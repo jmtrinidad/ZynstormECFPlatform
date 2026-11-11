@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Dtos;
+using ZynstormECFPlatform.Services.Users;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers;
 
@@ -12,20 +13,23 @@ namespace ZynstormECFPlatform.Web.Api.Controllers;
 [Route("v{version:apiVersion}/[controller]")]
 [ApiController]
 [Authorize]
-public class RiFormatController(IRiFormatService formatService) : ControllerBase
+public class RiFormatController(IRiFormatService formatService, IClientAccessService clientAccess) : ControllerBase
 {
     [HttpGet("client-types")]
     public async Task<ActionResult<IReadOnlyList<ClientTypeDto>>> ListClientTypes() =>
         Ok(await formatService.ListClientTypesAsync());
 
+    [Authorize(Roles = "SA")]
     [HttpPost("client-types")]
     public Task<ActionResult> CreateClientType([FromBody] ClientTypeSaveDto dto) =>
         Run(async () => Ok(await formatService.CreateClientTypeAsync(dto)));
 
+    [Authorize(Roles = "SA")]
     [HttpPut("client-types/{guidId}")]
     public Task<ActionResult> UpdateClientType(string guidId, [FromBody] ClientTypeSaveDto dto) =>
         Run(async () => Ok(await formatService.UpdateClientTypeAsync(guidId, dto)));
 
+    [Authorize(Roles = "SA")]
     [HttpDelete("client-types/{guidId}")]
     public Task<ActionResult> DeleteClientType(string guidId) =>
         Run(async () =>
@@ -34,10 +38,12 @@ public class RiFormatController(IRiFormatService formatService) : ControllerBase
             return NoContent();
         });
 
+    [Authorize(Roles = "SA")]
     [HttpPost("client-types/{guidId}/templates/{templateGuidId}")]
     public Task<ActionResult> AddTemplateToClientType(string guidId, string templateGuidId) =>
         Run(async () => Ok(await formatService.AddTemplateToClientTypeAsync(guidId, templateGuidId)));
 
+    [Authorize(Roles = "SA")]
     [HttpDelete("client-types/{guidId}/templates/{templateGuidId}")]
     public Task<ActionResult> RemoveTemplateFromClientType(string guidId, string templateGuidId) =>
         Run(async () => Ok(await formatService.RemoveTemplateFromClientTypeAsync(guidId, templateGuidId)));
@@ -46,6 +52,7 @@ public class RiFormatController(IRiFormatService formatService) : ControllerBase
     public async Task<ActionResult<IReadOnlyList<RiHtmlTemplateDto>>> ListTemplates() =>
         Ok(await formatService.ListTemplatesAsync());
 
+    [Authorize(Roles = "SA")]
     [HttpPost("templates")]
     public Task<ActionResult> UploadTemplate([FromBody] RiHtmlTemplateUploadDto dto) =>
         Run(async () =>
@@ -54,6 +61,7 @@ public class RiFormatController(IRiFormatService formatService) : ControllerBase
             return result.Errors.Count > 0 ? UnprocessableEntity(result) : Ok(result);
         });
 
+    [Authorize(Roles = "SA")]
     [HttpDelete("templates/{guidId}")]
     public Task<ActionResult> DeleteTemplate(string guidId) =>
         Run(async () =>
@@ -70,22 +78,32 @@ public class RiFormatController(IRiFormatService formatService) : ControllerBase
     public Task<ActionResult> Assign(string clientGuidId, [FromBody] ClientRiFormatAssignDto dto) =>
         Run(async () =>
         {
+            if (!await clientAccess.CanAccessClientAsync(User, clientGuidId)) return NotFound();
             await formatService.AssignToClientAsync(clientGuidId, dto);
             return NoContent();
         });
 
     [HttpGet("clients/{clientGuidId}/resolved")]
     public Task<ActionResult> Resolved(string clientGuidId) =>
-        Run(async () => Ok(await formatService.GetResolvedAsync(clientGuidId)));
+        Run(async () =>
+        {
+            if (!await clientAccess.CanAccessClientAsync(User, clientGuidId)) return NotFound();
+            return Ok(await formatService.GetResolvedAsync(clientGuidId));
+        });
 
     [HttpGet("clients/{clientGuidId}/logo")]
     public Task<ActionResult> GetLogo(string clientGuidId) =>
-        Run(async () => Ok(await formatService.GetClientLogoAsync(clientGuidId)));
+        Run(async () =>
+        {
+            if (!await clientAccess.CanAccessClientAsync(User, clientGuidId)) return NotFound();
+            return Ok(await formatService.GetClientLogoAsync(clientGuidId));
+        });
 
     [HttpPut("clients/{clientGuidId}/logo")]
     public Task<ActionResult> SetLogo(string clientGuidId, [FromBody] ClientLogoDto dto) =>
         Run(async () =>
         {
+            if (!await clientAccess.CanAccessClientAsync(User, clientGuidId)) return NotFound();
             await formatService.SetClientLogoAsync(clientGuidId, dto);
             return NoContent();
         });
