@@ -69,6 +69,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Billing.IClientUsageService, Billing.ClientUsageService>();
         services.AddTransient<Billing.IPaymentReminderService, Billing.PaymentReminderService>();
         services.AddTransient<Billing.IClientPaymentRegistrationService, Billing.ClientPaymentRegistrationService>();
+        services.AddTransient<Billing.IBillingAccountPaymentService, Billing.BillingAccountPaymentService>();
         services.AddTransient<Credentials.IClientApiKeyService, Credentials.ClientApiKeyService>();
         services.AddScoped<Users.IUserPageAccessManager, Users.UserPageAccessManager>();
 
