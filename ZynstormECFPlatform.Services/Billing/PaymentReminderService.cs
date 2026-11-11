@@ -26,6 +26,7 @@ public class PaymentReminderService(
     private IQueryable<Client> Candidates() =>
         clientRepository.Table
             .Include(c => c.Plan)
+            .Where(BillingScope.IndividuallyBilled)
             .Where(c => c.Plan != null
                      && c.Plan.StatusId == (int)StatusEnum.Active
                      && c.NextPaymentDate != null);
@@ -227,6 +228,8 @@ public class PaymentReminderService(
 
         if (client == null)
             return new(false, "No se encontró el cliente.");
+        if (client.BillingAccountId != null)
+            return new(false, "El cliente pertenece a una cuenta de facturación; los avisos de pago se envían a la cuenta.");
         if (client.Plan == null)
             return new(false, "El cliente no tiene un plan asignado.");
         if (client.NextPaymentDate is not DateTime nextPayment)

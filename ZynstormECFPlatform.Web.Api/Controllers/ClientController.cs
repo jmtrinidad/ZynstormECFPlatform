@@ -159,6 +159,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         private IQueryable<Client> ActivePlanClientsQuery() =>
             Repository.Table.AsNoTracking()
                 .Include(c => c.Plan)
+                .Where(BillingScope.IndividuallyBilled)
                 .Where(c => c.Plan != null && c.Plan.StatusId == (int)StatusEnum.Active);
 
         private string? CurrentUserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

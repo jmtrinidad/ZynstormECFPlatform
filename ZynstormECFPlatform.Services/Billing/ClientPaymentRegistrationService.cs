@@ -18,6 +18,7 @@ public class ClientPaymentRegistrationService(
 {
     private const string ClientNotFound = "Cliente no encontrado.";
     private const string NoPlan = "El cliente no tiene un plan asignado.";
+    private const string BelongsToAccount = "El cliente pertenece a una cuenta de facturación; el pago se registra en la cuenta.";
 
     public async Task<PaymentRegistrationResult<PaymentPreviewDto>> GetPreviewAsync(string clientGuid, CancellationToken cancellationToken = default)
     {
@@ -26,6 +27,7 @@ public class ClientPaymentRegistrationService(
             .FirstOrDefaultAsync(c => c.GuidId == clientGuid, cancellationToken);
 
         if (client == null) return PaymentRegistrationResult<PaymentPreviewDto>.NotFound(ClientNotFound);
+        if (client.BillingAccountId != null) return PaymentRegistrationResult<PaymentPreviewDto>.Invalid(BelongsToAccount);
         if (client.Plan == null) return PaymentRegistrationResult<PaymentPreviewDto>.Invalid(NoPlan);
 
         var today = DateTimeExtensions.DrNow.Date;
@@ -58,6 +60,7 @@ public class ClientPaymentRegistrationService(
             .FirstOrDefaultAsync(c => c.GuidId == clientGuid, cancellationToken);
 
         if (client == null) return PaymentRegistrationResult<PaymentReceiptDto>.NotFound(ClientNotFound);
+        if (client.BillingAccountId != null) return PaymentRegistrationResult<PaymentReceiptDto>.Invalid(BelongsToAccount);
         if (client.Plan == null) return PaymentRegistrationResult<PaymentReceiptDto>.Invalid(NoPlan);
         if (request.IncludePlanFee && PaymentCalculator.GetMonthlyFee(client) <= 0)
             return PaymentRegistrationResult<PaymentReceiptDto>.Invalid("El plan del cliente no tiene mensualidad a pagar.");
