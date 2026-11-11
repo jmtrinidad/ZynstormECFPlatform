@@ -39,6 +39,9 @@ public partial class ClientPaymentItem : BaseEntity
     // Excedente
     public int? ClientMonthlyUsageId { get; set; }
 
+    /// <summary>Mes de consumo de la cuenta que se está pagando. Solo en líneas de excedente de una cuenta.</summary>
+    public int? BillingAccountMonthlyUsageId { get; set; }
+
     public int? Year { get; set; }
 
     public int? Month { get; set; }
@@ -48,4 +51,6 @@ public partial class ClientPaymentItem : BaseEntity
     public virtual ClientPayment ClientPayment { get; set; } = null!;
 
     public virtual ClientMonthlyUsage? ClientMonthlyUsage { get; set; }
+
+    public virtual BillingAccountMonthlyUsage? BillingAccountMonthlyUsage { get; set; }
 }

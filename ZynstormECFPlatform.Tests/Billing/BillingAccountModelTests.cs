@@ -63,4 +63,26 @@ public class BillingAccountModelTests
         Assert.Equal(1, entity.FindProperty(nameof(BillingAccount.PaidMonths))!.GetDefaultValue());
         Assert.Equal(3, entity.FindProperty(nameof(BillingAccount.PaymentGraceDays))!.GetDefaultValue());
     }
+
+    [Fact]
+    public void ClientPayment_BelongsToExactlyOneOfClientOrAccount()
+    {
+        var entity = BuildModel().FindEntityType(typeof(ClientPayment))!;
+
+        Assert.True(entity.FindProperty(nameof(ClientPayment.ClientId))!.IsNullable);
+        Assert.True(entity.FindProperty(nameof(ClientPayment.BillingAccountId))!.IsNullable);
+        Assert.Contains(entity.GetCheckConstraints(), c => c.Name == "CK_ClientPayment_ClientOrAccount");
+    }
+
+    [Fact]
+    public void ClientPaymentItem_AccountOverageCanBePaidOnlyOnce()
+    {
+        var entity = BuildModel().FindEntityType(typeof(ClientPaymentItem))!;
+
+        var index = Assert.Single(entity.GetIndexes(), i =>
+            i.Properties.Select(p => p.Name).SequenceEqual(["BillingAccountMonthlyUsageId"]));
+
+        Assert.True(index.IsUnique);
+        Assert.Contains("\"ItemType\" = 2", index.GetFilter());
+    }
 }

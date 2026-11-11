@@ -861,6 +861,20 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasForeignKey(d => d.ClientId)
                   .OnDelete(DeleteBehavior.ClientSetNull)
                   .HasConstraintName("FK_ClientPayment_Client");
+
+            entity.HasOne(d => d.BillingAccount)
+                  .WithMany(p => p.Payments)
+                  .HasForeignKey(d => d.BillingAccountId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_ClientPayment_BillingAccount");
+
+            entity.HasIndex(e => new { e.BillingAccountId, e.PaymentDate })
+                  .HasDatabaseName("IX_ClientPayment_BillingAccountId_PaymentDate");
+
+            // Un recibo es de un cliente suelto o de una cuenta, nunca de ambos ni de ninguno.
+            entity.ToTable(t => t.HasCheckConstraint(
+                "CK_ClientPayment_ClientOrAccount",
+                "(\"ClientId\" IS NULL) <> (\"BillingAccountId\" IS NULL)"));
         });
 
         modelBuilder.Entity<ClientPaymentItem>(entity =>
@@ -917,6 +931,18 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasForeignKey(d => d.ClientMonthlyUsageId)
                   .OnDelete(DeleteBehavior.ClientSetNull)
                   .HasConstraintName("FK_ClientPaymentItem_ClientMonthlyUsage");
+
+            entity.HasOne(d => d.BillingAccountMonthlyUsage)
+                  .WithMany()
+                  .HasForeignKey(d => d.BillingAccountMonthlyUsageId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_ClientPaymentItem_BillingAccountMonthlyUsage");
+
+            // Un mes de excedente de una cuenta se paga una sola vez.
+            entity.HasIndex(e => e.BillingAccountMonthlyUsageId)
+                  .IsUnique()
+                  .HasFilter("\"ItemType\" = 2 AND \"BillingAccountMonthlyUsageId\" IS NOT NULL AND NOT \"IsDeleted\"")
+                  .HasDatabaseName("IX_ClientPaymentItem_AccountOverage_Usage");
         });
 
         modelBuilder.Entity<ClientBranche>(entity =>

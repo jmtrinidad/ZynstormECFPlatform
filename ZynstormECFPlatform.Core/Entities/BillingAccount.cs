@@ -52,4 +52,6 @@ public partial class BillingAccount : BaseEntity
     public virtual ICollection<Client> Clients { get; set; } = [];
 
     public virtual ICollection<BillingAccountMonthlyUsage> MonthlyUsages { get; set; } = [];
+
+    public virtual ICollection<ClientPayment> Payments { get; set; } = [];
 }

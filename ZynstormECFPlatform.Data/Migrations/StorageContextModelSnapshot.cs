@@ -3393,7 +3393,10 @@ namespace ZynstormECFPlatform.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("ClientPaymentId"));
 
-                    b.Property<int>("ClientId")
+                    b.Property<int?>("BillingAccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ClientId")
                         .HasColumnType("integer");
 
                     b.Property<DateTime?>("DeletedTimeUtc")
@@ -3448,10 +3451,16 @@ namespace ZynstormECFPlatform.Data.Migrations
 
                     b.HasKey("ClientPaymentId");
 
+                    b.HasIndex("BillingAccountId", "PaymentDate")
+                        .HasDatabaseName("IX_ClientPayment_BillingAccountId_PaymentDate");
+
                     b.HasIndex("ClientId", "PaymentDate")
                         .HasDatabaseName("IX_ClientPayment_ClientId_PaymentDate");
 
-                    b.ToTable("ClientPayment");
+                    b.ToTable("ClientPayment", t =>
+                        {
+                            t.HasCheckConstraint("CK_ClientPayment_ClientOrAccount", "(\"ClientId\" IS NULL) <> (\"BillingAccountId\" IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ClientPaymentItem", b =>
@@ -3465,6 +3474,9 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<int?>("BillingAccountMonthlyUsageId")
+                        .HasColumnType("integer");
 
                     b.Property<int?>("ClientMonthlyUsageId")
                         .HasColumnType("integer");
@@ -3547,6 +3559,11 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("ClientPaymentItemId");
+
+                    b.HasIndex("BillingAccountMonthlyUsageId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ClientPaymentItem_AccountOverage_Usage")
+                        .HasFilter("\"ItemType\" = 2 AND \"BillingAccountMonthlyUsageId\" IS NOT NULL AND NOT \"IsDeleted\"");
 
                     b.HasIndex("ClientMonthlyUsageId")
                         .IsUnique()
@@ -7587,17 +7604,28 @@ namespace ZynstormECFPlatform.Data.Migrations
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ClientPayment", b =>
                 {
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.BillingAccount", "BillingAccount")
+                        .WithMany("Payments")
+                        .HasForeignKey("BillingAccountId")
+                        .HasConstraintName("FK_ClientPayment_BillingAccount");
+
                     b.HasOne("ZynstormECFPlatform.Core.Entities.Client", "Client")
                         .WithMany("Payments")
                         .HasForeignKey("ClientId")
-                        .IsRequired()
                         .HasConstraintName("FK_ClientPayment_Client");
+
+                    b.Navigation("BillingAccount");
 
                     b.Navigation("Client");
                 });
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.ClientPaymentItem", b =>
                 {
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.BillingAccountMonthlyUsage", "BillingAccountMonthlyUsage")
+                        .WithMany()
+                        .HasForeignKey("BillingAccountMonthlyUsageId")
+                        .HasConstraintName("FK_ClientPaymentItem_BillingAccountMonthlyUsage");
+
                     b.HasOne("ZynstormECFPlatform.Core.Entities.ClientMonthlyUsage", "ClientMonthlyUsage")
                         .WithMany()
                         .HasForeignKey("ClientMonthlyUsageId")
@@ -7609,6 +7637,8 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_ClientPaymentItem_ClientPayment");
+
+                    b.Navigation("BillingAccountMonthlyUsage");
 
                     b.Navigation("ClientMonthlyUsage");
 
@@ -7957,6 +7987,8 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Navigation("Clients");
 
                     b.Navigation("MonthlyUsages");
+
+                    b.Navigation("Payments");
                 });
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.BusinessType", b =>
