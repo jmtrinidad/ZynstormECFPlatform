@@ -36,6 +36,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         IPaymentReminderService paymentReminderService,
         IClientPaymentRegistrationService paymentRegistrationService,
         IClientApiKeyService clientApiKeyService,
+        IBillingAccountService billingAccountService,
         Microsoft.Extensions.Options.IOptions<ZynstormECFPlatform.Core.AppSettings> appSettings) : BaseController<ClientController, Client, ClientCreateDto, ClientUpdateDto, ClientViewDto>(clientService, mapper, loggerFactory)
     {
         private int CertificateWarningDays => appSettings.Value.CertificateExpirationWarningDays > 0
@@ -165,6 +166,18 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         private string? CurrentUserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         private bool IsSA => User.IsInRole("SA");
 
+        /// <summary>Cuenta de facturación activa de la que el usuario actual es dueño, si tiene una.</summary>
+        private async Task<int?> FindOwnedAccountIdAsync()
+        {
+            var userId = CurrentUserId;
+            if (string.IsNullOrEmpty(userId)) return null;
+
+            var account = await billingAccountService.GetNoTrackingByAsync(
+                a => a.OwnerUserId == userId && a.StatusId == (int)StatusEnum.Active);
+
+            return account?.BillingAccountId;
+        }
+
         [HttpGet]
         [Route("", Order = 1)]
         public override async Task<ActionResult> Get(
@@ -290,6 +303,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         {
             try
             {
+                var ownedAccountId = await FindOwnedAccountIdAsync();
+                dto.PlanId = ClientCreationRules.ResolvePlanId(dto.PlanId, ownedAccountId);
+
                 var plan = await FindPlanAsync(dto.PlanId);
                 if (dto.PlanId.HasValue && plan == null)
                     return BadRequest("El plan seleccionado no existe.");
@@ -308,6 +324,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     model.OfferStartDate = OfferPricing.ResolveStartDate(
                         null, dto.PlanId, OfferPricing.PlanHasOffer(plan?.OfferPrice, plan?.OfferMonths), null, DateTimeExtensions.DrNow.Date);
                     model.CustomMonthlyFee = ClientPricing.ResolveCustomFee(IsSA, dto.CustomMonthlyFee, null);
+                    model.BillingAccountId = ownedAccountId;
 
                     model = await Repository.InsertAsync(model);
 
