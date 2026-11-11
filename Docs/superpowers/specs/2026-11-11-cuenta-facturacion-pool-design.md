@@ -61,7 +61,7 @@ El revendedor crea sus propios clientes y, a su vez, crea usuarios para esos cli
 ### 2. Consumo y cobro
 
 - **Contar.** `RegisterAcceptedAsync` detecta si el cliente tiene `BillingAccountId`. En ese caso, el SQL atómico incrementa en una sola sentencia tanto `ClientMonthlyUsage` (detalle por cliente) como `BillingAccountMonthlyUsage` (total del pool), y marca `BillingCountedAtUtc`. Se mantiene la idempotencia ante reintentos y concurrencia.
-- **Snapshot del plan.** La fila de la cuenta guarda el plan de la cuenta, no el del cliente. La fila del cliente guarda el mismo snapshot del plan de la cuenta, solo como referencia: el excedente nunca se cobra desde la fila del cliente.
+- **Snapshot del plan.** La fila de la cuenta guarda el plan de la cuenta, no el del cliente. La fila del cliente guarda `PlanId` null, `MonthlyFee` 0 y `MonthlyDocumentLimit` -1 (ilimitado), con el nombre del plan de la cuenta en `PlanName`. Así `GetPendingOveragesAsync` y el reporte de consumo actuales nunca calculan excedente ni mensualidad desde la fila del cliente: el cobro sale solo de la fila de la cuenta. Si el cliente ya tenía una fila del mes con su plan anterior al entrar a la cuenta, esa fila conserva su snapshot; por eso el SA debe asignar clientes a la cuenta a inicio de mes.
 - **Calcular.** `BillingCalculator.Calculate` no cambia. Se llama con el total del pool y el plan de la cuenta.
 - **Cobrar.** `ClientPaymentRegistrationService` opera sobre un "cobrable" que puede ser un cliente suelto o una cuenta. Se reutilizan las fechas de pago, el descuento por adelanto, la oferta, el precio especial y los excedentes pendientes de meses cerrados.
 - **Suspensión y recordatorios.**
