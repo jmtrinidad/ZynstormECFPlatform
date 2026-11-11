@@ -29,6 +29,26 @@ public class UserController(
     private readonly IMapper _mapper = mapper;
     private readonly ILogger<UserController> _logger = logger;
 
+    private bool CallerIsSA
+    {
+        get
+        {
+            var role = User.FindFirst(ClaimTypes.Role)?.Value;
+            return role?.ToUpper() == "SA" || role == "1";
+        }
+    }
+
+    /// <summary>Clientes que ve quien llama (sus UserClient). Null = SA, sin restricción.</summary>
+    private async Task<HashSet<int>?> AllowedClientIdsAsync()
+    {
+        if (CallerIsSA) return null;
+
+        var callerId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var links = await _userClientService.GetManyByAsync(x => x.UserId == callerId);
+
+        return links.Select(x => x.ClientId).ToHashSet();
+    }
+
     [HttpGet]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
@@ -98,7 +118,12 @@ public class UserController(
         {
             var creatorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var creatorRole = User.FindFirst(ClaimTypes.Role)?.Value;
-            
+
+            // Un Admin solo asigna clientes que él mismo ve (en un revendedor, los de su cuenta).
+            var forbiddenClients = UserClientAssignmentPolicy.FindForbidden(dto.ClientIds, await AllowedClientIdsAsync());
+            if (forbiddenClients.Count > 0)
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = UserClientAssignmentPolicy.ForbiddenMessage, clientIds = forbiddenClients });
+
             var user = new User
             {
                 UserName = dto.UserName,
@@ -162,8 +187,14 @@ public class UserController(
     {
         try
         {
-            var user = await _accountService.GetUserByIdAsync(dto.UserId);
+            // SA edita a cualquiera; un Admin solo a los usuarios que creó.
+            var user = await GetManageableUserAsync(dto.UserId);
             if (user == null) return NotFound();
+
+            var allowedClientIds = await AllowedClientIdsAsync();
+            var forbiddenClients = UserClientAssignmentPolicy.FindForbidden(dto.ClientIds, allowedClientIds);
+            if (forbiddenClients.Count > 0)
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = UserClientAssignmentPolicy.ForbiddenMessage, clientIds = forbiddenClients });
 
             user.FirstName = dto.FirstName;
             user.LastName = dto.LastName;
@@ -186,9 +217,10 @@ public class UserController(
                 }
             }
 
-            // Update Clients
-            var existingClients = await _userClientService.GetManyByAsync(x => x.UserId == user.Id);
-            foreach (var ec in existingClients)
+            // Update Clients: un Admin solo reemplaza las asignaciones que él mismo ve.
+            var existingClients = (await _userClientService.GetManyByAsync(x => x.UserId == user.Id)).ToList();
+            var replaceable = UserClientAssignmentPolicy.ClientIdsToReplace(existingClients.Select(x => x.ClientId), allowedClientIds);
+            foreach (var ec in existingClients.Where(x => replaceable.Contains(x.ClientId)))
             {
                 await _userClientService.HardDeleteAsync(ec);
             }
@@ -291,7 +323,8 @@ public class UserController(
     {
         try
         {
-            var user = await _accountService.GetUserByIdAsync(id);
+            // SA borra a cualquiera; un Admin solo a los usuarios que creó.
+            var user = await GetManageableUserAsync(id);
             if (user == null) return NotFound();
 
             user.IsDeleted = true;
