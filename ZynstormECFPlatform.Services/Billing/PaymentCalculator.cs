@@ -57,30 +57,31 @@ public static class PaymentCalculator
     /// <summary>
     /// Precio mensual vigente del cliente: el propio si tiene uno y, si no, el de su plan.
     /// </summary>
-    public static decimal GetMonthlyFee(Client client)
-    {
-        var plan = client.Plan ?? throw new ArgumentException("El cliente no tiene el plan cargado.", nameof(client));
-        return client.CustomMonthlyFee ?? plan.MonthlyFee;
-    }
+    public static decimal GetMonthlyFee(Client client) => GetMonthlyFee(BillingTerms.For(client));
+
+    public static decimal GetMonthlyFee(BillingTerms terms) => terms.CustomMonthlyFee ?? terms.Plan.MonthlyFee;
 
     /// <summary>
     /// Ciclo de pago de un cliente con su precio vigente y su oferta. El primer mes cubierto empieza en el
     /// próximo pago, o en <paramref name="fallbackPeriodStart"/> si el cliente no tiene fecha. El precio
     /// propio reemplaza al del plan y también a su oferta.
     /// </summary>
-    public static PaymentCalculationResult CalculateCycle(Client client, DateTime fallbackPeriodStart)
+    public static PaymentCalculationResult CalculateCycle(Client client, DateTime fallbackPeriodStart) =>
+        CalculateCycle(BillingTerms.For(client), fallbackPeriodStart);
+
+    public static PaymentCalculationResult CalculateCycle(BillingTerms terms, DateTime fallbackPeriodStart)
     {
-        var monthlyFee = GetMonthlyFee(client);
-        var offer = client.CustomMonthlyFee.HasValue
+        var monthlyFee = GetMonthlyFee(terms);
+        var offer = terms.CustomMonthlyFee.HasValue
             ? null
-            : OfferPricing.TermsFor(client.Plan!.OfferPrice, client.Plan.OfferMonths, client.OfferStartDate);
+            : OfferPricing.TermsFor(terms.Plan.OfferPrice, terms.Plan.OfferMonths, terms.OfferStartDate);
 
         return Calculate(
             monthlyFee,
-            client.PaidMonths,
-            client.PrepaymentDiscountPercent,
+            terms.PaidMonths,
+            terms.PrepaymentDiscountPercent,
             offer,
-            client.NextPaymentDate?.Date ?? fallbackPeriodStart.Date);
+            terms.NextPaymentDate?.Date ?? fallbackPeriodStart.Date);
     }
 
     private static int CountOfferMonths(OfferTerms offer, DateTime periodStart, int months)
