@@ -106,6 +106,9 @@ public class PaymentReceiptDto
     public string ClientGuidId { get; set; } = string.Empty;
     public string ClientName { get; set; } = string.Empty;
 
+    /// <summary>True si el recibo es de una cuenta de facturación; entonces <c>ClientGuidId</c> y <c>ClientName</c> son los de la cuenta.</summary>
+    public bool IsAccount { get; set; }
+
     [JsonConverter(typeof(CalendarDateJsonConverter))]
     public DateTime? PaymentDate { get; set; }
 
