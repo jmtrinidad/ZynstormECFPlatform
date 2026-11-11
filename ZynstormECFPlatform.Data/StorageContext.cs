@@ -679,6 +679,139 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasConstraintName("FK_ClientMonthlyUsage_Plan");
         });
 
+        modelBuilder.Entity<BillingAccount>(entity =>
+        {
+            entity.HasKey(e => e.BillingAccountId);
+
+            entity.Property(e => e.Name)
+                  .HasMaxLength(100)
+                  .IsUnicode(false)
+                  .IsRequired();
+
+            entity.Property(e => e.OwnerUserId)
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .IsRequired();
+
+            // Una cuenta por dueño; las eliminadas no cuentan.
+            entity.HasIndex(e => e.OwnerUserId)
+                  .IsUnique()
+                  .HasFilter("NOT \"IsDeleted\"")
+                  .HasDatabaseName("IX_BillingAccount_OwnerUserId");
+
+            entity.Property(e => e.OfferStartDate).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.LastPaymentDate).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.NextPaymentDate).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.FirstPaymentReminderSentFor).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.FinalPaymentReminderSentFor).HasColumnType(DateTimeColumnType);
+            entity.Property(e => e.PaymentSuspendedAtUtc).HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.PaidMonths)
+                  .HasDefaultValue(1)
+                  .IsRequired();
+
+            entity.Property(e => e.PrepaymentDiscountPercent)
+                  .HasPrecision(5, 2)
+                  .HasDefaultValue(0m)
+                  .IsRequired();
+
+            entity.Property(e => e.PaymentGraceDays)
+                  .HasDefaultValue(3)
+                  .IsRequired();
+
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.Plan)
+                  .WithMany()
+                  .HasForeignKey(d => d.PlanId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_BillingAccount_Plan");
+
+            entity.HasOne(d => d.Status)
+                  .WithMany()
+                  .HasForeignKey(d => d.StatusId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_BillingAccount_Status");
+
+            entity.HasOne(d => d.OwnerUser)
+                  .WithMany()
+                  .HasForeignKey(d => d.OwnerUserId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_BillingAccount_User");
+        });
+
+        modelBuilder.Entity<BillingAccountMonthlyUsage>(entity =>
+        {
+            entity.HasKey(e => e.BillingAccountMonthlyUsageId);
+
+            // Requerido por el INSERT ... ON CONFLICT de ClientUsageService (no filtrar este índice)
+            entity.HasIndex(e => new { e.BillingAccountId, e.Year, e.Month })
+                  .IsUnique()
+                  .HasDatabaseName("IX_BillingAccountMonthlyUsage_AccountId_Year_Month");
+
+            entity.Property(e => e.AcceptedDocuments)
+                  .HasDefaultValue(0);
+
+            entity.Property(e => e.PlanName)
+                  .HasMaxLength(100)
+                  .IsUnicode(false)
+                  .IsRequired();
+
+            entity.Property(e => e.RegisteredAt)
+                  .HasColumnType(DateTimeColumnType)
+                  .HasDefaultValueSql(DefaultDateTimeSqlValue);
+
+            entity.Property(c => c.LastUpdateUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(c => c.DeletedTimeUtc)
+                  .HasColumnType(DateTimeColumnType);
+
+            entity.Property(e => e.IsDeleted)
+                  .HasDefaultValue(false)
+                  .IsRequired();
+
+            entity.Property(e => e.GuidId)
+                  .IsRequired()
+                  .HasMaxLength(450)
+                  .IsUnicode(false)
+                  .HasDefaultValueSql(DefaultGUIDSqlValue);
+
+            entity.HasQueryFilter(c => !c.IsDeleted);
+
+            entity.HasOne(d => d.BillingAccount)
+                  .WithMany(p => p.MonthlyUsages)
+                  .HasForeignKey(d => d.BillingAccountId)
+                  .OnDelete(DeleteBehavior.ClientSetNull)
+                  .HasConstraintName("FK_BillingAccountMonthlyUsage_BillingAccount");
+
+            entity.HasOne(d => d.Plan)
+                  .WithMany()
+                  .HasForeignKey(d => d.PlanId)
+                  .OnDelete(DeleteBehavior.SetNull)
+                  .HasConstraintName("FK_BillingAccountMonthlyUsage_Plan");
+        });
+
         modelBuilder.Entity<ClientPayment>(entity =>
         {
             entity.HasKey(e => e.ClientPaymentId);
@@ -2075,6 +2208,12 @@ public class StorageContext : IdentityDbContext<User, Role, string>, IStorageCon
                   .HasForeignKey(d => d.RiHtmlTemplateId)
                   .OnDelete(DeleteBehavior.SetNull)
                   .HasConstraintName("FK_Client_RiHtmlTemplate");
+
+            entity.HasOne(d => d.BillingAccount)
+                  .WithMany(p => p.Clients)
+                  .HasForeignKey(d => d.BillingAccountId)
+                  .OnDelete(DeleteBehavior.SetNull)
+                  .HasConstraintName("FK_Client_BillingAccount");
         });
 
         modelBuilder.Entity<ClientTypeTemplate>(entity =>

@@ -30,6 +30,12 @@ public partial class Client : BaseEntity
 
     public int? PlanId { get; set; }
 
+    /// <summary>Cuenta de facturación (pool) a la que pertenece. Si tiene valor, factura contra el pool y <see cref="PlanId"/> se ignora. Null = cliente suelto.</summary>
+    public int? BillingAccountId { get; set; }
+
+    /// <summary>Cupo mensual informativo dentro del pool. No bloquea la emisión. Null = sin cupo.</summary>
+    public int? QuotaDocuments { get; set; }
+
     /// <summary>Fecha calendario en que empezó la oferta del plan para este cliente. Null = sin oferta.</summary>
     public DateTime? OfferStartDate { get; set; }
 
@@ -73,6 +79,8 @@ public partial class Client : BaseEntity
     public DateTime? PaymentSuspendedAtUtc { get; set; }
 
     public virtual Plan? Plan { get; set; }
+
+    public virtual BillingAccount? BillingAccount { get; set; }
 
     public virtual ICollection<ClientMonthlyUsage> MonthlyUsages { get; set; } = [];
 
