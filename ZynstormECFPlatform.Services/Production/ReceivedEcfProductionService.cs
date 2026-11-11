@@ -52,6 +52,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
     private readonly IClientUsageService _clientUsageService;
     private readonly IEcfLookupService _lookupService;
     private readonly EcfReferenceCache _referenceCache;
+    private readonly IBillingAccountService _billingAccountService;
 
     public ReceivedEcfProductionService(
         IClientService clientService,
@@ -77,7 +78,8 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         IHostEnvironment hostEnvironment,
         IClientUsageService clientUsageService,
         IEcfLookupService lookupService,
-        EcfReferenceCache referenceCache)
+        EcfReferenceCache referenceCache,
+        IBillingAccountService billingAccountService)
     {
         _clientService = clientService;
         _apiKeyService = apiKeyService;
@@ -103,6 +105,7 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         _clientUsageService = clientUsageService;
         _lookupService = lookupService;
         _referenceCache = referenceCache;
+        _billingAccountService = billingAccountService;
     }
 
     public async Task<ReceivedEcfEmissionResultDto> ProcessAsync(
@@ -139,6 +142,14 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
 
         if (client.ClientInactive)
             return BuildClientInactiveResult(resultDto);
+
+        // Un cliente con cuenta factura contra ella: si la cuenta está suspendida, no emite.
+        if (client.BillingAccountId is int billingAccountId)
+        {
+            var account = await _billingAccountService.GetNoTrackingByAsync(a => a.BillingAccountId == billingAccountId);
+            if (BillingAccountAccess.IsSuspended(account))
+                return BuildAccountSuspendedResult(resultDto);
+        }
 
         var apiKey = await _apiKeyService.GetByAsync(x => x.ClientId == client.ClientId);
         if (apiKey == null)
@@ -280,6 +291,17 @@ public class ReceivedEcfProductionService : IReceivedEcfProductionService
         resultDto.Success = false;
         resultDto.ClientInactive = true;
         resultDto.Message = ClientInactiveMessage;
+        return resultDto;
+    }
+
+    public const string AccountSuspendedMessage = BillingAccountAccess.SuspendedMessage;
+
+    /// <summary>Misma bandera que la suspensión de un cliente, para que la API responda 403.</summary>
+    public static ReceivedEcfEmissionResultDto BuildAccountSuspendedResult(ReceivedEcfEmissionResultDto resultDto)
+    {
+        resultDto.Success = false;
+        resultDto.ClientInactive = true;
+        resultDto.Message = AccountSuspendedMessage;
         return resultDto;
     }
 

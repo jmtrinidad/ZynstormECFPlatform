@@ -972,6 +972,9 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     .AsNoTracking()
                     .Include(k => k.Client)
                         .ThenInclude(c => c.Plan)
+                    .Include(k => k.Client)
+                        .ThenInclude(c => c.BillingAccount)
+                            .ThenInclude(a => a!.Plan)
                     .FirstOrDefaultAsync(k => k.Apikey == effectiveKey, cancellationToken);
 
                 var statusDto = ClientStatusEvaluator.Evaluate(apiKeyEntity);

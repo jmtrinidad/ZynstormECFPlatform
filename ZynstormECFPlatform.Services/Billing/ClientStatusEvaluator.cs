@@ -6,6 +6,7 @@ namespace ZynstormECFPlatform.Services.Billing;
 
 /// <summary>
 /// Evaluador de estado activo de un cliente a partir de su entidad ApiKey y Client asociada.
+/// Un cliente que pertenece a una cuenta de facturación toma de ella el plan, el próximo pago y la suspensión.
 /// Función pura: no toca base de datos ni contexto HTTP.
 /// </summary>
 public static class ClientStatusEvaluator
@@ -14,6 +15,7 @@ public static class ClientStatusEvaluator
     public const string KeyInactiveMessage = "El ApiKey proporcionado se encuentra inactivo.";
     public const string ClientNotFoundOrInactiveMessage = "El cliente asociado a este ApiKey no existe o se encuentra inactivo.";
     public const string PaymentSuspendedMessage = "Cliente suspendido por falta de pago.";
+    public const string AccountSuspendedMessage = BillingAccountAccess.SuspendedMessage;
     public const string ClientInactiveMessage = "El cliente se encuentra desactivado. Por favor, comuníquese con soporte.";
     public const string ClientActiveMessage = "Cliente activo.";
 
@@ -47,8 +49,12 @@ public static class ClientStatusEvaluator
             };
         }
 
-        var isPaymentSuspended = client.PaymentSuspendedAtUtc != null;
+        var account = client.BillingAccount;
+        var accountSuspended = BillingAccountAccess.IsSuspended(account);
+        var isPaymentSuspended = client.PaymentSuspendedAtUtc != null || accountSuspended;
         var isClientInactive = client.ClientInactive;
+        var nextPaymentDate = account != null ? account.NextPaymentDate : client.NextPaymentDate;
+        var planName = account != null ? account.Plan?.Name : client.Plan?.Name;
 
         if (isPaymentSuspended)
         {
@@ -60,11 +66,11 @@ public static class ClientStatusEvaluator
                 Rnc = client.Rnc,
                 ClientInactive = true,
                 PaymentSuspended = true,
-                NextPaymentDate = client.NextPaymentDate,
-                PlanName = client.Plan?.Name,
+                NextPaymentDate = nextPaymentDate,
+                PlanName = planName,
                 IsDgiiProduction = client.IsDgiiProduction,
                 IsCertified = client.IsCertified,
-                Message = PaymentSuspendedMessage
+                Message = accountSuspended ? AccountSuspendedMessage : PaymentSuspendedMessage
             };
         }
 
@@ -78,8 +84,8 @@ public static class ClientStatusEvaluator
                 Rnc = client.Rnc,
                 ClientInactive = true,
                 PaymentSuspended = false,
-                NextPaymentDate = client.NextPaymentDate,
-                PlanName = client.Plan?.Name,
+                NextPaymentDate = nextPaymentDate,
+                PlanName = planName,
                 IsDgiiProduction = client.IsDgiiProduction,
                 IsCertified = client.IsCertified,
                 Message = ClientInactiveMessage
@@ -94,8 +100,8 @@ public static class ClientStatusEvaluator
             Rnc = client.Rnc,
             ClientInactive = false,
             PaymentSuspended = false,
-            NextPaymentDate = client.NextPaymentDate,
-            PlanName = client.Plan?.Name,
+            NextPaymentDate = nextPaymentDate,
+            PlanName = planName,
             IsDgiiProduction = client.IsDgiiProduction,
             IsCertified = client.IsCertified,
             Message = ClientActiveMessage
