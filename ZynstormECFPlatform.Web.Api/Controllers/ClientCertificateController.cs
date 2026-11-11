@@ -10,6 +10,7 @@ using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Services.Certificates;
+using ZynstormECFPlatform.Services.Users;
 
 namespace ZynstormECFPlatform.Web.Api.Controllers
 {
@@ -19,6 +20,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
         IClientService clientService,
         IApiKeyService apiKeyService,
         IEncryptedService encryptedService,
+        IClientAccessService clientAccess,
         IUnitOfWork unitOfWork,
         IMapper mapper,
         ILoggerFactory loggerFactory) : BaseController<ClientCertificateController, ClientCertificate, ClientCertificateCreateDto, ClientCertificateCreateDto, ClientCertificateViewDto>(certificateService, mapper, loggerFactory)
@@ -35,7 +37,8 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 {
                     var result = await certificateService.GetByAsync(x => x.GuidId == id, cancellationToken);
 
-                    if (result == null) return NotFound();
+                    if (result == null || !await clientAccess.CanAccessClientAsync(User, result.ClientId, cancellationToken))
+                        return NotFound();
 
                     return Ok(Mapper.Map<ClientCertificate, ClientCertificateViewDto>(result));
                 }
@@ -46,7 +49,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     // Buscamos primero al cliente por su GuidId
                     var client = await clientService.GetByAsync(x => x.GuidId == guidId, cancellationToken);
 
-                    if (client == null)
+                    if (client == null || !await clientAccess.CanAccessClientAsync(User, client.ClientId, cancellationToken))
                         return NotFound("No se encontró un cliente con el GuidId proporcionado.");
 
                     // Usamos el ClientId interno para filtrar los certificados
@@ -54,7 +57,11 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 }
                 else
                 {
-                    results = await certificateService.GetAllAsync(cancellationToken);
+                    // SA ve todos; el resto, solo los de sus clientes.
+                    var accessibleIds = await clientAccess.GetAccessibleClientIdsAsync(User, cancellationToken);
+                    results = accessibleIds == null
+                        ? await certificateService.GetAllAsync(cancellationToken)
+                        : await certificateService.GetManyByAsync(x => accessibleIds.Contains(x.ClientId), cancellationToken);
                 }
 
                 return Ok(Mapper.Map<IEnumerable<ClientCertificate>, IEnumerable<ClientCertificateViewDto>>(results));
@@ -81,7 +88,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 // 1. Buscamos al cliente por su GuidId para obtener el ClientId interno
                 var client = await clientService.GetByAsync(x => x.GuidId == dto.ClientGuidId);
 
-                if (client == null)
+                if (client == null || !await clientAccess.CanAccessClientAsync(User, client.ClientId))
                     return NotFound($"No se encontró un cliente con el GuidId proporcionado.");
 
                 // 2. Buscamos la ApiKey asociada al cliente para obtener su SecretKey
@@ -136,6 +143,46 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
             }
         }
 
+        // Los endpoints heredados de BaseController no conocen al cliente dueño del certificado.
+
+        [HttpGet]
+        [Route("guid/{guid}", Order = 1)]
+        public override async Task<ActionResult<ClientCertificateViewDto>> GetByGuid(string guid, CancellationToken cancellationToken = default)
+        {
+            var certificate = await certificateService.GetByAsync(x => x.GuidId == guid, cancellationToken);
+            if (certificate == null || !await clientAccess.CanAccessClientAsync(User, certificate.ClientId, cancellationToken))
+                return NotFound();
+
+            return await base.GetByGuid(guid, cancellationToken);
+        }
+
+        [HttpDelete]
+        [Route("", Order = 1)]
+        public override async Task<IActionResult> Delete([FromQuery] string id)
+        {
+            var certificate = await certificateService.GetByAsync(x => x.GuidId == id);
+            if (certificate == null || !await clientAccess.CanAccessClientAsync(User, certificate.ClientId))
+                return NotFound();
+
+            return await base.Delete(id);
+        }
+
+        [HttpDelete]
+        [Route("guid/{guid}", Order = 1)]
+        public override async Task<IActionResult> DeleteByGuid(string guid)
+        {
+            var certificate = await certificateService.GetByAsync(x => x.GuidId == guid);
+            if (certificate == null || !await clientAccess.CanAccessClientAsync(User, certificate.ClientId))
+                return NotFound();
+
+            return await base.DeleteByGuid(guid);
+        }
+
+        [HttpPut]
+        [Route("", Order = 1)]
+        [Authorize(Roles = "SA")]
+        public override Task<ActionResult<ClientCertificateViewDto>> Put([FromBody] ClientCertificateCreateDto dto) => base.Put(dto);
+
         /// <summary>
         /// Relee los certificados ya registrados para completar los datos del titular y del emisor.
         /// Con guidId (cliente) solo procesa los de ese cliente; sin él, todos.
@@ -154,14 +201,18 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 {
                     var client = await clientService.GetByAsync(x => x.GuidId == guidId, cancellationToken);
 
-                    if (client == null)
+                    if (client == null || !await clientAccess.CanAccessClientAsync(User, client.ClientId, cancellationToken))
                         return NotFound("No se encontró un cliente con el GuidId proporcionado.");
 
                     certificates = await certificateService.GetManyByAsync(x => x.ClientId == client.ClientId, cancellationToken);
                 }
                 else
                 {
-                    certificates = await certificateService.GetAllAsync(cancellationToken);
+                    // Sin cliente: SA relee todos; el resto, solo los de sus clientes.
+                    var accessibleIds = await clientAccess.GetAccessibleClientIdsAsync(User, cancellationToken);
+                    certificates = accessibleIds == null
+                        ? await certificateService.GetAllAsync(cancellationToken)
+                        : await certificateService.GetManyByAsync(x => accessibleIds.Contains(x.ClientId), cancellationToken);
                 }
 
                 var result = new ClientCertificateRefreshDetailsResultDto();
