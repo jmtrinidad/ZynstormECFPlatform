@@ -188,6 +188,183 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.ToTable("ApiKey");
                 });
 
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.BillingAccount", b =>
+                {
+                    b.Property<int>("BillingAccountId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("BillingAccountId"));
+
+                    b.Property<decimal?>("CustomMonthlyFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("DeletedTimeUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("FinalPaymentReminderSentFor")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("FirstPaymentReminderSentFor")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("GuidId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(450)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(450)")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("LastPaymentDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("LastUpdateUtc")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("NextPaymentDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("OfferStartDate")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("OwnerUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(450)");
+
+                    b.Property<int>("PaidMonths")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<int>("PaymentGraceDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3);
+
+                    b.Property<DateTime?>("PaymentSuspendedAtUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("PlanId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("PrepaymentDiscountPercent")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<DateTime>("RegisteredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("StatusId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("BillingAccountId");
+
+                    b.HasIndex("OwnerUserId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_BillingAccount_OwnerUserId")
+                        .HasFilter("NOT \"IsDeleted\"");
+
+                    b.HasIndex("PlanId");
+
+                    b.HasIndex("StatusId");
+
+                    b.ToTable("BillingAccount");
+                });
+
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.BillingAccountMonthlyUsage", b =>
+                {
+                    b.Property<int>("BillingAccountMonthlyUsageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("BillingAccountMonthlyUsageId"));
+
+                    b.Property<int>("AcceptedDocuments")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("BillingAccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DeletedTimeUtc")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("GuidId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(450)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(450)")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("LastUpdateUtc")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MonthlyDocumentLimit")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("MonthlyFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int?>("PlanId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PlanName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("RegisteredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("BillingAccountMonthlyUsageId");
+
+                    b.HasIndex("PlanId");
+
+                    b.HasIndex("BillingAccountId", "Year", "Month")
+                        .IsUnique()
+                        .HasDatabaseName("IX_BillingAccountMonthlyUsage_AccountId_Year_Month");
+
+                    b.ToTable("BillingAccountMonthlyUsage");
+                });
+
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.BusinessSimulationSample", b =>
                 {
                     b.Property<int>("BusinessSimulationSampleId")
@@ -2703,6 +2880,9 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .IsUnicode(false)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<int?>("BillingAccountId")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("ClientInactive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -2799,6 +2979,9 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasColumnType("numeric(5,2)")
                         .HasDefaultValue(0m);
 
+                    b.Property<int?>("QuotaDocuments")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("RegisteredAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp without time zone")
@@ -2823,6 +3006,8 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.HasKey("ClientId");
+
+                    b.HasIndex("BillingAccountId");
 
                     b.HasIndex("ClientTypeId");
 
@@ -7131,6 +7316,52 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Navigation("Status");
                 });
 
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.BillingAccount", b =>
+                {
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.User", "OwnerUser")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .IsRequired()
+                        .HasConstraintName("FK_BillingAccount_User");
+
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.Plan", "Plan")
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .IsRequired()
+                        .HasConstraintName("FK_BillingAccount_Plan");
+
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.Status", "Status")
+                        .WithMany()
+                        .HasForeignKey("StatusId")
+                        .IsRequired()
+                        .HasConstraintName("FK_BillingAccount_Status");
+
+                    b.Navigation("OwnerUser");
+
+                    b.Navigation("Plan");
+
+                    b.Navigation("Status");
+                });
+
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.BillingAccountMonthlyUsage", b =>
+                {
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.BillingAccount", "BillingAccount")
+                        .WithMany("MonthlyUsages")
+                        .HasForeignKey("BillingAccountId")
+                        .IsRequired()
+                        .HasConstraintName("FK_BillingAccountMonthlyUsage_BillingAccount");
+
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.Plan", "Plan")
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("FK_BillingAccountMonthlyUsage_Plan");
+
+                    b.Navigation("BillingAccount");
+
+                    b.Navigation("Plan");
+                });
+
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.BusinessSimulationSample", b =>
                 {
                     b.HasOne("ZynstormECFPlatform.Core.Entities.BusinessType", "BusinessType")
@@ -7219,6 +7450,12 @@ namespace ZynstormECFPlatform.Data.Migrations
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.Client", b =>
                 {
+                    b.HasOne("ZynstormECFPlatform.Core.Entities.BillingAccount", "BillingAccount")
+                        .WithMany("Clients")
+                        .HasForeignKey("BillingAccountId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("FK_Client_BillingAccount");
+
                     b.HasOne("ZynstormECFPlatform.Core.Entities.ClientType", "ClientType")
                         .WithMany("Clients")
                         .HasForeignKey("ClientTypeId")
@@ -7242,6 +7479,8 @@ namespace ZynstormECFPlatform.Data.Migrations
                         .HasForeignKey("StatusId")
                         .IsRequired()
                         .HasConstraintName("FK_Client_Status");
+
+                    b.Navigation("BillingAccount");
 
                     b.Navigation("ClientType");
 
@@ -7711,6 +7950,13 @@ namespace ZynstormECFPlatform.Data.Migrations
                     b.Navigation("ClientCallBacks");
 
                     b.Navigation("EcfDocuments");
+                });
+
+            modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.BillingAccount", b =>
+                {
+                    b.Navigation("Clients");
+
+                    b.Navigation("MonthlyUsages");
                 });
 
             modelBuilder.Entity("ZynstormECFPlatform.Core.Entities.BusinessType", b =>
