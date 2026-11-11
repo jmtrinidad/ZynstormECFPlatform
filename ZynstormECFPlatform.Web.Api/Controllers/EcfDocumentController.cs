@@ -150,9 +150,7 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                     }
                 }
 
-                // Ordenar por fecha de emisión descendente para mostrar las más recientes primero
-                query = query.OrderByDescending(e => e.IssueDateUtc);
-
+                // El orden se aplica sobre la proyección (fecha de envío ascendente, ver más abajo)
                 var totalCount = await query.CountAsync(cancellationToken);
 
                 // Proyectar datos optimizados a tipo anónimo (sin XML para excelente rendimiento)
@@ -185,7 +183,11 @@ namespace ZynstormECFPlatform.Web.Api.Controllers
                 int page = pageNumber ?? 1;
                 int size = pageSize ?? 10;
 
+                // Orden ascendente por la misma fecha que se muestra en "Fecha Envío" (NCF como desempate),
+                // para que un comprobante mayor no aparezca antes que uno menor.
                 var tempResults = await tempProjection
+                    .OrderBy(x => x.SentAtUtc ?? x.RegisteredAt)
+                    .ThenBy(x => x.Ncf)
                     .Skip((page - 1) * size)
                     .Take(size)
                     .ToListAsync(cancellationToken);
