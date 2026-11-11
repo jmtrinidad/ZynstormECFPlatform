@@ -88,6 +88,18 @@ public class BillingAccountPolicyTests
         Assert.Contains(BillingAccountPolicy.ValidateMembers([other], 1, 3), e => e.Contains("Ajeno"));
     }
 
+    [Fact]
+    public void Quota_CanBeClearedOrZeroOrPositive()
+    {
+        Assert.Empty(BillingAccountPolicy.ValidateQuota(null));
+        Assert.Empty(BillingAccountPolicy.ValidateQuota(0));
+        Assert.Empty(BillingAccountPolicy.ValidateQuota(500));
+    }
+
+    [Fact]
+    public void Quota_CannotBeNegative() =>
+        Assert.Contains(BillingAccountPolicy.ValidateQuota(-1), e => e.Contains("negativo"));
+
     [Theory]
     [InlineData(100, null, false)]
     [InlineData(100, 100, false)]

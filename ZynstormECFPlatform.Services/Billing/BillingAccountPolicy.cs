@@ -80,6 +80,9 @@ public static class BillingAccountPolicy
         return errors;
     }
 
+    public static List<string> ValidateQuota(int? quota) =>
+        quota < 0 ? ["El cupo no puede ser negativo."] : [];
+
     /// <summary>El cupo es informativo: solo sirve para mostrar una alerta, nunca bloquea la emisión.</summary>
     public static bool IsQuotaExceeded(int acceptedDocuments, int? quota) =>
         quota is int limit && acceptedDocuments > limit;

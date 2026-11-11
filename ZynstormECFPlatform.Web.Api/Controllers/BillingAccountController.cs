@@ -21,27 +21,22 @@ namespace ZynstormECFPlatform.Web.Api.Controllers;
 public class BillingAccountController(
     IBillingAccountService accountService,
     IBillingAccountPaymentService paymentService,
-    IBillingAccountMonthlyUsageService usageService,
-    IClientMonthlyUsageService clientUsageService,
+    IBillingAccountViewService viewService,
     IClientService clientService,
+    IUserClientService userClientService,
     IPlanService planService,
-    IPlanOverageTierService tierService,
     IAccountService userAccountService,
     IUnitOfWork unitOfWork,
     ILogger<BillingAccountController> logger) : ControllerBase
 {
     private string? CurrentUserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-    private IQueryable<BillingAccount> AccountsWithDetails() =>
-        accountService.Table.AsNoTracking().Include(a => a.Plan).Include(a => a.OwnerUser);
-
     [HttpGet("")]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken = default)
     {
         try
         {
-            var accounts = await AccountsWithDetails().OrderBy(a => a.Name).ToListAsync(cancellationToken);
-            return Ok(await BuildViewsAsync(accounts, cancellationToken));
+            return Ok(await viewService.GetAllAsync(cancellationToken));
         }
         catch (Exception exception)
         {
@@ -55,7 +50,7 @@ public class BillingAccountController(
     {
         try
         {
-            var detail = await BuildDetailAsync(guid, cancellationToken);
+            var detail = await viewService.GetDetailAsync(guid, cancellationToken);
             return detail == null ? NotFound(new { message = "Cuenta no encontrada." }) : Ok(detail);
         }
         catch (Exception exception)
@@ -98,7 +93,7 @@ public class BillingAccountController(
             };
 
             var inserted = await accountService.InsertAsync(account);
-            return Ok(await BuildDetailAsync(inserted!.GuidId, cancellationToken));
+            return Ok(await viewService.GetDetailAsync(inserted!.GuidId, cancellationToken));
         }
         catch (DbUpdateException exception)
         {
@@ -143,7 +138,7 @@ public class BillingAccountController(
                 account.PaymentSuspendedAtUtc = null;
 
             await accountService.UpdateAsync(account);
-            return Ok(await BuildDetailAsync(guid, cancellationToken));
+            return Ok(await viewService.GetDetailAsync(guid, cancellationToken));
         }
         catch (Exception exception)
         {
@@ -154,7 +149,8 @@ public class BillingAccountController(
 
     /// <summary>
     /// Deja como miembros exactamente los clientes indicados: asigna los nuevos y suelta a los que ya no figuran.
-    /// El PlanId propio de un cliente asignado se conserva pero deja de cobrarse.
+    /// El PlanId propio de un cliente asignado se conserva pero deja de cobrarse. Al asignar, el dueño recibe
+    /// el acceso (UserClient) al cliente; al soltar, el acceso del dueño no se quita.
     /// </summary>
     [HttpPut("guid/{guid}/clients")]
     public async Task<IActionResult> SetClients(string guid, [FromBody] BillingAccountClientsDto dto, CancellationToken cancellationToken = default)
@@ -176,13 +172,43 @@ public class BillingAccountController(
             foreach (var client in affected)
                 client.BillingAccountId = requested.Contains(client.GuidId) ? account.BillingAccountId : null;
 
-            await unitOfWork.ExecuteInTransactionAsync(async _ => await clientService.UpdateAsync(affected), cancellationToken);
+            // El dueño debe ver a sus clientes en listados, documentos y dashboard: todo eso se rige por UserClient.
+            var requestedIds = requestedClients.Select(c => c.ClientId).ToList();
+            var ownerLinks = (await userClientService.GetManyByAsync(
+                    x => x.UserId == account.OwnerUserId && requestedIds.Contains(x.ClientId), cancellationToken))
+                .Select(x => x.ClientId)
+                .ToHashSet();
 
-            return Ok(await BuildDetailAsync(guid, cancellationToken));
+            await unitOfWork.ExecuteInTransactionAsync(async _ =>
+            {
+                await clientService.UpdateAsync(affected);
+
+                foreach (var clientId in requestedIds.Where(id => !ownerLinks.Contains(id)))
+                    await userClientService.InsertAsync(new UserClient { UserId = account.OwnerUserId, ClientId = clientId });
+            }, cancellationToken);
+
+            return Ok(await viewService.GetDetailAsync(guid, cancellationToken));
         }
         catch (Exception exception)
         {
             logger.LogError(exception, "Error asignando clientes a la cuenta {Guid}", guid);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
+    }
+
+    [HttpPut("guid/{guid}/clients/{clientGuid}/quota")]
+    public async Task<IActionResult> SetClientQuota(string guid, string clientGuid, [FromBody] ClientQuotaDto dto, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await viewService.SetClientQuotaAsync(guid, clientGuid, dto.Quota, cancellationToken);
+            if (result.Outcome != PaymentRegistrationOutcome.Ok) return ToActionResult(result);
+
+            return Ok(await viewService.GetDetailAsync(guid, cancellationToken));
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Error fijando el cupo del cliente {ClientGuid} en la cuenta {Guid}", clientGuid, guid);
             return StatusCode(StatusCodes.Status503ServiceUnavailable);
         }
     }
@@ -236,114 +262,4 @@ public class BillingAccountController(
         PaymentRegistrationOutcome.Conflict => Conflict(new { message = string.Join(" ", result.Errors), errors = result.Errors }),
         _ => BadRequest(new { message = string.Join(" ", result.Errors), errors = result.Errors })
     };
-
-    private async Task<BillingAccountDetailDto?> BuildDetailAsync(string guid, CancellationToken cancellationToken)
-    {
-        var account = await AccountsWithDetails().FirstOrDefaultAsync(a => a.GuidId == guid, cancellationToken);
-        if (account == null) return null;
-
-        var view = (await BuildViewsAsync([account], cancellationToken)).Single();
-        var today = DateTimeExtensions.DrNow;
-
-        var clients = await clientService.Table.AsNoTracking()
-            .Where(c => c.BillingAccountId == account.BillingAccountId)
-            .OrderBy(c => c.Name)
-            .ToListAsync(cancellationToken);
-
-        var clientIds = clients.Select(c => c.ClientId).ToList();
-        var accepted = await clientUsageService.Table.AsNoTracking()
-            .Where(u => clientIds.Contains(u.ClientId) && u.Year == today.Year && u.Month == today.Month)
-            .ToDictionaryAsync(u => u.ClientId, u => u.AcceptedDocuments, cancellationToken);
-
-        var detail = new BillingAccountDetailDto();
-        CopyView(view, detail);
-        detail.Clients = clients.Select(c =>
-        {
-            var documents = accepted.GetValueOrDefault(c.ClientId);
-            return new BillingAccountClientUsageDto
-            {
-                ClientGuidId = c.GuidId,
-                ClientName = c.Name,
-                ClientRnc = c.Rnc,
-                AcceptedDocuments = documents,
-                QuotaDocuments = c.QuotaDocuments,
-                QuotaExceeded = BillingAccountPolicy.IsQuotaExceeded(documents, c.QuotaDocuments)
-            };
-        }).ToList();
-
-        return detail;
-    }
-
-    private async Task<List<BillingAccountViewDto>> BuildViewsAsync(IReadOnlyList<BillingAccount> accounts, CancellationToken cancellationToken)
-    {
-        if (accounts.Count == 0) return [];
-
-        var today = DateTimeExtensions.DrNow;
-        var ids = accounts.Select(a => a.BillingAccountId).ToList();
-        var planIds = accounts.Select(a => a.PlanId).Distinct().ToList();
-
-        var poolNow = await usageService.Table.AsNoTracking()
-            .Where(u => ids.Contains(u.BillingAccountId) && u.Year == today.Year && u.Month == today.Month)
-            .ToDictionaryAsync(u => u.BillingAccountId, u => u.AcceptedDocuments, cancellationToken);
-
-        var tiers = await tierService.Table.AsNoTracking()
-            .Where(t => planIds.Contains(t.PlanId))
-            .ToListAsync(cancellationToken);
-
-        var clientCounts = await clientService.Table.AsNoTracking()
-            .Where(c => c.BillingAccountId != null && ids.Contains(c.BillingAccountId.Value))
-            .GroupBy(c => c.BillingAccountId!.Value)
-            .Select(g => new { Id = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.Id, x => x.Count, cancellationToken);
-
-        var pending = await paymentService.GetPendingOveragesAsync(ids, cancellationToken);
-
-        return accounts.Select(a =>
-        {
-            var terms = BillingTerms.For(a);
-            var documents = poolNow.GetValueOrDefault(a.BillingAccountId);
-            var calculation = BillingCalculator.Calculate(
-                PaymentCalculator.GetMonthlyFee(terms),
-                a.Plan.MonthlyDocumentLimit,
-                tiers.Where(t => t.PlanId == a.PlanId).Select(t => new OverageTier(t.FromUnit, t.ToUnit, t.UnitPrice)),
-                documents);
-            var (status, days) = PaymentCalculator.GetPaymentStatus(a.NextPaymentDate, PaymentCalculator.DefaultWarningDays);
-            var accountPending = pending.GetValueOrDefault(a.BillingAccountId);
-
-            return new BillingAccountViewDto
-            {
-                GuidId = a.GuidId,
-                Name = a.Name,
-                OwnerUserId = a.OwnerUserId,
-                OwnerName = a.OwnerUser?.FullName ?? string.Empty,
-                OwnerEmail = a.OwnerUser?.Email,
-                PlanId = a.PlanId,
-                PlanName = a.Plan.Name,
-                MonthlyDocumentLimit = a.Plan.MonthlyDocumentLimit,
-                MonthlyFee = PaymentCalculator.GetMonthlyFee(terms),
-                CustomMonthlyFee = a.CustomMonthlyFee,
-                StatusId = a.StatusId,
-                ClientsCount = clientCounts.GetValueOrDefault(a.BillingAccountId),
-                CurrentMonthAcceptedDocuments = documents,
-                CurrentMonthOverageDocuments = calculation.OverageDocuments,
-                CurrentMonthOverageAmount = calculation.OverageAmount,
-                PaidMonths = a.PaidMonths,
-                PrepaymentDiscountPercent = a.PrepaymentDiscountPercent,
-                PaymentGraceDays = PaymentReminderPolicy.NormalizeGraceDays(a.PaymentGraceDays),
-                LastPaymentDate = a.LastPaymentDate,
-                NextPaymentDate = a.NextPaymentDate,
-                PaymentStatus = (int)status,
-                PaymentDaysToDue = days,
-                PaymentSuspended = a.PaymentSuspendedAtUtc != null,
-                PendingOverageAmount = accountPending?.Sum(p => p.Amount) ?? 0m,
-                PendingOverageMonths = accountPending?.Count ?? 0
-            };
-        }).ToList();
-    }
-
-    private static void CopyView(BillingAccountViewDto from, BillingAccountViewDto to)
-    {
-        foreach (var property in typeof(BillingAccountViewDto).GetProperties().Where(p => p.CanRead && p.CanWrite))
-            property.SetValue(to, property.GetValue(from));
-    }
 }

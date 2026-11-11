@@ -26,6 +26,12 @@ public class BillingAccountClientsDto
     public List<string> ClientGuidIds { get; set; } = [];
 }
 
+/// <summary>Cupo mensual informativo de un cliente de la cuenta. Null lo quita.</summary>
+public class ClientQuotaDto
+{
+    public int? Quota { get; set; }
+}
+
 public class BillingAccountClientUsageDto
 {
     public string ClientGuidId { get; set; } = string.Empty;
