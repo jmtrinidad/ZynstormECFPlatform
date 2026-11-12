@@ -298,6 +298,23 @@ public static class BusinessSimulationSeeds
             ["47"] = ("SERVICIO PROFESIONAL EXTERIOR", "HONORARIOS MEDICOS EXTERIOR"),
         };
 
+        // Servicios ambulatorios adicionales (itemType 2 = Servicio, exentos de ITBIS) que se
+        // agregan después del ítem principal en los tipos con detalle libre. Los tipos 33/34
+        // (notas) y 41/43/46/47 conservan un solo ítem para no alterar sus reglas de referencia.
+        const string clinicExempt = "\"billingIndicator\":4,\"itemType\":2}";
+        var clinicExtraItems = new Dictionary<string, string>
+        {
+            ["31"] = "{\"name\":\"LABORATORIO CLINICO HEMOGRAMA COMPLETO\",\"quantity\":1,\"unitPrice\":650.00," + clinicExempt
+                   + ",{\"name\":\"ELECTROCARDIOGRAMA 12 DERIVACIONES\",\"quantity\":1,\"unitPrice\":900.00," + clinicExempt
+                   + ",{\"name\":\"CURACION Y SUTURA MENOR\",\"quantity\":1,\"unitPrice\":1200.00," + clinicExempt,
+            ["32"] = "{\"name\":\"RADIOGRAFIA DE TORAX\",\"quantity\":1,\"unitPrice\":1800.00," + clinicExempt
+                   + ",{\"name\":\"TERAPIA FISICA SESION\",\"quantity\":3,\"unitPrice\":1000.00," + clinicExempt,
+            ["44"] = "{\"name\":\"SONOGRAFIA ABDOMINAL\",\"quantity\":1,\"unitPrice\":2500.00," + clinicExempt
+                   + ",{\"name\":\"NEBULIZACION\",\"quantity\":2,\"unitPrice\":350.00," + clinicExempt,
+            ["45"] = "{\"name\":\"VACUNACION Y ADMINISTRACION DE INYECTABLES\",\"quantity\":2,\"unitPrice\":400.00," + clinicExempt
+                   + ",{\"name\":\"ELECTROCARDIOGRAMA 12 DERIVACIONES\",\"quantity\":1,\"unitPrice\":900.00," + clinicExempt,
+        };
+
         var nextId = samples.Max(s => s.BusinessSimulationSampleId) + 1;
 
         foreach (var businessType in businessTypes.Where(b => b.BusinessTypeId != 1))
@@ -308,7 +325,17 @@ public static class BusinessSimulationSeeds
                 if (!templatesByType.TryGetValue(ecfType, out var json)) continue;
 
                 if (businessType.BusinessTypeId == 14 && clinicItemNames.TryGetValue(ecfType, out var clinicName))
-                    json = json.Replace($"\"name\":\"{clinicName.From}\"", $"\"name\":\"{clinicName.To}\"");
+                {
+                    // Ítem principal tematizado y marcado explícitamente como servicio (itemType 2).
+                    json = json.Replace($"\"name\":\"{clinicName.From}\"", $"\"name\":\"{clinicName.To}\",\"itemType\":2");
+
+                    if (clinicExtraItems.TryGetValue(ecfType, out var extraItems))
+                    {
+                        // Inserta los servicios adicionales justo después del primer ítem.
+                        var firstItemEnd = json.IndexOf('}', json.IndexOf("\"items\":[", StringComparison.Ordinal));
+                        json = json.Insert(firstItemEnd + 1, "," + extraItems);
+                    }
+                }
 
                 samples.Add(new BusinessSimulationSample
                 {

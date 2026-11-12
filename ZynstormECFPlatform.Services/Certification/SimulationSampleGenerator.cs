@@ -19,10 +19,14 @@ public static class SimulationSampleGenerator
             },
             "Clínica/Servicio Ambulatorio" => new List<EcfItemRequestDto>
             {
-                new() { NombreItem = "Consulta Médica General", CantidadItem = 1, PrecioUnitarioItem = 1500, MontoItem = 1500, IndicadorFacturacion = "0" }, // Exento
-                new() { NombreItem = "Procedimiento Ambulatorio (Curación)", CantidadItem = 1, PrecioUnitarioItem = 2200, MontoItem = 2200, IndicadorFacturacion = "0" },
-                new() { NombreItem = "Pruebas de Laboratorio", CantidadItem = 2, PrecioUnitarioItem = 650, MontoItem = 1300, IndicadorFacturacion = "0" },
-                new() { NombreItem = "Mascarillas y Material Descartable", CantidadItem = 3, PrecioUnitarioItem = 125, MontoItem = 375, IndicadorFacturacion = "1" } // Gravado
+                // IndicadorBienoServicio = "2": todos son servicios ambulatorios.
+                new() { NombreItem = "Consulta Médica General", CantidadItem = 1, PrecioUnitarioItem = 1500, MontoItem = 1500, IndicadorFacturacion = "0", IndicadorBienoServicio = "2" }, // Exento
+                new() { NombreItem = "Procedimiento Ambulatorio (Curación)", CantidadItem = 1, PrecioUnitarioItem = 2200, MontoItem = 2200, IndicadorFacturacion = "0", IndicadorBienoServicio = "2" },
+                new() { NombreItem = "Pruebas de Laboratorio", CantidadItem = 2, PrecioUnitarioItem = 650, MontoItem = 1300, IndicadorFacturacion = "0", IndicadorBienoServicio = "2" },
+                new() { NombreItem = "Electrocardiograma 12 Derivaciones", CantidadItem = 1, PrecioUnitarioItem = 900, MontoItem = 900, IndicadorFacturacion = "0", IndicadorBienoServicio = "2" },
+                new() { NombreItem = "Radiografía de Tórax", CantidadItem = 1, PrecioUnitarioItem = 1800, MontoItem = 1800, IndicadorFacturacion = "0", IndicadorBienoServicio = "2" },
+                new() { NombreItem = "Terapia Física (Sesión)", CantidadItem = 3, PrecioUnitarioItem = 1000, MontoItem = 3000, IndicadorFacturacion = "0", IndicadorBienoServicio = "2" },
+                new() { NombreItem = "Mascarillas y Material Descartable", CantidadItem = 3, PrecioUnitarioItem = 125, MontoItem = 375, IndicadorFacturacion = "1", IndicadorBienoServicio = "1" } // Gravado (bien)
             },
             "Repuesto" => new List<EcfItemRequestDto>
             {
