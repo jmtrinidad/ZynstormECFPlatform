@@ -39,7 +39,8 @@ public class CertificationRiModelService(
 
         var company = await BuildCompanyHeaderAsync(client);
         var logo = await formatService.GetLogoForClientAsync(client.ClientId);
-        var html = RiHtmlRenderer.Render(format.Template.Html, doc.XmlSent, company, format.SampleDataJson, logo);
+        var xml = await ResolveXmlForRiAsync(doc);
+        var html = RiHtmlRenderer.Render(format.Template.Html, xml, company, format.SampleDataJson, logo);
         return new RiRenderResult(Encoding.UTF8.GetBytes(html), "text/html", $"RI_{ncf}.html");
     }
 
@@ -55,7 +56,24 @@ public class CertificationRiModelService(
             ?? throw new InvalidOperationException($"No se encontró el comprobante {ncf} para el cliente.");
 
         var company = await BuildCompanyHeaderAsync(client);
-        return RiPdfRenderer.Render(ParseEcfType(doc.EcfType.Code), doc.XmlSent, company);
+        return RiPdfRenderer.Render(ParseEcfType(doc.EcfType.Code), await ResolveXmlForRiAsync(doc), company);
+    }
+
+    /// <summary>
+    /// XML a usar para la RI. El RFCE (32 &lt; 250k) no trae fecha de firma: se toma del XML
+    /// completo del mismo e-NCF dentro del mismo proceso de certificación.
+    /// </summary>
+    private async Task<string> ResolveXmlForRiAsync(CertificationDocument doc)
+    {
+        if (!doc.XmlSent.Contains("<RFCE", StringComparison.OrdinalIgnoreCase)) return doc.XmlSent;
+
+        var siblings = await context.Set<CertificationDocument>()
+            .Where(d => d.CertificationProcessId == doc.CertificationProcessId
+                        && d.ENcfSecuence == doc.ENcfSecuence
+                        && d.CertificationDocumentId != doc.CertificationDocumentId)
+            .Select(d => d.XmlSent)
+            .ToListAsync();
+        return RfceSignatureDate.Complete(doc.XmlSent, siblings);
     }
 
     public async Task<byte[]> RenderAllZipAsync(string clientGuidId, string webRootPath)
@@ -89,14 +107,19 @@ public class CertificationRiModelService(
                 {
                     byte[] bytes;
                     string extension;
+                    var xml = RfceSignatureDate.Complete(doc.XmlSent, docs
+                        .Where(d => d.CertificationProcessId == doc.CertificationProcessId
+                                    && d.ENcfSecuence == doc.ENcfSecuence
+                                    && d.CertificationDocumentId != doc.CertificationDocumentId)
+                        .Select(d => d.XmlSent));
                     if (format.Template is null)
                     {
-                        bytes = RiPdfRenderer.Render(ParseEcfType(doc.EcfType.Code), doc.XmlSent, company);
+                        bytes = RiPdfRenderer.Render(ParseEcfType(doc.EcfType.Code), xml, company);
                         extension = "pdf";
                     }
                     else
                     {
-                        bytes = Encoding.UTF8.GetBytes(RiHtmlRenderer.Render(format.Template.Html, doc.XmlSent, company, format.SampleDataJson, logo));
+                        bytes = Encoding.UTF8.GetBytes(RiHtmlRenderer.Render(format.Template.Html, xml, company, format.SampleDataJson, logo));
                         extension = "html";
                     }
 
