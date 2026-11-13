@@ -40,10 +40,18 @@ bucle existente del seed:
 
 ## Contenido de las muestras
 
-Todos los ítems llevan `itemType` 2 (servicio). Los de alquiler van gravados
-(`billingIndicator` 1, ITBIS 18%). Los tipos 46 y 47 conservan el indicador de su
-plantilla (exportación y pagos al exterior). Se conservan los montos, RNC y demás
-campos de la plantilla.
+Todos los ítems llevan `itemType` 2 (servicio). Las plantillas de Transporte de las que
+se parte son todas exentas (`billingIndicator` 4; la 46 usa 3), así que el indicador se
+cambia donde la regla fiscal lo permite:
+
+- Gravados con ITBIS 18% (`billingIndicator` 1): tipos 31, 32, 33, 34, 41 y 45.
+- Conservan el indicador de su plantilla: 43 (gastos menores, que no lleva ITBIS), 44
+  (regímenes especiales, exentos), 46 (exportación, 3) y 47 (pagos al exterior, 4).
+  Sus ítems adicionales, cuando los hay (44), también son exentos.
+
+Se conservan los montos, RNC y demás campos de la plantilla. El XSD solo valida el
+esquema, no la regla de gravado o exento, por lo que esta decisión sigue la norma
+y no se puede comprobar de forma automática.
 
 | e-CF | Ítem principal (reemplaza al de la plantilla) | Ítems adicionales |
 |---|---|---|
@@ -74,13 +82,14 @@ exigido por su regla, aunque no sea realista para un alquiler diario.
   mapa de nombres de ítems, el mapa de ítems adicionales y su aplicación en el bucle
   (misma estructura que el bloque de Clínica).
 - `ZynstormECFPlatform.Services/Certification/SimulationSampleGenerator.cs`: caso
-  `"Renta de Vehículos"` con ítems de alquiler (servicio, gravados).
+  `"Renta de Vehículos"` con ítems de alquiler (servicio, gravados). Es la ruta que
+  regenera las muestras desde el servicio de simulación; la migración usa el seed.
 - Migración `AddRentaVehiculosBusinessType`, generada con `dotnet ef`, con el
   `InsertData` del tipo y de las 10 muestras, y su `Down`.
 - `ZynstormECFPlatform.Tests`: prueba que verifica que el tipo 15 produce las 10 muestras
   y que cada `JsonData` es JSON válido con al menos un ítem de servicio.
-- Frontend: sin cambios previstos, porque el selector carga los tipos desde la API. Se
-  confirma al implementar.
+- Frontend: sin cambios. Se comprobó que no hay listas fijas de tipos de negocio en el
+  frontend ni en el backend fuera del seed y del generador; el selector los carga de la API.
 
 ## Fuera de alcance
 
