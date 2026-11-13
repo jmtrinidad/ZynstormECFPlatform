@@ -13,6 +13,7 @@ using ZynstormECFPlatform.Core.Entities;
 using ZynstormECFPlatform.Core.Enums;
 using ZynstormECFPlatform.Dtos;
 using ZynstormECFPlatform.Services.Billing;
+using ZynstormECFPlatform.Services.Notifications;
 using ZynstormECFPlatform.Services.Production;
 
 namespace ZynstormECFPlatform.Services.Jobs;
@@ -242,15 +243,13 @@ public class EcfTrackingJob
             return;
         }
 
-        int targetNotificationTypeId = statusId == 10 ? 1 : 2;
+        int targetNotificationTypeId = statusId == 10
+            ? NotificationSubscriptionPolicy.InvoiceAccepted
+            : NotificationSubscriptionPolicy.InvoiceRejected;
 
         var usersToNotify = userClients
             .Select(uc => uc.User)
-            .Where(u =>
-            {
-                var config = u.UserNotificationConfigurations.FirstOrDefault(c => c.NotificationTypeId == targetNotificationTypeId);
-                return config == null || config.IsEnabled;
-            })
+            .Where(u => NotificationSubscriptionPolicy.IsSubscribed(u, targetNotificationTypeId))
             .ToList();
 
         if (!usersToNotify.Any())

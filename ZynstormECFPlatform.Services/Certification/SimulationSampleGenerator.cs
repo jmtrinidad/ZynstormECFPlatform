@@ -28,6 +28,15 @@ public static class SimulationSampleGenerator
                 new() { NombreItem = "Terapia Física (Sesión)", CantidadItem = 3, PrecioUnitarioItem = 1000, MontoItem = 3000, IndicadorFacturacion = "0", IndicadorBienoServicio = "2" },
                 new() { NombreItem = "Mascarillas y Material Descartable", CantidadItem = 3, PrecioUnitarioItem = 125, MontoItem = 375, IndicadorFacturacion = "1", IndicadorBienoServicio = "1" } // Gravado (bien)
             },
+            "Renta de Vehículos" => new List<EcfItemRequestDto>
+            {
+                // IndicadorBienoServicio = "2": todos son servicios de alquiler, gravados con ITBIS 18%.
+                new() { NombreItem = "Alquiler Kia Picanto 2025 (Día)", CantidadItem = 1, PrecioUnitarioItem = 2400, MontoItem = 2400, IndicadorFacturacion = "1", IndicadorBienoServicio = "2" },
+                new() { NombreItem = "Alquiler Nissan Sentra SV (Día)", CantidadItem = 1, PrecioUnitarioItem = 2100, MontoItem = 2100, IndicadorFacturacion = "1", IndicadorBienoServicio = "2" },
+                new() { NombreItem = "Alquiler Scooter CFMOTO 150cc (Día)", CantidadItem = 2, PrecioUnitarioItem = 900, MontoItem = 1800, IndicadorFacturacion = "1", IndicadorBienoServicio = "2" },
+                new() { NombreItem = "Entrega y Recogida a Domicilio", CantidadItem = 1, PrecioUnitarioItem = 500, MontoItem = 500, IndicadorFacturacion = "1", IndicadorBienoServicio = "2" },
+                new() { NombreItem = "Casco y Accesorios", CantidadItem = 2, PrecioUnitarioItem = 300, MontoItem = 600, IndicadorFacturacion = "1", IndicadorBienoServicio = "2" }
+            },
             "Repuesto" => new List<EcfItemRequestDto>
             {
                 new() { NombreItem = "Pastillas de Freno Delanteras", CantidadItem = 1, PrecioUnitarioItem = 2500, MontoItem = 2500, IndicadorFacturacion = "1" },
