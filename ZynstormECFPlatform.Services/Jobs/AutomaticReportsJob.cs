@@ -10,6 +10,7 @@ using ZynstormECFPlatform.Abstractions.Data;
 using ZynstormECFPlatform.Abstractions.Services;
 using ZynstormECFPlatform.Common;
 using ZynstormECFPlatform.Core.Entities;
+using ZynstormECFPlatform.Services.Notifications;
 using ZynstormECFPlatform.Services.Reports;
 
 namespace ZynstormECFPlatform.Services.Jobs;
@@ -59,11 +60,7 @@ public class AutomaticReportsJob
 
                 var usersToNotify = userClients
                     .Select(uc => uc.User)
-                    .Where(u =>
-                    {
-                        var config = u.UserNotificationConfigurations.FirstOrDefault(c => c.NotificationTypeId == 3);
-                        return config == null || config.IsEnabled;
-                    })
+                    .Where(u => NotificationSubscriptionPolicy.IsSubscribed(u, NotificationSubscriptionPolicy.DailyReport))
                     .ToList();
 
                 bool hasExternalEmails = !string.IsNullOrWhiteSpace(client.DailyReportEmails);
@@ -117,11 +114,7 @@ public class AutomaticReportsJob
 
                 var usersToNotify = userClients
                     .Select(uc => uc.User)
-                    .Where(u =>
-                    {
-                        var config = u.UserNotificationConfigurations.FirstOrDefault(c => c.NotificationTypeId == 4);
-                        return config == null || config.IsEnabled;
-                    })
+                    .Where(u => NotificationSubscriptionPolicy.IsSubscribed(u, NotificationSubscriptionPolicy.WeeklyReport))
                     .ToList();
 
                 bool hasExternalEmails = !string.IsNullOrWhiteSpace(client.WeeklyReportEmails);
