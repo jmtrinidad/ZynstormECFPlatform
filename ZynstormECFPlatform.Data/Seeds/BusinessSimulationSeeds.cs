@@ -243,14 +243,14 @@ public static class BusinessSimulationSeeds
                 BusinessSimulationSampleId = 21, BusinessTypeId = 12, EcfType = "31", 
                 Name = "Tienda Electrodomésticos Crédito Fiscal", Description = "Ejemplo validado para Tipo 31.",
                 GuidId = "98765432-1234-5678-90ab-cdef12345621", RegisteredAt = DateTime.Parse("2026-05-08T00:00:00Z"),
-                JsonData = "{\"ncf\":\"E310000000001\",\"customerRnc\":\"130862346\",\"customerName\":\"IT SOLUCLICK SRL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"NEVERA SAMSUNG BESPOKE 23 P3\",\"quantity\":1,\"unitPrice\":85000.00,\"billingIndicator\":1},{\"name\":\"TELEVISOR LG OLED 55\\\"\",\"quantity\":1,\"unitPrice\":65000.00,\"billingIndicator\":1}]}"
+                JsonData = "{\"ncf\":\"E310000000001\",\"customerRnc\":\"130862346\",\"customerName\":\"IT SOLUCLICK SRL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"NEVERA SAMSUNG BESPOKE 23 P3\",\"quantity\":1,\"unitPrice\":85000.00,\"billingIndicator\":1,\"taxPercentage\":18},{\"name\":\"TELEVISOR LG OLED 55\\\"\",\"quantity\":1,\"unitPrice\":65000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}"
             },
             new BusinessSimulationSample 
             { 
                 BusinessSimulationSampleId = 22, BusinessTypeId = 12, EcfType = "32", 
                 Name = "Tienda Electrodomésticos Consumo", Description = "Ejemplo validado para Tipo 32.",
                 GuidId = "98765432-1234-5678-90ab-cdef12345622", RegisteredAt = DateTime.Parse("2026-05-08T00:00:00Z"),
-                JsonData = "{\"ncf\":\"E320000000001\",\"customerRnc\":\"22400000000\",\"customerName\":\"CONSUMIDOR FINAL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"LICUADORA NINJA PROFESSIONAL\",\"quantity\":1,\"unitPrice\":8500.00,\"billingIndicator\":1},{\"name\":\"FREIDORA DE AIRE DIGITAL 5.5L\",\"quantity\":1,\"unitPrice\":7200.00,\"billingIndicator\":1}]}"
+                JsonData = "{\"ncf\":\"E320000000001\",\"customerRnc\":\"22400000000\",\"customerName\":\"CONSUMIDOR FINAL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"LICUADORA NINJA PROFESSIONAL\",\"quantity\":1,\"unitPrice\":8500.00,\"billingIndicator\":1,\"taxPercentage\":18},{\"name\":\"FREIDORA DE AIRE DIGITAL 5.5L\",\"quantity\":1,\"unitPrice\":7200.00,\"billingIndicator\":1,\"taxPercentage\":18}]}"
             },
             // --- MUEBLERÍA ---
             new BusinessSimulationSample 
@@ -258,14 +258,14 @@ public static class BusinessSimulationSeeds
                 BusinessSimulationSampleId = 23, BusinessTypeId = 13, EcfType = "31", 
                 Name = "Mueblería Crédito Fiscal", Description = "Ejemplo validado para Tipo 31.",
                 GuidId = "98765432-1234-5678-90ab-cdef12345623", RegisteredAt = DateTime.Parse("2026-05-08T00:00:00Z"),
-                JsonData = "{\"ncf\":\"E310000000001\",\"customerRnc\":\"131880657\",\"customerName\":\"MUEBLES Y DECORACIONES S.A.\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"JUEGO DE COMEDOR MODERNO 6 SILLAS\",\"quantity\":1,\"unitPrice\":45000.00,\"billingIndicator\":1}]}"
+                JsonData = "{\"ncf\":\"E310000000001\",\"customerRnc\":\"131880657\",\"customerName\":\"MUEBLES Y DECORACIONES S.A.\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"JUEGO DE COMEDOR MODERNO 6 SILLAS\",\"quantity\":1,\"unitPrice\":45000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}"
             },
             new BusinessSimulationSample 
             { 
                 BusinessSimulationSampleId = 24, BusinessTypeId = 13, EcfType = "32", 
                 Name = "Mueblería Consumo", Description = "Ejemplo validado para Tipo 32.",
                 GuidId = "98765432-1234-5678-90ab-cdef12345624", RegisteredAt = DateTime.Parse("2026-05-08T00:00:00Z"),
-                JsonData = "{\"ncf\":\"E320000000001\",\"customerRnc\":\"22400000000\",\"customerName\":\"CONSUMIDOR FINAL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"SOFA SECCIONAL EN TELA GRIS\",\"quantity\":1,\"unitPrice\":38000.00,\"billingIndicator\":1},{\"name\":\"CAMA QUEEN SIZE CON BASE\",\"quantity\":1,\"unitPrice\":22000.00,\"billingIndicator\":1}]}"
+                JsonData = "{\"ncf\":\"E320000000001\",\"customerRnc\":\"22400000000\",\"customerName\":\"CONSUMIDOR FINAL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"SOFA SECCIONAL EN TELA GRIS\",\"quantity\":1,\"unitPrice\":38000.00,\"billingIndicator\":1,\"taxPercentage\":18},{\"name\":\"CAMA QUEEN SIZE CON BASE\",\"quantity\":1,\"unitPrice\":22000.00,\"billingIndicator\":1,\"taxPercentage\":18}]}"
             }
         };
 
@@ -316,11 +316,13 @@ public static class BusinessSimulationSeeds
                    + ",{\"name\":\"ELECTROCARDIOGRAMA 12 DERIVACIONES\",\"quantity\":1,\"unitPrice\":900.00," + clinicExempt,
         };
 
-        // Renta de Vehículos (Id 15): mismas plantillas validadas de Transporte. Se temátican
-        // los nombres de los ítems y se marcan como servicio (itemType 2). Las plantillas son
-        // exentas (4), así que se pasan a gravado (1, ITBIS 18%) solo en los tipos donde la
-        // norma lo permite; 43 (gastos menores), 44 (regímenes especiales), 46 (exportación)
-        // y 47 (pagos al exterior) conservan el indicador de su plantilla.
+        // Renta de Vehículos (Id 15): mismas plantillas validadas de Transporte. Se temátican los
+        // nombres de los ítems y se marcan como servicio (itemType 2). Las plantillas son exentas
+        // (4), así que se pasan a gravado (1, ITBIS 18%) en los tipos 31, 32, 33, 34, 41 y 45
+        // con "taxPercentage":18 explícito, como las muestras de Farmacia que la DGII acepta:
+        // el simulador calcula el ITBIS con TaxPercentage, y sin él un ítem gravado sale con
+        // TotalITBIS1 = 0 y la DGII lo rechaza. 43 (gastos menores), 44 (regímenes especiales),
+        // 46 (exportación) y 47 (pagos al exterior) conservan el indicador de su plantilla.
         var rentalItemNames = new Dictionary<string, (string From, string To)>
         {
             ["31"] = ("CEDEBRAL 5000 JARABE", "ALQUILER KIA PICANTO 2025 (DIA)"),
@@ -338,8 +340,8 @@ public static class BusinessSimulationSeeds
         var rentalTaxedTypes = new HashSet<string> { "31", "32", "33", "34", "41", "45" };
 
         // Ítems adicionales después del ítem principal en los tipos con detalle libre
-        // (31, 32, 44, 45). El tipo 44 usa ítems exentos; el resto, gravados.
-        const string rentalTaxed = "\"billingIndicator\":1,\"itemType\":2}";
+        // (31, 32, 44, 45). El tipo 44 usa ítems exentos; el resto, gravados con taxPercentage 18.
+        const string rentalTaxed = "\"billingIndicator\":1,\"taxPercentage\":18,\"itemType\":2}";
         const string rentalExempt = "\"billingIndicator\":4,\"itemType\":2}";
         var rentalExtraItems = new Dictionary<string, string>
         {
@@ -381,10 +383,10 @@ public static class BusinessSimulationSeeds
                     // Ítem principal tematizado y marcado como servicio (itemType 2).
                     json = json.Replace($"\"name\":\"{rentalName.From}\"", $"\"name\":\"{rentalName.To}\",\"itemType\":2");
 
-                    // La plantilla es exenta (4); se pasa a gravado antes de insertar los extras,
-                    // que ya traen su propio indicador.
+                    // La plantilla es exenta (4); se pasa a gravado con taxPercentage 18 explícito
+                    // antes de insertar los extras, que ya traen su propio indicador.
                     if (rentalTaxedTypes.Contains(ecfType))
-                        json = json.Replace("\"billingIndicator\":4", "\"billingIndicator\":1");
+                        json = json.Replace("\"billingIndicator\":4", "\"billingIndicator\":1,\"taxPercentage\":18");
 
                     if (rentalExtraItems.TryGetValue(ecfType, out var rentalExtra))
                     {

@@ -35,7 +35,7 @@ public class RentaVehiculosSeedTests
     private static IDictionary<string, object?> RentaSample(string ecfType) =>
         SamplesOf(RentaId).Single(d => (string)d["EcfType"]! == ecfType);
 
-    private record Item(string Name, decimal Quantity, decimal UnitPrice, int BillingIndicator, int ItemType);
+    private record Item(string Name, decimal Quantity, decimal UnitPrice, int BillingIndicator, int ItemType, decimal TaxPercentage);
 
     private static List<Item> ItemsOf(string ecfType)
     {
@@ -46,7 +46,8 @@ public class RentaVehiculosSeedTests
                 e.GetProperty("quantity").GetDecimal(),
                 e.GetProperty("unitPrice").GetDecimal(),
                 e.GetProperty("billingIndicator").GetInt32(),
-                e.GetProperty("itemType").GetInt32()))
+                e.GetProperty("itemType").GetInt32(),
+                e.TryGetProperty("taxPercentage", out var tax) ? tax.GetDecimal() : 0m))
             .ToList();
     }
 
@@ -126,20 +127,28 @@ public class RentaVehiculosSeedTests
         Assert.Equal(expectedCount, ItemsOf(ecfType).Count);
     }
 
+    // Gravados con ITBIS 18% (indicador 1) llevan TaxPercentage 18 explícito, como las muestras de
+    // Farmacia que la DGII acepta: el simulador calcula el ITBIS con TaxPercentage y, si falta,
+    // el comprobante sale con TotalITBIS1 = 0 y la DGII lo rechaza. 43, 44 y 47 no llevan ITBIS
+    // (exentos, 4) y la exportación (46) conserva su indicador 3.
     [Theory]
-    [InlineData("31", 1)]
-    [InlineData("32", 1)]
-    [InlineData("33", 1)]
-    [InlineData("34", 1)]
-    [InlineData("41", 1)]
-    [InlineData("45", 1)]
-    [InlineData("43", 4)]
-    [InlineData("44", 4)]
-    [InlineData("46", 3)]
-    [InlineData("47", 4)]
-    public void BillingIndicator_FollowsTaxRule(string ecfType, int expectedIndicator)
+    [InlineData("31", 1, 18)]
+    [InlineData("32", 1, 18)]
+    [InlineData("33", 1, 18)]
+    [InlineData("34", 1, 18)]
+    [InlineData("41", 1, 18)]
+    [InlineData("45", 1, 18)]
+    [InlineData("43", 4, 0)]
+    [InlineData("44", 4, 0)]
+    [InlineData("46", 3, 0)]
+    [InlineData("47", 4, 0)]
+    public void BillingIndicatorAndTaxPercentage_FollowTheFarmaciaPattern(string ecfType, int expectedIndicator, int expectedTaxPercentage)
     {
-        Assert.All(ItemsOf(ecfType), i => Assert.Equal(expectedIndicator, i.BillingIndicator));
+        Assert.All(ItemsOf(ecfType), i =>
+        {
+            Assert.Equal(expectedIndicator, i.BillingIndicator);
+            Assert.Equal(expectedTaxPercentage, i.TaxPercentage);
+        });
     }
 
     [Fact]

@@ -40,18 +40,30 @@ bucle existente del seed:
 
 ## Contenido de las muestras
 
-Todos los ítems llevan `itemType` 2 (servicio). Las plantillas de Transporte de las que
-se parte son todas exentas (`billingIndicator` 4; la 46 usa 3), así que el indicador se
-cambia donde la regla fiscal lo permite:
+Todos los ítems llevan `itemType` 2 (servicio). Las plantillas de Transporte de las que se
+parte son exentas (`billingIndicator` 4; la 46 usa 3), así que el indicador se cambia donde
+la regla fiscal lo permite:
 
-- Gravados con ITBIS 18% (`billingIndicator` 1): tipos 31, 32, 33, 34, 41 y 45.
-- Conservan el indicador de su plantilla: 43 (gastos menores, que no lleva ITBIS), 44
-  (regímenes especiales, exentos), 46 (exportación, 3) y 47 (pagos al exterior, 4).
-  Sus ítems adicionales, cuando los hay (44), también son exentos.
+- Gravados con ITBIS 18%: tipos 31, 32, 33, 34, 41 y 45, con `"billingIndicator":1` y
+  **`"taxPercentage":18` explícito**, igual que las muestras de Farmacia que la DGII acepta.
+- Conservan el indicador de su plantilla, sin `taxPercentage`: 43 (gastos menores), 44
+  (regímenes especiales), 46 (exportación, 3) y 47 (pagos al exterior). Los ítems
+  adicionales del 44 también son exentos.
 
-Se conservan los montos, RNC y demás campos de la plantilla. El XSD solo valida el
-esquema, no la regla de gravado o exento, por lo que esta decisión sigue la norma
-y no se puede comprobar de forma automática.
+**Por qué `taxPercentage` explícito (2026-11-13).** La primera versión ponía solo
+`billingIndicator` 1 y la DGII la rechazó con "TotalITBIS no es válido" y "TotalITBIS1 no
+coincide con MontoGravado1 x ITBIS Tasa 1". El simulador (`OldCertificationSimulationService`
+y `OldEcfGeneratorService`) calcula el ITBIS de cada ítem con `TaxPercentage`, que vale 0 si
+la muestra no lo trae: el XML salía con monto gravado y ITBIS 0. Las muestras de Farmacia
+(ids 2 y siguientes de los negocios originales) llevan `TaxPercentage` explícito y no
+fallan. Las muestras gravadas de Electrodomésticos y Mueblería (ids 21 a 24) tenían el mismo
+defecto y se corrigieron igual.
+
+**Guarda a futuro.** `SeedSamplesItbisTests` genera el XML real de todas las muestras
+sembradas y exige que `TotalITBIS1` sea 18% de `MontoGravadoI1` y que `TotalITBIS` coincida.
+Una muestra gravada nueva sin `taxPercentage` hace fallar esa prueba antes de llegar a la DGII.
+
+Se conservan los montos, RNC y demás campos de la plantilla.
 
 | e-CF | Ítem principal (reemplaza al de la plantilla) | Ítems adicionales |
 |---|---|---|
