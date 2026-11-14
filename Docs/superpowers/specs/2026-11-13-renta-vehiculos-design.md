@@ -25,7 +25,7 @@ indicadores ya validados por la DGII.
 
 - `BusinessTypeId = 15`
 - `Name = "Renta de Vehículos"`
-- `Description = "Alquiler de vehículos, motos y buggies por día."`
+- `Description = "Alquiler de vehículos, motos y buggies por día (servicio gravado con ITBIS 18%)."`
 - `GuidId = "1d2e3f4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a"`
 - `RegisteredAt = 2026-11-13`
 
@@ -40,18 +40,28 @@ bucle existente del seed:
 
 ## Contenido de las muestras
 
-Todos los ítems llevan `itemType` 2 (servicio) y conservan el `billingIndicator` de la
-plantilla de Transporte: 4 (exento) en todos los tipos y 3 en la exportación (46). Es el
-mismo criterio de las muestras que la DGII ya acepta (Transporte, Clínica, etc.). Los ítems
-adicionales también son exentos.
+Todos los ítems llevan `itemType` 2 (servicio). Las plantillas de Transporte de las que se
+parte son exentas (`billingIndicator` 4; la 46 usa 3), así que el indicador se cambia donde
+la regla fiscal lo permite:
 
-**Corrección (2026-11-13).** La primera versión pasaba a gravado (`billingIndicator` 1)
-los tipos 31, 32, 33, 34, 41 y 45, y la DGII los rechazó con "TotalITBIS no es válido" y
-"TotalITBIS1 no coincide con MontoGravado1 x ITBIS Tasa 1". Causa: el simulador
-(`OldCertificationSimulationService` y `OldEcfGeneratorService`) calcula el ITBIS de cada
-ítem con `TaxPercentage`, que vale 0 si la muestra no lo trae. El XML salía con monto
-gravado y ITBIS 0. Las muestras ya aceptadas son todas exentas, y esta versión las imita.
-La migración `FixRentaVehiculosExemptSamples` corrige las filas ya insertadas.
+- Gravados con ITBIS 18%: tipos 31, 32, 33, 34, 41 y 45, con `"billingIndicator":1` y
+  **`"taxPercentage":18` explícito**, igual que las muestras de Farmacia que la DGII acepta.
+- Conservan el indicador de su plantilla, sin `taxPercentage`: 43 (gastos menores), 44
+  (regímenes especiales), 46 (exportación, 3) y 47 (pagos al exterior). Los ítems
+  adicionales del 44 también son exentos.
+
+**Por qué `taxPercentage` explícito (2026-11-13).** La primera versión ponía solo
+`billingIndicator` 1 y la DGII la rechazó con "TotalITBIS no es válido" y "TotalITBIS1 no
+coincide con MontoGravado1 x ITBIS Tasa 1". El simulador (`OldCertificationSimulationService`
+y `OldEcfGeneratorService`) calcula el ITBIS de cada ítem con `TaxPercentage`, que vale 0 si
+la muestra no lo trae: el XML salía con monto gravado y ITBIS 0. Las muestras de Farmacia
+(ids 2 y siguientes de los negocios originales) llevan `TaxPercentage` explícito y no
+fallan. Las muestras gravadas de Electrodomésticos y Mueblería (ids 21 a 24) tenían el mismo
+defecto y se corrigieron igual.
+
+**Guarda a futuro.** `SeedSamplesItbisTests` genera el XML real de todas las muestras
+sembradas y exige que `TotalITBIS1` sea 18% de `MontoGravadoI1` y que `TotalITBIS` coincida.
+Una muestra gravada nueva sin `taxPercentage` hace fallar esa prueba antes de llegar a la DGII.
 
 Se conservan los montos, RNC y demás campos de la plantilla.
 

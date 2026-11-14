@@ -35,7 +35,7 @@ public class RentaVehiculosSeedTests
     private static IDictionary<string, object?> RentaSample(string ecfType) =>
         SamplesOf(RentaId).Single(d => (string)d["EcfType"]! == ecfType);
 
-    private record Item(string Name, decimal Quantity, decimal UnitPrice, int BillingIndicator, int ItemType);
+    private record Item(string Name, decimal Quantity, decimal UnitPrice, int BillingIndicator, int ItemType, decimal TaxPercentage);
 
     private static List<Item> ItemsOf(string ecfType)
     {
@@ -46,7 +46,8 @@ public class RentaVehiculosSeedTests
                 e.GetProperty("quantity").GetDecimal(),
                 e.GetProperty("unitPrice").GetDecimal(),
                 e.GetProperty("billingIndicator").GetInt32(),
-                e.GetProperty("itemType").GetInt32()))
+                e.GetProperty("itemType").GetInt32(),
+                e.TryGetProperty("taxPercentage", out var tax) ? tax.GetDecimal() : 0m))
             .ToList();
     }
 
@@ -58,7 +59,9 @@ public class RentaVehiculosSeedTests
 
         Assert.Equal("Renta de Vehículos", type["Name"]);
         Assert.Equal("1d2e3f4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a", type["GuidId"]);
-        Assert.Equal("Alquiler de vehículos, motos y buggies por día.", type["Description"]);
+        Assert.Equal(
+            "Alquiler de vehículos, motos y buggies por día (servicio gravado con ITBIS 18%).",
+            type["Description"]);
     }
 
     [Fact]
@@ -124,23 +127,28 @@ public class RentaVehiculosSeedTests
         Assert.Equal(expectedCount, ItemsOf(ecfType).Count);
     }
 
-    // Igual que las muestras que la DGII ya acepta (Transporte, Clínica, etc.): exentas (4) y la
-    // de exportación (46) en 3. El simulador no rellena TaxPercentage, así que un ítem gravado (1)
-    // produce TotalITBIS1 = 0 y la DGII rechaza el comprobante.
+    // Gravados con ITBIS 18% (indicador 1) llevan TaxPercentage 18 explícito, como las muestras de
+    // Farmacia que la DGII acepta: el simulador calcula el ITBIS con TaxPercentage y, si falta,
+    // el comprobante sale con TotalITBIS1 = 0 y la DGII lo rechaza. 43, 44 y 47 no llevan ITBIS
+    // (exentos, 4) y la exportación (46) conserva su indicador 3.
     [Theory]
-    [InlineData("31", 4)]
-    [InlineData("32", 4)]
-    [InlineData("33", 4)]
-    [InlineData("34", 4)]
-    [InlineData("41", 4)]
-    [InlineData("43", 4)]
-    [InlineData("44", 4)]
-    [InlineData("45", 4)]
-    [InlineData("46", 3)]
-    [InlineData("47", 4)]
-    public void BillingIndicator_MatchesTheDgiiAcceptedSamples(string ecfType, int expectedIndicator)
+    [InlineData("31", 1, 18)]
+    [InlineData("32", 1, 18)]
+    [InlineData("33", 1, 18)]
+    [InlineData("34", 1, 18)]
+    [InlineData("41", 1, 18)]
+    [InlineData("45", 1, 18)]
+    [InlineData("43", 4, 0)]
+    [InlineData("44", 4, 0)]
+    [InlineData("46", 3, 0)]
+    [InlineData("47", 4, 0)]
+    public void BillingIndicatorAndTaxPercentage_FollowTheFarmaciaPattern(string ecfType, int expectedIndicator, int expectedTaxPercentage)
     {
-        Assert.All(ItemsOf(ecfType), i => Assert.Equal(expectedIndicator, i.BillingIndicator));
+        Assert.All(ItemsOf(ecfType), i =>
+        {
+            Assert.Equal(expectedIndicator, i.BillingIndicator);
+            Assert.Equal(expectedTaxPercentage, i.TaxPercentage);
+        });
     }
 
     [Fact]
@@ -158,12 +166,6 @@ public class RentaVehiculosSeedTests
             },
             items.Select(i => (i.Name, i.UnitPrice)).ToArray());
         Assert.All(items, i => Assert.Equal(2, i.ItemType));
-    }
-
-    [Fact]
-    public void Type31_ItemsAreExemptServices()
-    {
-        Assert.All(ItemsOf("31"), i => Assert.Equal(4, i.BillingIndicator));
     }
 
     [Fact]

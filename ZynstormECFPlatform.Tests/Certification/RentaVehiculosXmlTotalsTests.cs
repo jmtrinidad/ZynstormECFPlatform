@@ -1,111 +1,57 @@
-using System.Globalization;
-using System.Text.Json;
-using System.Xml.Linq;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
-using ZynstormECFPlatform.Core.Entities;
-using ZynstormECFPlatform.Data;
-using ZynstormECFPlatform.Services.Certification.OldSimulation;
-
 namespace ZynstormECFPlatform.Tests.Certification;
 
 /// <summary>
-/// La DGII rechazó las muestras de Renta con "TotalITBIS no es válido" y "TotalITBIS1 no coincide
-/// con MontoGravado1 x ITBIS tasa 1". Estas pruebas generan el XML real de cada muestra por el
-/// mismo camino de la simulación y verifican la coherencia de los totales de ITBIS.
+/// Totales del XML real que la simulación genera para las muestras de Renta de Vehículos. La
+/// primera versión salía con TotalITBIS1 = 0 y la DGII la rechazó; la cobertura general de todas
+/// las muestras está en SeedSamplesItbisTests.
 /// </summary>
 public class RentaVehiculosXmlTotalsTests
 {
     private const int RentaId = 15;
 
-    private static readonly IModel Model = BuildModel();
-
-    private static IModel BuildModel()
+    private static System.Xml.Linq.XElement Totales(string ecfType)
     {
-        var options = new DbContextOptionsBuilder<StorageContext>()
-            .UseNpgsql("Host=localhost;Database=model_only;Username=x;Password=x")
-            .Options;
-        using var context = new StorageContext(options);
-        return context.GetService<IDesignTimeModel>().Model;
+        var sample = SeedSampleXml.All().Single(s => s.BusinessTypeId == RentaId && s.EcfType == ecfType);
+        return SeedSampleXml.GenerateTotales(sample);
     }
 
-    private static string SampleJson(string ecfType) =>
-        (string)Model.FindEntityType(typeof(BusinessSimulationSample))!.GetSeedData()
-            .Single(d => (int)d["BusinessTypeId"]! == RentaId && (string)d["EcfType"]! == ecfType)["JsonData"]!;
-
-    private static XElement GenerateTotales(string ecfType)
-    {
-        var dto = JsonSerializer.Deserialize<OldEcfInvoiceRequestDto>(
-            SampleJson(ecfType), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
-
-        // Mismos valores que aplica la simulación antes de generar el XML.
-        dto.IssuerRnc = "133009889";
-        dto.IssuerName = "EMISOR DE PRUEBA SRL";
-        dto.IssuerAddress = "CALLE PRINCIPAL #1";
-        dto.IssuerPhone = "809-555-1234";
-        dto.IssuerActivityCode = "6201";
-        dto.EcfType = int.Parse(ecfType);
-        dto.IssueDate = new DateTime(2026, 11, 13);
-        dto.SequenceExpirationDate = new DateTime(2028, 12, 31);
-        dto.IncomeType ??= "01";
-        dto.PaymentType ??= 1;
-        if (dto.ReferenceNcf != null) dto.ReferenceIssueDate = new DateTime(2026, 11, 12);
-        OldCertificationSimulationService.ApplyItemDefaults(dto.Items);
-
-        var xml = new OldEcfGeneratorService().GenerateUnsignedXml(dto);
-        return XDocument.Parse(xml).Descendants("Totales").First();
-    }
-
-    private static decimal? Value(XElement totales, string name) =>
-        decimal.TryParse(totales.Element(name)?.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : null;
-
+    // Gravados con ITBIS 18%: el monto gravado a la tasa 1 existe y el ITBIS cuadra.
     [Theory]
     [InlineData("31")]
     [InlineData("32")]
     [InlineData("33")]
     [InlineData("34")]
     [InlineData("41")]
-    [InlineData("43")]
-    [InlineData("44")]
     [InlineData("45")]
-    [InlineData("46")]
-    [InlineData("47")]
-    public void Totales_ItbisIsConsistentWithTheTaxableAmount(string ecfType)
+    public void TaxedSamples_DeclareTaxableAmountWithMatchingItbis(string ecfType)
     {
-        AssertItbisConsistent(ecfType);
+        var totales = Totales(ecfType);
+
+        Assert.True(SeedSampleXml.Value(totales, "MontoGravadoI1") > 0);
+        Assert.True(SeedSampleXml.Value(totales, "TotalITBIS1") > 0);
+        SeedSampleXml.AssertItbisConsistent(totales);
     }
 
-    // Las muestras exentas no deben declarar monto gravado a la tasa 1 y sí su monto exento,
-    // como las muestras de Transporte y Clínica que la DGII acepta.
+    // 43 (gastos menores), 44 (regímenes especiales) y 47 (pagos al exterior) no llevan ITBIS:
+    // declaran solo monto exento, como las muestras de Transporte y Clínica.
     [Theory]
-    [InlineData("31")]
-    [InlineData("32")]
-    [InlineData("33")]
-    [InlineData("34")]
-    [InlineData("41")]
     [InlineData("43")]
     [InlineData("44")]
-    [InlineData("45")]
     [InlineData("47")]
-    public void Totales_ExemptSamplesDeclareExemptAmountOnly(string ecfType)
+    public void ExemptSamples_DeclareExemptAmountOnly(string ecfType)
     {
-        var totales = GenerateTotales(ecfType);
+        var totales = Totales(ecfType);
 
-        Assert.Null(Value(totales, "MontoGravadoI1"));
-        Assert.True(Value(totales, "MontoExento") > 0);
+        Assert.Null(SeedSampleXml.Value(totales, "MontoGravadoI1"));
+        Assert.True(SeedSampleXml.Value(totales, "MontoExento") > 0);
     }
 
-    private static void AssertItbisConsistent(string ecfType)
+    [Fact]
+    public void Type46_KeepsItsZeroRateExportTreatment()
     {
-        var totales = GenerateTotales(ecfType);
-        var gravadoI1 = Value(totales, "MontoGravadoI1");
+        var totales = Totales("46");
 
-        if (gravadoI1 is null)
-            return; // Sin monto gravado a la tasa 1 no hay ITBIS que cuadrar.
-
-        var expected = Math.Round(gravadoI1.Value * 0.18m, 2);
-        Assert.Equal(expected, Value(totales, "TotalITBIS1"));
-        Assert.Equal(expected, Value(totales, "TotalITBIS"));
+        Assert.Null(SeedSampleXml.Value(totales, "MontoGravadoI1"));
+        Assert.True(SeedSampleXml.Value(totales, "MontoGravadoI3") > 0);
     }
 }
