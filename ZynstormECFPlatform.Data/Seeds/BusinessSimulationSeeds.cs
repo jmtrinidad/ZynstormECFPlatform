@@ -26,7 +26,7 @@ public static class BusinessSimulationSeeds
             new BusinessType { BusinessTypeId = 12, Name = "Tienda de electrodomésticos", Description = "Venta de equipos para el hogar y dispositivos electrónicos.", GuidId = "8a9b0c1d-1e2f-3g4h-5i6j-8k9l0m1n2o3q", RegisteredAt = DateTime.Parse("2026-05-08T00:00:00Z") },
             new BusinessType { BusinessTypeId = 13, Name = "Mueblería", Description = "Venta de muebles, decoración y artículos para el hogar.", GuidId = "9b0c1d2e-3f4g-5h6i-7j8k-9l0m1n2o3p4r", RegisteredAt = DateTime.Parse("2026-05-08T00:00:00Z") },
             new BusinessType { BusinessTypeId = 14, Name = "Clínica/Servicio Ambulatorio", Description = "Consultas, procedimientos y servicios de salud ambulatorios (mayormente exentos de ITBIS).", GuidId = "0c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f", RegisteredAt = DateTime.Parse("2026-11-03T00:00:00Z") },
-            new BusinessType { BusinessTypeId = 15, Name = "Renta de Vehículos", Description = "Alquiler de vehículos, motos y buggies por día (servicio gravado con ITBIS 18%).", GuidId = "1d2e3f4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a", RegisteredAt = DateTime.Parse("2026-11-13T00:00:00Z") }
+            new BusinessType { BusinessTypeId = 15, Name = "Renta de Vehículos", Description = "Alquiler de vehículos, motos y buggies por día.", GuidId = "1d2e3f4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a", RegisteredAt = DateTime.Parse("2026-11-13T00:00:00Z") }
         };
 
         modelBuilder.Entity<BusinessType>().HasData(businessTypes);
@@ -316,11 +316,11 @@ public static class BusinessSimulationSeeds
                    + ",{\"name\":\"ELECTROCARDIOGRAMA 12 DERIVACIONES\",\"quantity\":1,\"unitPrice\":900.00," + clinicExempt,
         };
 
-        // Renta de Vehículos (Id 15): mismas plantillas validadas de Transporte. Se temátican
-        // los nombres de los ítems y se marcan como servicio (itemType 2). Las plantillas son
-        // exentas (4), así que se pasan a gravado (1, ITBIS 18%) solo en los tipos donde la
-        // norma lo permite; 43 (gastos menores), 44 (regímenes especiales), 46 (exportación)
-        // y 47 (pagos al exterior) conservan el indicador de su plantilla.
+        // Renta de Vehículos (Id 15): mismas plantillas validadas de Transporte. Solo se temátican
+        // los nombres de los ítems y se marcan como servicio (itemType 2). Los indicadores de
+        // facturación se conservan (4 = exento; 3 en la exportación), igual que en las muestras
+        // que la DGII ya acepta: el simulador no rellena TaxPercentage, por lo que un ítem
+        // gravado (1) produce TotalITBIS1 = 0 y la DGII rechaza el comprobante.
         var rentalItemNames = new Dictionary<string, (string From, string To)>
         {
             ["31"] = ("CEDEBRAL 5000 JARABE", "ALQUILER KIA PICANTO 2025 (DIA)"),
@@ -335,23 +335,20 @@ public static class BusinessSimulationSeeds
             ["47"] = ("SERVICIO PROFESIONAL EXTERIOR", "ALQUILER DE VEHICULO EN EL EXTERIOR"),
         };
 
-        var rentalTaxedTypes = new HashSet<string> { "31", "32", "33", "34", "41", "45" };
-
-        // Ítems adicionales después del ítem principal en los tipos con detalle libre
-        // (31, 32, 44, 45). El tipo 44 usa ítems exentos; el resto, gravados.
-        const string rentalTaxed = "\"billingIndicator\":1,\"itemType\":2}";
+        // Ítems adicionales (servicios exentos, como en Clínica) después del ítem principal en los
+        // tipos con detalle libre (31, 32, 44, 45).
         const string rentalExempt = "\"billingIndicator\":4,\"itemType\":2}";
         var rentalExtraItems = new Dictionary<string, string>
         {
-            ["31"] = "{\"name\":\"ALQUILER NISSAN SENTRA SV (DIA)\",\"quantity\":1,\"unitPrice\":2100.00," + rentalTaxed
-                   + ",{\"name\":\"ALQUILER SCOOTER CFMOTO 150CC (DIA)\",\"quantity\":1,\"unitPrice\":900.00," + rentalTaxed
-                   + ",{\"name\":\"ENTREGA Y RECOGIDA A DOMICILIO\",\"quantity\":1,\"unitPrice\":500.00," + rentalTaxed,
-            ["32"] = "{\"name\":\"ALQUILER SCOOTER SUZUKI AN 125 (DIA)\",\"quantity\":1,\"unitPrice\":600.00," + rentalTaxed
-                   + ",{\"name\":\"CASCO Y ACCESORIOS\",\"quantity\":1,\"unitPrice\":300.00," + rentalTaxed,
+            ["31"] = "{\"name\":\"ALQUILER NISSAN SENTRA SV (DIA)\",\"quantity\":1,\"unitPrice\":2100.00," + rentalExempt
+                   + ",{\"name\":\"ALQUILER SCOOTER CFMOTO 150CC (DIA)\",\"quantity\":1,\"unitPrice\":900.00," + rentalExempt
+                   + ",{\"name\":\"ENTREGA Y RECOGIDA A DOMICILIO\",\"quantity\":1,\"unitPrice\":500.00," + rentalExempt,
+            ["32"] = "{\"name\":\"ALQUILER SCOOTER SUZUKI AN 125 (DIA)\",\"quantity\":1,\"unitPrice\":600.00," + rentalExempt
+                   + ",{\"name\":\"CASCO Y ACCESORIOS\",\"quantity\":1,\"unitPrice\":300.00," + rentalExempt,
             ["44"] = "{\"name\":\"ALQUILER SYM FNX 200CC (DIA)\",\"quantity\":1,\"unitPrice\":900.00," + rentalExempt
                    + ",{\"name\":\"ENTREGA Y RECOGIDA A DOMICILIO\",\"quantity\":1,\"unitPrice\":500.00," + rentalExempt,
-            ["45"] = "{\"name\":\"ALQUILER SCOOTER SUZUKI AN 125 (DIA)\",\"quantity\":1,\"unitPrice\":600.00," + rentalTaxed
-                   + ",{\"name\":\"CASCO Y ACCESORIOS\",\"quantity\":1,\"unitPrice\":300.00," + rentalTaxed,
+            ["45"] = "{\"name\":\"ALQUILER SCOOTER SUZUKI AN 125 (DIA)\",\"quantity\":1,\"unitPrice\":600.00," + rentalExempt
+                   + ",{\"name\":\"CASCO Y ACCESORIOS\",\"quantity\":1,\"unitPrice\":300.00," + rentalExempt,
         };
 
         var nextId = samples.Max(s => s.BusinessSimulationSampleId) + 1;
@@ -380,11 +377,6 @@ public static class BusinessSimulationSeeds
                 {
                     // Ítem principal tematizado y marcado como servicio (itemType 2).
                     json = json.Replace($"\"name\":\"{rentalName.From}\"", $"\"name\":\"{rentalName.To}\",\"itemType\":2");
-
-                    // La plantilla es exenta (4); se pasa a gravado antes de insertar los extras,
-                    // que ya traen su propio indicador.
-                    if (rentalTaxedTypes.Contains(ecfType))
-                        json = json.Replace("\"billingIndicator\":4", "\"billingIndicator\":1");
 
                     if (rentalExtraItems.TryGetValue(ecfType, out var rentalExtra))
                     {

@@ -25,7 +25,7 @@ indicadores ya validados por la DGII.
 
 - `BusinessTypeId = 15`
 - `Name = "Renta de Vehículos"`
-- `Description = "Alquiler de vehículos, motos y buggies por día (servicio gravado con ITBIS 18%)."`
+- `Description = "Alquiler de vehículos, motos y buggies por día."`
 - `GuidId = "1d2e3f4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a"`
 - `RegisteredAt = 2026-11-13`
 
@@ -40,18 +40,20 @@ bucle existente del seed:
 
 ## Contenido de las muestras
 
-Todos los ítems llevan `itemType` 2 (servicio). Las plantillas de Transporte de las que
-se parte son todas exentas (`billingIndicator` 4; la 46 usa 3), así que el indicador se
-cambia donde la regla fiscal lo permite:
+Todos los ítems llevan `itemType` 2 (servicio) y conservan el `billingIndicator` de la
+plantilla de Transporte: 4 (exento) en todos los tipos y 3 en la exportación (46). Es el
+mismo criterio de las muestras que la DGII ya acepta (Transporte, Clínica, etc.). Los ítems
+adicionales también son exentos.
 
-- Gravados con ITBIS 18% (`billingIndicator` 1): tipos 31, 32, 33, 34, 41 y 45.
-- Conservan el indicador de su plantilla: 43 (gastos menores, que no lleva ITBIS), 44
-  (regímenes especiales, exentos), 46 (exportación, 3) y 47 (pagos al exterior, 4).
-  Sus ítems adicionales, cuando los hay (44), también son exentos.
+**Corrección (2026-11-13).** La primera versión pasaba a gravado (`billingIndicator` 1)
+los tipos 31, 32, 33, 34, 41 y 45, y la DGII los rechazó con "TotalITBIS no es válido" y
+"TotalITBIS1 no coincide con MontoGravado1 x ITBIS Tasa 1". Causa: el simulador
+(`OldCertificationSimulationService` y `OldEcfGeneratorService`) calcula el ITBIS de cada
+ítem con `TaxPercentage`, que vale 0 si la muestra no lo trae. El XML salía con monto
+gravado y ITBIS 0. Las muestras ya aceptadas son todas exentas, y esta versión las imita.
+La migración `FixRentaVehiculosExemptSamples` corrige las filas ya insertadas.
 
-Se conservan los montos, RNC y demás campos de la plantilla. El XSD solo valida el
-esquema, no la regla de gravado o exento, por lo que esta decisión sigue la norma
-y no se puede comprobar de forma automática.
+Se conservan los montos, RNC y demás campos de la plantilla.
 
 | e-CF | Ítem principal (reemplaza al de la plantilla) | Ítems adicionales |
 |---|---|---|

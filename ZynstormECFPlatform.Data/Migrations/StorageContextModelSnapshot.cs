@@ -2257,7 +2257,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0015-000000000031",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E310000000001\",\"customerRnc\":\"130862346\",\"customerName\":\"IT SOLUCLICK SRL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"ALQUILER KIA PICANTO 2025 (DIA)\",\"itemType\":2,\"quantity\":1,\"unitPrice\":244.00,\"billingIndicator\":1},{\"name\":\"ALQUILER NISSAN SENTRA SV (DIA)\",\"quantity\":1,\"unitPrice\":2100.00,\"billingIndicator\":1,\"itemType\":2},{\"name\":\"ALQUILER SCOOTER CFMOTO 150CC (DIA)\",\"quantity\":1,\"unitPrice\":900.00,\"billingIndicator\":1,\"itemType\":2},{\"name\":\"ENTREGA Y RECOGIDA A DOMICILIO\",\"quantity\":1,\"unitPrice\":500.00,\"billingIndicator\":1,\"itemType\":2}]}",
+                            JsonData = "{\"ncf\":\"E310000000001\",\"customerRnc\":\"130862346\",\"customerName\":\"IT SOLUCLICK SRL\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"ALQUILER KIA PICANTO 2025 (DIA)\",\"itemType\":2,\"quantity\":1,\"unitPrice\":244.00,\"billingIndicator\":4},{\"name\":\"ALQUILER NISSAN SENTRA SV (DIA)\",\"quantity\":1,\"unitPrice\":2100.00,\"billingIndicator\":4,\"itemType\":2},{\"name\":\"ALQUILER SCOOTER CFMOTO 150CC (DIA)\",\"quantity\":1,\"unitPrice\":900.00,\"billingIndicator\":4,\"itemType\":2},{\"name\":\"ENTREGA Y RECOGIDA A DOMICILIO\",\"quantity\":1,\"unitPrice\":500.00,\"billingIndicator\":4,\"itemType\":2}]}",
                             Name = "Renta de Vehículos - Tipo 31",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -2270,7 +2270,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0015-000000000032",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E320000000001\",\"customerRnc\":\"40208719662\",\"customerName\":\"BRYAN TORRES\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"ALQUILER BUGGY CF MOTO UFORCE 600 (DIA)\",\"itemType\":2,\"quantity\":2,\"unitPrice\":300000.00,\"billingIndicator\":1},{\"name\":\"ALQUILER SCOOTER SUZUKI AN 125 (DIA)\",\"quantity\":1,\"unitPrice\":600.00,\"billingIndicator\":1,\"itemType\":2},{\"name\":\"CASCO Y ACCESORIOS\",\"quantity\":1,\"unitPrice\":300.00,\"billingIndicator\":1,\"itemType\":2}]}",
+                            JsonData = "{\"ncf\":\"E320000000001\",\"customerRnc\":\"40208719662\",\"customerName\":\"BRYAN TORRES\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"ALQUILER BUGGY CF MOTO UFORCE 600 (DIA)\",\"itemType\":2,\"quantity\":2,\"unitPrice\":300000.00,\"billingIndicator\":4},{\"name\":\"ALQUILER SCOOTER SUZUKI AN 125 (DIA)\",\"quantity\":1,\"unitPrice\":600.00,\"billingIndicator\":4,\"itemType\":2},{\"name\":\"CASCO Y ACCESORIOS\",\"quantity\":1,\"unitPrice\":300.00,\"billingIndicator\":4,\"itemType\":2}]}",
                             Name = "Renta de Vehículos - Tipo 32",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -2283,7 +2283,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0015-000000000033",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E330000000001\",\"customerRnc\":\"131880657\",\"customerName\":\"CLIENTES DE LA ADMINISTRACION\",\"incomeType\":\"01\",\"paymentType\":1,\"referenceNcf\":\"E310000000002\",\"referenceReasonCode\":3,\"items\":[{\"name\":\"AJUSTE POR DIAS DE ALQUILER\",\"itemType\":2,\"quantity\":1,\"unitPrice\":203898.31,\"billingIndicator\":1}]}",
+                            JsonData = "{\"ncf\":\"E330000000001\",\"customerRnc\":\"131880657\",\"customerName\":\"CLIENTES DE LA ADMINISTRACION\",\"incomeType\":\"01\",\"paymentType\":1,\"referenceNcf\":\"E310000000002\",\"referenceReasonCode\":3,\"items\":[{\"name\":\"AJUSTE POR DIAS DE ALQUILER\",\"itemType\":2,\"quantity\":1,\"unitPrice\":203898.31,\"billingIndicator\":4}]}",
                             Name = "Renta de Vehículos - Tipo 33",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -2296,7 +2296,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0015-000000000034",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E340000000001\",\"customerRnc\":\"131880657\",\"customerName\":\"CLIENTES DE LA ADMINISTRACION\",\"incomeType\":\"01\",\"paymentType\":2,\"referenceNcf\":\"E310000000002\",\"referenceReasonCode\":3,\"items\":[{\"name\":\"CARGO ADICIONAL POR KILOMETRAJE Y COMBUSTIBLE\",\"itemType\":2,\"quantity\":5,\"unitPrice\":601.00,\"billingIndicator\":1}]}",
+                            JsonData = "{\"ncf\":\"E340000000001\",\"customerRnc\":\"131880657\",\"customerName\":\"CLIENTES DE LA ADMINISTRACION\",\"incomeType\":\"01\",\"paymentType\":2,\"referenceNcf\":\"E310000000002\",\"referenceReasonCode\":3,\"items\":[{\"name\":\"CARGO ADICIONAL POR KILOMETRAJE Y COMBUSTIBLE\",\"itemType\":2,\"quantity\":5,\"unitPrice\":601.00,\"billingIndicator\":4}]}",
                             Name = "Renta de Vehículos - Tipo 34",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -2309,7 +2309,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0015-000000000041",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"MANTENIMIENTO Y LAVADO DE FLOTA\",\"itemType\":2,\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":1}]}",
+                            JsonData = "{\"ncf\":\"E410000000001\",\"customerRnc\":\"00100325067\",\"customerName\":\"ENRIQUE CAMILO SANTOS TAVAREZ\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"MANTENIMIENTO Y LAVADO DE FLOTA\",\"itemType\":2,\"quantity\":1,\"unitPrice\":1000.00,\"billingIndicator\":4}]}",
                             Name = "Renta de Vehículos - Tipo 41",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -2348,7 +2348,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                             GuidId = "00000000-0000-0000-0015-000000000045",
                             IsDeleted = false,
                             IsDgiiApproved = false,
-                            JsonData = "{\"ncf\":\"E450000000001\",\"customerRnc\":\"401506459\",\"customerName\":\"PLAN DE ASISTENCIA SOCIAL DE LA PRESIDENCIA\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"ALQUILER SCOOTER SYM FNX 200CC (DIA)\",\"itemType\":2,\"quantity\":1,\"unitPrice\":1197.00,\"billingIndicator\":1},{\"name\":\"ALQUILER SCOOTER SUZUKI AN 125 (DIA)\",\"quantity\":1,\"unitPrice\":600.00,\"billingIndicator\":1,\"itemType\":2},{\"name\":\"CASCO Y ACCESORIOS\",\"quantity\":1,\"unitPrice\":300.00,\"billingIndicator\":1,\"itemType\":2}]}",
+                            JsonData = "{\"ncf\":\"E450000000001\",\"customerRnc\":\"401506459\",\"customerName\":\"PLAN DE ASISTENCIA SOCIAL DE LA PRESIDENCIA\",\"incomeType\":\"01\",\"paymentType\":1,\"items\":[{\"name\":\"ALQUILER SCOOTER SYM FNX 200CC (DIA)\",\"itemType\":2,\"quantity\":1,\"unitPrice\":1197.00,\"billingIndicator\":4},{\"name\":\"ALQUILER SCOOTER SUZUKI AN 125 (DIA)\",\"quantity\":1,\"unitPrice\":600.00,\"billingIndicator\":4,\"itemType\":2},{\"name\":\"CASCO Y ACCESORIOS\",\"quantity\":1,\"unitPrice\":300.00,\"billingIndicator\":4,\"itemType\":2}]}",
                             Name = "Renta de Vehículos - Tipo 45",
                             RegisteredAt = new DateTime(2026, 5, 6, 20, 0, 0, 0, DateTimeKind.Local)
                         },
@@ -2557,7 +2557,7 @@ namespace ZynstormECFPlatform.Data.Migrations
                         new
                         {
                             BusinessTypeId = 15,
-                            Description = "Alquiler de vehículos, motos y buggies por día (servicio gravado con ITBIS 18%).",
+                            Description = "Alquiler de vehículos, motos y buggies por día.",
                             GuidId = "1d2e3f4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a",
                             IsDeleted = false,
                             Name = "Renta de Vehículos",
